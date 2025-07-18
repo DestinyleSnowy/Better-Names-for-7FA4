@@ -14,12 +14,12 @@
     'use strict';
 
     const DEFAULT_MAX_UNITS = 10;
-    let storedUnits = GM_getValue('maxNameUnits', DEFAULT_MAX_UNITS);
-    let maxUnits    = (storedUnits === 'none') ? Infinity : parseInt(storedUnits, 10);
-    let hideAvatar  = GM_getValue('hideAvatar', false);
-    let enableCopy  = GM_getValue('enableCopy', false);
-    let copyNotify  = GM_getValue('copyNotify', false);
-    let hideOrig    = GM_getValue('hideOrig', false);
+    const storedUnits = GM_getValue('maxNameUnits', DEFAULT_MAX_UNITS);
+    const maxUnits    = (storedUnits === 'none') ? Infinity : parseInt(storedUnits, 10);
+    const hideAvatar  = GM_getValue('hideAvatar', false);
+    const enableCopy  = GM_getValue('enableCopy', false);
+    const copyNotify  = GM_getValue('copyNotify', false);
+    const hideOrig    = GM_getValue('hideOrig', false);
 
     const css = `
     #bn-container { position: fixed; bottom: 20px; right: 20px; width: 260px; z-index: 10000; }
@@ -102,8 +102,7 @@
         const ref = document.querySelector("body > div:nth-child(2) > div > div:nth-child(8) > div:nth-child(1) > div > div.ui.buttons.right.floated > a:nth-child(1)");
         if (!ref) return;
         if (hideOrig) {
-            const orig = document.querySelector("body > div:nth-child(2) > div > div:nth-child(8) > div:nth-child(1) > div > div.ui.buttons.right.floated > a:nth-child(1)");
-            if (orig) orig.style.display = 'none';
+            ref.style.display = 'none';
         }
         const btn = document.createElement('a');
         btn.className = 'small ui button';
@@ -112,8 +111,16 @@
             try {
                 const res = await fetch(location.href + '/markdown/text');
                 const text = await res.text();
-                const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta);
-                ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(text);
+                } else {
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                }
                 if (copyNotify) {
                     GM_notification({ text: '复制成功！', timeout: 2000 });
                 } else {
