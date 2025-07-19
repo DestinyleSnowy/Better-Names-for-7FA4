@@ -28,9 +28,8 @@
     #bn-container * { pointer-events: auto; }
     #bn-trigger { position: absolute; bottom: 0; right: 0; width: 32px; height: 32px; background: rgba(0,0,0,0.4); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; cursor: pointer; transition: background 0.2s; }
     #bn-trigger:hover { background: rgba(0,0,0,0.6); }
-    #bn-panel { position: absolute; bottom: 40px; right: 0; width: 260px; padding: 12px; background: rgba(255,255,255,0.95); box-shadow: 0 2px 8px rgba(0,0,0,0.2); border-radius: 6px; transform: scale(0.8); transform-origin: bottom right; opacity: 0; transition: transform 0.2s ease-out, opacity 0.2s ease-out; }
-    #bn-trigger:hover + #bn-panel,
-    #bn-panel:hover { transform: scale(1); opacity: 1; }
+    #bn-panel { position: absolute; bottom: 40px; right: 0; width: 260px; padding: 12px; background: rgba(255,255,255,0.95); box-shadow: 0 2px 8px rgba(0,0,0,0.2); border-radius: 6px; transform: scale(0.8); transform-origin: bottom right; opacity: 0; pointer-events: none; transition: transform 0.2s ease-out, opacity 0.2s ease-out; }
+    #bn-panel.bn-show { transform: scale(1); opacity: 1; pointer-events: auto; }
     .bn-title { font-weight: bold; margin-bottom: 4px; font-size: 14px; color: #333; }
     .bn-desc  { font-size: 12px; color: #666; margin-bottom: 8px; }
     #bn-panel label { display: block; margin-bottom: 6px; font-size: 13px; }
@@ -38,8 +37,8 @@
     #bn-panel .bn-btn { margin: 4px 4px 0 0; padding: 6px 8px; font-size: 12px; border: none; border-radius: 4px; cursor: pointer; background: #2185d0; color: #fff; transition: background 0.2s; }
     #bn-panel .bn-btn:hover { background: #1678c2; }
     #bn-copy-options { margin-left: 16px; display: ${enableCopy ? 'block' : 'none'}; }
-    .bn-icon { margin-left: 2px; vertical-align: middle; }
-    .bn-medal { display: inline-block; width: 16px; height: 16px; line-height: 16px; border-radius: 50%; color: #fff; font-size: 10px; text-align: center; font-weight: bold; }
+    .bn-icon { margin-left: 2px; vertical-align: middle; display: inline-flex; align-items: center; }
+    .bn-medal { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; line-height: 16px; border-radius: 50%; color: #fff; font-size: 10px; text-align: center; font-weight: bold; vertical-align: middle; }
     .bn-medal-gold { background: #f1c40f; }
     .bn-medal-silver { background: #bdc3c7; }
     .bn-medal-bronze { background: #e67e22; }
@@ -78,6 +77,8 @@
       </div>`;
     document.body.appendChild(container);
 
+    const trigger  = document.getElementById('bn-trigger');
+    const panel    = document.getElementById('bn-panel');
     const inp      = document.getElementById('bn-input');
     const chkAv    = document.getElementById('bn-hide-avatar');
     const chkCp    = document.getElementById('bn-enable-copy');
@@ -86,6 +87,27 @@
     const copyOpts = document.getElementById('bn-copy-options');
     const chkHook  = document.getElementById('bn-show-hook');
     const chkMedal = document.getElementById('bn-show-medal');
+
+    let hideTimer = null;
+    const showPanel = () => {
+        clearTimeout(hideTimer);
+        panel.classList.add('bn-show');
+    };
+    const hidePanel = () => {
+        panel.classList.remove('bn-show');
+    };
+    trigger.addEventListener('mouseenter', showPanel);
+    trigger.addEventListener('mouseleave', () => {
+        hideTimer = setTimeout(() => {
+            if (!panel.matches(':hover')) hidePanel();
+        }, 200);
+    });
+    panel.addEventListener('mouseenter', showPanel);
+    panel.addEventListener('mouseleave', () => {
+        hideTimer = setTimeout(() => {
+            if (!trigger.matches(':hover')) hidePanel();
+        }, 200);
+    });
 
     chkAv.onchange = () => { GM_setValue('hideAvatar', chkAv.checked); location.reload(); };
     chkCp.onchange = () => { GM_setValue('enableCopy', chkCp.checked); location.reload(); };
