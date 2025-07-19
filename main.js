@@ -20,6 +20,8 @@
     const enableCopy  = GM_getValue('enableCopy', false);
     const copyNotify  = GM_getValue('copyNotify', false);
     const hideOrig    = GM_getValue('hideOrig', false);
+    const showHook    = GM_getValue('showHook', true);
+    const showMedal   = GM_getValue('showMedal', true);
 
     const css = `
     #bn-container { position: fixed; bottom: 20px; right: 20px; width: 260px; z-index: 10000; }
@@ -35,6 +37,7 @@
     #bn-panel .bn-btn { margin: 4px 4px 0 0; padding: 6px 8px; font-size: 12px; border: none; border-radius: 4px; cursor: pointer; background: #2185d0; color: #fff; transition: background 0.2s; }
     #bn-panel .bn-btn:hover { background: #1678c2; }
     #bn-copy-options { margin-left: 16px; display: ${enableCopy ? 'block' : 'none'}; }
+    .bn-icon { margin-left: 2px; vertical-align: middle; }
     `;
     const style = document.createElement('style'); style.textContent = css; document.head.appendChild(style);
 
@@ -61,6 +64,12 @@
           <label><input type="checkbox" id="bn-copy-notify" ${copyNotify?'checked':''}/> 提示复制成功</label>
           <label><input type="checkbox" id="bn-hide-orig" ${hideOrig?'checked':''}/> 隐藏原“题目源码”链接</label>
         </div>
+        <br />
+        <div class="bn-title">【显示钩子】</div>
+        <label><input type="checkbox" id="bn-show-hook" ${showHook?'checked':''}/> 显示钩子</label>
+        <br />
+        <div class="bn-title">【NOI 奖牌】</div>
+        <label><input type="checkbox" id="bn-show-medal" ${showMedal?'checked':''}/> 显示NOI奖牌</label>
       </div>`;
     document.body.appendChild(container);
 
@@ -70,11 +79,15 @@
     const chkNt    = document.getElementById('bn-copy-notify');
     const chkHo    = document.getElementById('bn-hide-orig');
     const copyOpts = document.getElementById('bn-copy-options');
+    const chkHook  = document.getElementById('bn-show-hook');
+    const chkMedal = document.getElementById('bn-show-medal');
 
     chkAv.onchange = () => { GM_setValue('hideAvatar', chkAv.checked); location.reload(); };
     chkCp.onchange = () => { GM_setValue('enableCopy', chkCp.checked); location.reload(); };
     chkNt.onchange = () => { GM_setValue('copyNotify', chkNt.checked); location.reload(); };
     chkHo.onchange = () => { GM_setValue('hideOrig', chkHo.checked); location.reload(); };
+    chkHook.onchange = () => { GM_setValue('showHook', chkHook.checked); location.reload(); };
+    chkMedal.onchange = () => { GM_setValue('showMedal', chkMedal.checked); location.reload(); };
 
     document.getElementById('bn-cancel').onclick = () => {
         inp.value      = isFinite(maxUnits) ? maxUnits : '';
@@ -82,6 +95,8 @@
         chkCp.checked  = enableCopy;
         chkNt.checked  = copyNotify;
         chkHo.checked  = hideOrig;
+        chkHook.checked = showHook;
+        chkMedal.checked = showMedal;
         copyOpts.style.display = enableCopy ? 'block' : 'none';
     };
     document.getElementById('bn-default').onclick = () => { GM_setValue('maxNameUnits', DEFAULT_MAX_UNITS); location.reload(); };
@@ -94,6 +109,8 @@
         GM_setValue('enableCopy', chkCp.checked);
         GM_setValue('copyNotify', chkNt.checked);
         GM_setValue('hideOrig', chkHo.checked);
+        GM_setValue('showHook', chkHook.checked);
+        GM_setValue('showMedal', chkMedal.checked);
         location.reload();
     };
 
@@ -133,6 +150,27 @@
         ref.parentNode.insertBefore(btn, ref);
     }
 
+    const HOOK_GREEN = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="#5eb95e" style="margin-bottom: -3px;"><path d="M16 8C16 6.84375 15.25 5.84375 14.1875 5.4375C14.6562 4.4375 14.4688 3.1875 13.6562 2.34375C12.8125 1.53125 11.5625 1.34375 10.5625 1.8125C10.1562 0.75 9.15625 0 8 0C6.8125 0 5.8125 0.75 5.40625 1.8125C4.40625 1.34375 3.15625 1.53125 2.34375 2.34375C1.5 3.1875 1.3125 4.4375 1.78125 5.4375C0.71875 5.84375 0 6.84375 0 8C0 9.1875 0.71875 10.1875 1.78125 10.5938C1.3125 11.5938 1.5 12.8438 2.34375 13.6562C3.15625 14.5 4.40625 14.6875 5.40625 14.2188C5.8125 15.2812 6.8125 16 8 16C9.15625 16 10.1562 15.2812 10.5625 14.2188C11.5938 14.6875 12.8125 14.5 13.6562 13.6562C14.4688 12.8438 14.6562 11.5938 14.1875 10.5938C15.25 10.1875 16 9.1875 16 8ZM11.4688 6.625L7.375 10.6875C7.21875 10.8438 7 10.8125 6.875 10.6875L4.5 8.3125C4.375 8.1875 4.375 7.96875 4.5 7.8125L5.3125 7C5.46875 6.875 5.6875 6.875 5.8125 7.03125L7.125 8.34375L10.1562 5.34375C10.3125 5.1875 10.5312 5.1875 10.6562 5.34375L11.4688 6.15625C11.5938 6.28125 11.5938 6.5 11.4688 6.625Z"></path></svg>';
+    const HOOK_BLUE  = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="#3498db" style="margin-bottom: -3px;"><path d="M16 8C16 6.84375 15.25 5.84375 14.1875 5.4375C14.6562 4.4375 14.4688 3.1875 13.6562 2.34375C12.8125 1.53125 11.5625 1.34375 10.5625 1.8125C10.1562 0.75 9.15625 0 8 0C6.8125 0 5.8125 0.75 5.40625 1.8125C4.40625 1.34375 3.15625 1.53125 2.34375 2.34375C1.5 3.1875 1.3125 4.4375 1.78125 5.4375C0.71875 5.84375 0 6.84375 0 8C0 9.1875 0.71875 10.1875 1.78125 10.5938C1.3125 11.5938 1.5 12.8438 2.34375 13.6562C3.15625 14.5 4.40625 14.6875 5.40625 14.2188C5.8125 15.2812 6.8125 16 8 16C9.15625 16 10.1562 15.2812 10.5625 14.2188C11.5938 14.6875 12.8125 14.5 13.6562 13.6562C14.4688 12.8438 14.6562 11.5938 14.1875 10.5938C15.25 10.1875 16 9.1875 16 8ZM11.4688 6.625L7.375 10.6875C7.21875 10.8438 7 10.8125 6.875 10.6875L4.5 8.3125C4.375 8.1875 4.375 7.96875 4.5 7.8125L5.3125 7C5.46875 6.875 5.6875 6.875 5.8125 7.03125L7.125 8.34375L10.1562 5.34375C10.3125 5.1875 10.5312 5.1875 10.6562 5.34375L11.4688 6.15625C11.5938 6.28125 11.5938 6.5 11.4688 6.625Z"></path></svg>';
+    const HOOK_GOLD = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 512 512" fill="currentColor" style="color:#f1c40f;margin-bottom:-3px;"><g class="fa-duotone-group"><path fill="currentColor" d="M256 0c36.8 0 68.8 20.7 84.9 51.1C373.8 41 411 49 437 75s34 63.3 23.9 96.1C491.3 187.2 512 219.2 512 256s-20.7 68.8-51.1 84.9C471 373.8 463 411 437 437s-63.3 34-96.1 23.9C324.8 491.3 292.8 512 256 512s-68.8-20.7-84.9-51.1C138.2 471 101 463 75 437s-34-63.3-23.9-96.1C20.7 324.8 0 292.8 0 256s20.7-68.8 51.1-84.9C41 138.2 49 101 75 75s63.3-34 96.1-23.9C187.2 20.7 219.2 0 256 0zM369 209c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0l-111 111-47-47c-9.4-9.4-24.6-9.4-33.9 0s-9.4 24.6 0 33.9l64 64c9.4 9.4 24.6 9.4 33.9 0L369 209z" class="fa-secondary"></path><path fill="currentColor" d="M369 175c9.4 9.4 9.4 24.6 0 33.9L241 337c-9.4 9.4-24.6 9.4-33.9 0l-64-64c-9.4-9.4-9.4-24.6 0-33.9s24.6-9.4 33.9 0l47 47L335 175c9.4-9.4 24.6-9.4 33.9 0z" class="fa-primary"></path></g></svg>';
+
+    const MEDAL_ICONS = {
+        gold: '🥇',
+        silver: '🥈',
+        bronze: '🥉'
+    };
+
+    function getMedalIcon(type) {
+        return MEDAL_ICONS[type] || '';
+    }
+
+    function getHookIcon(lv) {
+        if (lv <= 0) return '';
+        if (lv <= 5) return HOOK_GREEN;
+        if (lv <= 7) return HOOK_BLUE;
+        return HOOK_GOLD;
+    }
+
     const palettes = {
         dark: {
             low3:  'rgb(255, 111, 111)',
@@ -157,9 +195,9 @@
     };
 
     const users = {
-        1458: { name: "彭博彦", colorKey: 'low3' },
-        966:  { name: "公子文", colorKey: 'low1' },
-        882:  { name: "唐若轩", colorKey: 'low1' },
+        1458: { name: "彭博彦", colorKey: 'low3', hook: 8, medal: 'gold' },
+        966:  { name: "公子文", colorKey: 'low1', hook: 4, medal: 'silver' },
+        882:  { name: "唐若轩", colorKey: 'low1', hook: 7, medal: 'bronze' },
         811:  { name: "杨笑",   colorKey: 'is'   },
         629:  { name: "曹灿",   colorKey: 'oth'  },
         2010: { name: "张恩齐", colorKey: 'is'   },
@@ -283,24 +321,33 @@
 
         if (img && hideAvatar) img.remove();
 
-        let newText;
+        a.querySelectorAll('.bn-icon').forEach(el => el.remove());
+
+        let newHTML;
         if (info) {
-            newText = (img ? ' ' : '') + info.name;
+            newHTML = (img ? '&nbsp;' : '') + info.name;
             const c = palette[info.colorKey];
             if (c) a.style.color = c;
+            if (showHook && info.hook) {
+                newHTML += ' <span class="bn-icon" title="OI 程序设计能力评级">' + getHookIcon(info.hook) + '</span>';
+            }
+            if (showMedal && info.medal) {
+                const label = info.medal === 'gold' ? '金牌' : info.medal === 'silver' ? '银牌' : '铜牌';
+                newHTML += ' <span class="bn-icon" title="NOI奖牌：' + label + '">' + getMedalIcon(info.medal) + '</span>';
+            }
         } else {
             let original = '';
             a.childNodes.forEach(n => {
                 if (n.nodeType === Node.TEXT_NODE) original += n.textContent;
             });
             original = original.trim();
-            newText = (img ? ' ' : '') + truncateByUnits(original, maxUnits);
+            newHTML = (img ? '&nbsp;' : '') + truncateByUnits(original, maxUnits);
         }
 
         Array.from(a.childNodes).forEach(n => {
             if (n.nodeType === Node.TEXT_NODE) a.removeChild(n);
         });
-        a.append(newText);
+        a.insertAdjacentHTML('beforeend', newHTML);
     }
 
     document.querySelectorAll('a[href^="/user/"]').forEach(processUserLink);
