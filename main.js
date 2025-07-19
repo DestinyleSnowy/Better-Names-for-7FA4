@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      3.5.0.dev.beta
-// @description  修复“可批阅习题栏”用户名替换错误
+// @version      3.6.1.dev.beta
+// @description  为用户新增钩子和奖牌参数，并修复了一些错误
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @grant        GM_getValue
