@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      3.6.1.dev.beta
-// @description  为用户新增钩子和奖牌参数，并修复了一些错误
+// @version      3.6.3.dev.beta
+// @description  修复了一些错误
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @grant        GM_getValue
@@ -224,15 +224,15 @@
     };
 
     const users = {
-        1458: { name: "彭博彦", colorKey: 'low3', hook: 8, medal: 'gold' },
-        966:  { name: "公子文", colorKey: 'low1', hook: 4, medal: 'silver' },
-        882:  { name: "唐若轩", colorKey: 'low1', hook: 7, medal: 'bronze' },
-        811:  { name: "杨笑",   colorKey: 'is'   },
+        1458: { name: "彭博彦", colorKey: 'low3' },
+        966:  { name: "公子文", colorKey: 'low1' },
+        882:  { name: "唐若轩", colorKey: 'low1' },
+        811:  { name: "杨笑",   colorKey: 'is',   hook: 6 },
         629:  { name: "曹灿",   colorKey: 'oth'  },
-        2010: { name: "张恩齐", colorKey: 'is'   },
-        2177: { name: "张尽欢", colorKey: 'is'   },
-        2176: { name: "刘子墨", colorKey: 'is'   },
-        994:  { name: "黎莫轩", colorKey: 'upp2' },
+        2010: { name: "张恩齐", colorKey: 'is',   hook: 5 },
+        2177: { name: "张尽欢", colorKey: 'is',   hook: 6 },
+        2176: { name: "刘子墨", colorKey: 'is',   hook: 5 },
+        994:  { name: "黎莫轩", colorKey: 'upp2', hook: 10, medal: 'gold' },
         34:   { name: "李弩翰", colorKey: 'upp2' },
         1094: { name: "文星杰", colorKey: 'upp1' },
         1179: { name: "赖今羿", colorKey: 'upp1' },
@@ -243,11 +243,11 @@
         18:   { name: "黄诗哲", colorKey: 'upp1' },
         735:  { name: "宋成宸", colorKey: 'upp1' },
         880:  { name: "陈统峙", colorKey: 'oth'  },
-        874:  { name: "陈霖瑄", colorKey: 'is'   },
+        874:  { name: "陈霖瑄", colorKey: 'is', hook: 7, medal: 'bronze' },
         793:  { name: "孙邦博", colorKey: 'is'   },
         890:  { name: "王腾立", colorKey: 'is'   },
         1069: { name: "李思阳", colorKey: 'is'   },
-        878:  { name: "王译萱", colorKey: 'is'   },
+        878:  { name: "王译萱", colorKey: 'is', hook: 8, medal: 'silver' },
         879:  { name: "张子佩", colorKey: 'is'   },
         875:  { name: "程翊宸", colorKey: 'oth'  },
         1070: { name: "章正瀚", colorKey: 'low1' },
