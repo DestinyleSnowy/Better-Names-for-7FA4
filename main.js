@@ -29,13 +29,16 @@
     #bn-container * { pointer-events: auto; }
     #bn-trigger { position: absolute; bottom: 0; right: 0; width: 32px; height: 32px; background: rgba(0,0,0,0.4); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; cursor: pointer; transition: background 0.2s; }
     #bn-trigger:hover { background: rgba(0,0,0,0.6); }
-    #bn-panel { position: absolute; bottom: 40px; right: 0; width: 260px; padding: 12px; background: rgba(255,255,255,0.95); box-shadow: 0 2px 8px rgba(0,0,0,0.2); border-radius: 6px; transform: scale(0.8); transform-origin: bottom right; opacity: 0; pointer-events: none; transition: transform 0.2s ease-out, opacity 0.2s ease-out; }
+    #bn-panel { position: absolute; bottom: 40px; right: 0; width: 260px; padding: 12px; background: rgba(255,255,255,0.95); box-shadow: 0 2px 8px rgba(0,0,0,0.2); border-radius: 6px; transform: scale(0.8); transform-origin: bottom right; opacity: 0; pointer-events: none; transition: transform 0.2s ease-out, opacity 0.2s ease-out; display: flex; flex-direction: column; gap: 12px; }
     #bn-panel.bn-show { transform: scale(1); opacity: 1; pointer-events: auto; }
+    .bn-section { border-bottom: 1px solid #ddd; padding-bottom: 8px; }
+    .bn-section:last-child { border-bottom: none; }
+    .bn-btn-group { display: flex; flex-wrap: wrap; gap: 4px; }
     .bn-title { font-weight: bold; margin-bottom: 4px; font-size: 14px; color: #333; }
     .bn-desc  { font-size: 12px; color: #666; margin-bottom: 8px; }
     #bn-panel label { display: block; margin-bottom: 6px; font-size: 13px; }
     #bn-panel input[type="number"] { width: 100%; padding: 6px; margin-bottom: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
-    #bn-panel .bn-btn { margin: 4px 4px 0 0; padding: 6px 8px; font-size: 12px; border: none; border-radius: 4px; cursor: pointer; background: #2185d0; color: #fff; transition: background 0.2s; }
+    #bn-panel .bn-btn { padding: 6px 8px; font-size: 12px; border: none; border-radius: 4px; cursor: pointer; background: #2185d0; color: #fff; transition: background 0.2s; }
     #bn-panel .bn-btn:hover { background: #1678c2; }
     #bn-copy-options { margin-left: 16px; display: ${enableCopy ? 'block' : 'none'}; }
     .bn-icon { margin-left: 2px; vertical-align: middle; display: inline-flex; align-items: center; }
@@ -51,31 +54,37 @@
     container.innerHTML = `
       <div id="bn-trigger">⚙️</div>
       <div id="bn-panel">
-        <div class="bn-title">【截断功能】</div>
-        <div class="bn-desc">超过长度后自动添加 "..."（中2字、英1字）</div>
-        <input id="bn-input" type="number" min="1" step="1" value="${isFinite(maxUnits)? maxUnits : ''}" placeholder="正整数">
-        <div>
-          <button class="bn-btn" id="bn-confirm">确定</button>
-          <button class="bn-btn" id="bn-default">恢复默认</button>
-          <button class="bn-btn" id="bn-none">不截断</button>
-          <button class="bn-btn" id="bn-cancel">取消</button>
+        <div class="bn-section">
+          <div class="bn-title">【截断功能】</div>
+          <div class="bn-desc">超过长度后自动添加 "..."（中2字、英1字）</div>
+          <input id="bn-input" type="number" min="1" step="1" value="${isFinite(maxUnits)? maxUnits : ''}" placeholder="正整数">
+          <div class="bn-btn-group">
+            <button class="bn-btn" id="bn-confirm">确定</button>
+            <button class="bn-btn" id="bn-default">恢复默认</button>
+            <button class="bn-btn" id="bn-none">不截断</button>
+            <button class="bn-btn" id="bn-cancel">取消</button>
+          </div>
         </div>
-        <br />
-        <div class="bn-title">【隐藏头像】</div>
-        <label><input type="checkbox" id="bn-hide-avatar" ${hideAvatar?'checked':''}/> 隐藏头像</label>
-        <br />
-        <div class="bn-title">【一键复制】</div>
-        <label><input type="checkbox" id="bn-enable-copy" ${enableCopy?'checked':''}/> 启用复制</label>
-        <div id="bn-copy-options">
-          <label><input type="checkbox" id="bn-copy-notify" ${copyNotify?'checked':''}/> 提示复制成功</label>
-          <label><input type="checkbox" id="bn-hide-orig" ${hideOrig?'checked':''}/> 隐藏原“题目源码”链接</label>
+        <div class="bn-section">
+          <div class="bn-title">【隐藏头像】</div>
+          <label><input type="checkbox" id="bn-hide-avatar" ${hideAvatar?'checked':''}/> 隐藏头像</label>
         </div>
-        <br />
-        <div class="bn-title">【显示钩子 (BETA)】</div>
-        <label><input type="checkbox" id="bn-show-hook" ${showHook?'checked':''}/> 显示钩子</label>
-        <br />
-        <div class="bn-title">【NOI 奖牌 (BETA)】</div>
-        <label><input type="checkbox" id="bn-show-medal" ${showMedal?'checked':''}/> 显示NOI奖牌</label>
+        <div class="bn-section">
+          <div class="bn-title">【一键复制】</div>
+          <label><input type="checkbox" id="bn-enable-copy" ${enableCopy?'checked':''}/> 启用复制</label>
+          <div id="bn-copy-options">
+            <label><input type="checkbox" id="bn-copy-notify" ${copyNotify?'checked':''}/> 提示复制成功</label>
+            <label><input type="checkbox" id="bn-hide-orig" ${hideOrig?'checked':''}/> 隐藏原“题目源码”链接</label>
+          </div>
+        </div>
+        <div class="bn-section">
+          <div class="bn-title">【显示钩子 (BETA)】</div>
+          <label><input type="checkbox" id="bn-show-hook" ${showHook?'checked':''}/> 显示钩子</label>
+        </div>
+        <div class="bn-section">
+          <div class="bn-title">【NOI 奖牌 (BETA)】</div>
+          <label><input type="checkbox" id="bn-show-medal" ${showMedal?'checked':''}/> 显示NOI奖牌</label>
+        </div>
       </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
