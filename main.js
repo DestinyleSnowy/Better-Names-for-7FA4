@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      3.6.6.dev.beta
-// @description  添加了一些用户信息
+// @version      3.7.0.dev.beta
+// @description  更新金钩图标，修复面板触发及图标对齐问题
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
+// @exclude      http://*.7fa4.cn:9080/*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_notification
@@ -38,6 +39,7 @@
     #bn-panel .bn-btn:hover { background: #1678c2; }
     #bn-copy-options { margin-left: 16px; display: ${enableCopy ? 'block' : 'none'}; }
     .bn-icon { margin-left: 2px; vertical-align: middle; display: inline-flex; align-items: center; }
+    .bn-icon svg { width: 16px; height: 16px; }
     .bn-medal { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; line-height: 16px; border-radius: 50%; color: #fff; font-size: 10px; text-align: center; font-weight: bold; vertical-align: middle; }
     .bn-medal-gold { background: #f1c40f; }
     .bn-medal-silver { background: #bdc3c7; }
@@ -76,6 +78,7 @@
         <label><input type="checkbox" id="bn-show-medal" ${showMedal?'checked':''}/> 显示NOI奖牌</label>
       </div>`;
     document.body.appendChild(container);
+    container.style.pointerEvents = 'none';
 
     const trigger  = document.getElementById('bn-trigger');
     const panel    = document.getElementById('bn-panel');
@@ -92,20 +95,22 @@
     const showPanel = () => {
         clearTimeout(hideTimer);
         panel.classList.add('bn-show');
+        container.style.pointerEvents = 'auto';
     };
     const hidePanel = () => {
         panel.classList.remove('bn-show');
+        container.style.pointerEvents = 'none';
     };
     trigger.addEventListener('mouseenter', showPanel);
     trigger.addEventListener('mouseleave', () => {
         hideTimer = setTimeout(() => {
-            if (!panel.matches(':hover')) hidePanel();
+            if (!trigger.matches(':hover') && !panel.matches(':hover') && !container.matches(':hover')) hidePanel();
         }, 200);
     });
     panel.addEventListener('mouseenter', showPanel);
     panel.addEventListener('mouseleave', () => {
         hideTimer = setTimeout(() => {
-            if (!trigger.matches(':hover')) hidePanel();
+            if (!trigger.matches(':hover') && !panel.matches(':hover') && !container.matches(':hover')) hidePanel();
         }, 200);
     });
 
@@ -180,7 +185,7 @@
 
     const HOOK_GREEN = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="#5eb95e" style="margin-bottom: -3px;"><path d="M16 8C16 6.84375 15.25 5.84375 14.1875 5.4375C14.6562 4.4375 14.4688 3.1875 13.6562 2.34375C12.8125 1.53125 11.5625 1.34375 10.5625 1.8125C10.1562 0.75 9.15625 0 8 0C6.8125 0 5.8125 0.75 5.40625 1.8125C4.40625 1.34375 3.15625 1.53125 2.34375 2.34375C1.5 3.1875 1.3125 4.4375 1.78125 5.4375C0.71875 5.84375 0 6.84375 0 8C0 9.1875 0.71875 10.1875 1.78125 10.5938C1.3125 11.5938 1.5 12.8438 2.34375 13.6562C3.15625 14.5 4.40625 14.6875 5.40625 14.2188C5.8125 15.2812 6.8125 16 8 16C9.15625 16 10.1562 15.2812 10.5625 14.2188C11.5938 14.6875 12.8125 14.5 13.6562 13.6562C14.4688 12.8438 14.6562 11.5938 14.1875 10.5938C15.25 10.1875 16 9.1875 16 8ZM11.4688 6.625L7.375 10.6875C7.21875 10.8438 7 10.8125 6.875 10.6875L4.5 8.3125C4.375 8.1875 4.375 7.96875 4.5 7.8125L5.3125 7C5.46875 6.875 5.6875 6.875 5.8125 7.03125L7.125 8.34375L10.1562 5.34375C10.3125 5.1875 10.5312 5.1875 10.6562 5.34375L11.4688 6.15625C11.5938 6.28125 11.5938 6.5 11.4688 6.625Z"></path></svg>';
     const HOOK_BLUE  = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="#3498db" style="margin-bottom: -3px;"><path d="M16 8C16 6.84375 15.25 5.84375 14.1875 5.4375C14.6562 4.4375 14.4688 3.1875 13.6562 2.34375C12.8125 1.53125 11.5625 1.34375 10.5625 1.8125C10.1562 0.75 9.15625 0 8 0C6.8125 0 5.8125 0.75 5.40625 1.8125C4.40625 1.34375 3.15625 1.53125 2.34375 2.34375C1.5 3.1875 1.3125 4.4375 1.78125 5.4375C0.71875 5.84375 0 6.84375 0 8C0 9.1875 0.71875 10.1875 1.78125 10.5938C1.3125 11.5938 1.5 12.8438 2.34375 13.6562C3.15625 14.5 4.40625 14.6875 5.40625 14.2188C5.8125 15.2812 6.8125 16 8 16C9.15625 16 10.1562 15.2812 10.5625 14.2188C11.5938 14.6875 12.8125 14.5 13.6562 13.6562C14.4688 12.8438 14.6562 11.5938 14.1875 10.5938C15.25 10.1875 16 9.1875 16 8ZM11.4688 6.625L7.375 10.6875C7.21875 10.8438 7 10.8125 6.875 10.6875L4.5 8.3125C4.375 8.1875 4.375 7.96875 4.5 7.8125L5.3125 7C5.46875 6.875 5.6875 6.875 5.8125 7.03125L7.125 8.34375L10.1562 5.34375C10.3125 5.1875 10.5312 5.1875 10.6562 5.34375L11.4688 6.15625C11.5938 6.28125 11.5938 6.5 11.4688 6.625Z"></path></svg>';
-    const HOOK_GOLD = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 512 512" fill="currentColor" style="color:#f1c40f;margin-bottom:-3px;"><g class="fa-duotone-group"><path fill="currentColor" d="M256 0c36.8 0 68.8 20.7 84.9 51.1C373.8 41 411 49 437 75s34 63.3 23.9 96.1C491.3 187.2 512 219.2 512 256s-20.7 68.8-51.1 84.9C471 373.8 463 411 437 437s-63.3 34-96.1 23.9C324.8 491.3 292.8 512 256 512s-68.8-20.7-84.9-51.1C138.2 471 101 463 75 437s-34-63.3-23.9-96.1C20.7 324.8 0 292.8 0 256s20.7-68.8 51.1-84.9C41 138.2 49 101 75 75s63.3-34 96.1-23.9C187.2 20.7 219.2 0 256 0zM369 209c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0l-111 111-47-47c-9.4-9.4-24.6-9.4-33.9 0s-9.4 24.6 0 33.9l64 64c9.4 9.4 24.6 9.4 33.9 0L369 209z" class="fa-secondary"></path><path fill="currentColor" d="M369 175c9.4 9.4 9.4 24.6 0 33.9L241 337c-9.4 9.4-24.6 9.4-33.9 0l-64-64c-9.4-9.4-9.4-24.6 0-33.9s24.6-9.4 33.9 0l47 47L335 175c9.4-9.4 24.6-9.4 33.9 0z" class="fa-primary"></path></g></svg>';
+    const HOOK_GOLD = '<svg class="svg-inline--fa fa-badge-check" aria-hidden="true" focusable="false" data-prefix="fad" data-icon="badge-check" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" style="--fa-primary-color: #fff; --fa-secondary-color: var(--lfe-color--gold-3); --fa-secondary-opacity: 1;"><g class="fa-duotone-group"><path class="fa-secondary" fill="currentColor" d="M0 256c0 36.8 20.7 68.8 51.1 84.9C41 373.8 49 411 75 437s63.3 34 96.1 23.9C187.2 491.3 219.2 512 256 512s68.8-20.7 84.9-51.1C373.8 471 411 463 437 437s34-63.3 23.9-96.1C491.3 324.8 512 292.8 512 256s-20.7-68.8-51.1-84.9C471 138.2 463 101 437 75s-63.3-34-96.1-23.9C324.8 20.7 292.8 0 256 0s-68.8 20.7-84.9 51.1C138.2 41 101 49 75 75s-34 63.3-23.9 96.1C20.7 187.2 0 219.2 0 256zm136 0c0-6.1 2.3-12.3 7-17c9.4-9.4 24.6-9.4 33.9 0l47 47c37-37 74-74 111-111c4.7-4.7 10.8-7 17-7s12.3 2.3 17 7c2.3 2.3 4.1 5 5.3 7.9c.6 1.5 1 2.9 1.3 4.4c.2 1.1 .3 2.2 .3 2.2c.1 1.2 .1 1.2 .1 2.5c-.1 1.5-.1 1.9-.1 2.3c-.1 .7-.2 1.5-.3 2.2c-.3 1.5-.7 3-1.3 4.4c-1.2 2.9-2.9 5.6-5.3 7.9c-42.7 42.7-85.3 85.3-128 128c-4.7 4.7-10.8 7-17 7s-12.3-2.3-17-7c-21.3-21.3-42.7-42.7-64-64c-4.7-4.7-7-10.8-7-17z"></path><path class="fa-primary" fill="currentColor" d="M369 175c9.4 9.4 9.4 24.6 0 33.9L241 337c-9.4 9.4-24.6 9.4-33.9 0l-64-64c-9.4-9.4-9.4-24.6 0-33.9s24.6-9.4 33.9 0l47 47L335 175c9.4-9.4 24.6-9.4 33.9 0z"></path></g></svg>';
 
     const MEDAL_ICONS = {
         gold: '<span class="bn-medal bn-medal-gold"></span>',
