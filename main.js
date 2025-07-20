@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      3.8.0.dev.beta
-// @description  优化了面板的唤起逻辑
+// @version      3.9.1.dev.beta
+// @description  修复了一些错误
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -78,11 +78,11 @@
           </div>
         </div>
         <div class="bn-section">
-          <div class="bn-title">【显示钩子 (BETA)】</div>
+          <div class="bn-title">【显示钩子】</div>
           <label><input type="checkbox" id="bn-show-hook" ${showHook?'checked':''}/> 显示钩子</label>
         </div>
         <div class="bn-section">
-          <div class="bn-title">【NOI 奖牌 (BETA)】</div>
+          <div class="bn-title">【NOI 奖牌】</div>
           <label><input type="checkbox" id="bn-show-medal" ${showMedal?'checked':''}/> 显示NOI奖牌</label>
         </div>
       </div>`;
