@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      3.7.1.dev.beta
-// @description  修复了一些错误
+// @version      3.8.0.dev.beta
+// @description  优化了面板的唤起逻辑
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -26,7 +26,6 @@
 
     const css = `
     #bn-container { position: fixed; bottom: 20px; right: 20px; width: 260px; z-index: 10000; }
-    #bn-container.bn-collapsed { width: 32px; height: 32px; }
     #bn-container * { pointer-events: auto; }
     #bn-trigger { position: absolute; bottom: 0; right: 0; width: 32px; height: 32px; background: rgba(0,0,0,0.4); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; cursor: pointer; transition: background 0.2s; }
     #bn-trigger:hover { background: rgba(0,0,0,0.6); }
@@ -80,7 +79,6 @@
       </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
-    container.classList.add('bn-collapsed');
 
     const trigger  = document.getElementById('bn-trigger');
     const panel    = document.getElementById('bn-panel');
@@ -97,13 +95,11 @@
     const showPanel = () => {
         clearTimeout(hideTimer);
         panel.classList.add('bn-show');
-        container.classList.remove('bn-collapsed');
         container.style.pointerEvents = 'auto';
     };
     const hidePanel = () => {
         panel.classList.remove('bn-show');
         container.style.pointerEvents = 'none';
-        container.classList.add('bn-collapsed');
     };
     trigger.addEventListener('mouseenter', showPanel);
     trigger.addEventListener('mouseleave', () => {
@@ -111,7 +107,6 @@
             if (!trigger.matches(':hover') && !panel.matches(':hover') && !container.matches(':hover')) hidePanel();
         }, 200);
     });
-    panel.addEventListener('mouseenter', showPanel);
     panel.addEventListener('mouseleave', () => {
         hideTimer = setTimeout(() => {
             if (!trigger.matches(':hover') && !panel.matches(':hover') && !container.matches(':hover')) hidePanel();
