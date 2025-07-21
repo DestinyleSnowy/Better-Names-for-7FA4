@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      3.9.3.dev.beta
-// @description  修复了一些错误
+// @version      3.9.5.dev.beta
+// @description  新增查看他人代码确认弹窗并修复错误
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -23,6 +23,7 @@
     const hideOrig    = GM_getValue('hideOrig', false);
     const showHook    = GM_getValue('showHook', true);
     const showMedal   = GM_getValue('showMedal', true);
+    const checkNeed   = GM_getValue('checkNeed', true);
 
     const css = `
     #bn-container { position: fixed; bottom: 20px; right: 20px; width: 260px; z-index: 10000; }
@@ -87,7 +88,11 @@
           <label><input type="checkbox" id="bn-show-medal" ${showMedal?'checked':''}/> 显示NOI奖牌</label>
         </div>
         <div class="bn-section">
-          <div class="bn-desc">3.9.3.dev.beta</div>
+          <div class="bn-title">【代码查看】</div>
+          <label><input type="checkbox" id="bn-check-need" ${checkNeed?'checked':''}/> 查看他人代码前确认</label>
+        </div>
+        <div class="bn-section">
+          <div class="bn-desc">3.9.5.dev.beta</div>
         </div>
       </div>`;
     document.body.appendChild(container);
@@ -103,6 +108,7 @@
     const copyOpts = document.getElementById('bn-copy-options');
     const chkHook  = document.getElementById('bn-show-hook');
     const chkMedal = document.getElementById('bn-show-medal');
+    const chkNeed  = document.getElementById('bn-check-need');
 
     let hideTimer = null;
     const showPanel = () => {
@@ -132,6 +138,7 @@
     chkHo.onchange = () => { GM_setValue('hideOrig', chkHo.checked); location.reload(); };
     chkHook.onchange = () => { GM_setValue('showHook', chkHook.checked); location.reload(); };
     chkMedal.onchange = () => { GM_setValue('showMedal', chkMedal.checked); location.reload(); };
+    chkNeed.onchange = () => { GM_setValue('checkNeed', chkNeed.checked); location.reload(); };
 
     document.getElementById('bn-cancel').onclick = () => {
         inp.value      = isFinite(maxUnits) ? maxUnits : '';
@@ -141,6 +148,7 @@
         chkHo.checked  = hideOrig;
         chkHook.checked = showHook;
         chkMedal.checked = showMedal;
+        chkNeed.checked = checkNeed;
         copyOpts.style.display = enableCopy ? 'block' : 'none';
     };
     document.getElementById('bn-default').onclick = () => { GM_setValue('maxNameUnits', DEFAULT_MAX_UNITS); location.reload(); };
@@ -155,6 +163,7 @@
         GM_setValue('hideOrig', chkHo.checked);
         GM_setValue('showHook', chkHook.checked);
         GM_setValue('showMedal', chkMedal.checked);
+        GM_setValue('checkNeed', chkNeed.checked);
         location.reload();
     };
 
@@ -416,6 +425,48 @@
     });
 
     observer.observe(document.body, { childList: true, subtree: true });
+
+    const myUid = (document.querySelector('#user-dropdown > a') || {href: ''}).href.match(/\/user\/(\d+)/);
+    const myId  = myUid ? myUid[1] : '';
+
+    function showCheckNeedModal(url) {
+        const modal = document.createElement('div');
+        modal.className = 'ui basic modal check-need-modal transition visible active';
+        modal.style.display = 'block';
+        modal.innerHTML = `
+            <div class="ui icon header">
+                <i class="exclamation triangle icon"></i>
+                是否继续
+            </div>
+            <div class="content">你即将查看他人的代码，请经过深入思考以后，确实难以解决再选择查看。</div>
+            <div class="actions">
+                <a class="ui red ok inverted button" href="${url}">确认</a>
+                <div class="ui green ok inverted button">取消</div>
+            </div>`;
+        document.body.appendChild(modal);
+        const ok = modal.querySelector('.ui.red.ok.inverted.button');
+        const cancel = modal.querySelector('.ui.green.ok.inverted.button');
+        ok.addEventListener('click', () => { modal.remove(); });
+        cancel.addEventListener('click', () => { modal.remove(); });
+    }
+
+    document.addEventListener('click', e => {
+        if (!checkNeed) return;
+        const link3 = e.target.closest('#vueAppFuckSafari tbody tr td:nth-child(3) a, body > div:nth-child(2) > div > div.padding > table tbody tr td:nth-child(3) a');
+        if (link3) {
+            e.preventDefault();
+            showCheckNeedModal(link3.href);
+            return;
+        }
+        const link8 = e.target.closest('#vueAppFuckSafari tbody tr td:nth-child(8) a');
+        if (link8) {
+            const m = link8.getAttribute('href').match(/\/user\/(\d+)/);
+            if (!m || m[1] !== myId) {
+                e.preventDefault();
+                showCheckNeedModal(link8.href);
+            }
+        }
+    }, true);
 
     if (enableCopy) fEasierClip();
 })();
