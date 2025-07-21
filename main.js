@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      3.9.6.dev.beta
+// @version      3.10.2.dev.beta
 // @description  新增查看他人代码确认弹窗并修复错误
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
