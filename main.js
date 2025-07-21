@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      3.9.1.dev.beta
+// @version      3.9.2.dev.beta
 // @description  修复了一些错误
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
@@ -47,6 +47,7 @@
     .bn-medal-gold { background: #f1c40f; }
     .bn-medal-silver { background: #bdc3c7; }
     .bn-medal-bronze { background: #e67e22; }
+    .bn-medal-iron { background: #767778; }
     `;
     const style = document.createElement('style'); style.textContent = css; document.head.appendChild(style);
 
@@ -197,7 +198,8 @@
     const MEDAL_ICONS = {
         gold: '<span class="bn-medal bn-medal-gold"></span>',
         silver: '<span class="bn-medal bn-medal-silver"></span>',
-        bronze: '<span class="bn-medal bn-medal-bronze"></span>'
+        bronze: '<span class="bn-medal bn-medal-bronze"></span>',
+        iron: '<span class="bn-medal bn-medal-iron"></span>'
     };
 
     function getMedalIcon(type) {
@@ -242,7 +244,7 @@
         811:  { name: "杨笑",   colorKey: 'is',   hook: 6 },
         629:  { name: "曹灿",   colorKey: 'oth',  hook: 7 },
         2010: { name: "张恩齐", colorKey: 'is',   hook: 5 },
-        2177: { name: "张尽欢", colorKey: 'is',   hook: 6 },
+        2177: { name: "张尽欢", colorKey: 'is',   hook: 6, medal: 'iron' },
         2176: { name: "刘子墨", colorKey: 'is',   hook: 5 },
         994:  { name: "黎莫轩", colorKey: 'upp2', hook: 10, medal: 'gold' },
         34:   { name: "李弩翰", colorKey: 'upp2', hook: 8 },
@@ -250,9 +252,9 @@
         1179: { name: "赖今羿", colorKey: 'upp1', hook: 7 },
         661:  { name: "国皓语", colorKey: 'upp1', hook: 7 },
         1085: { name: "汪士恒", colorKey: 'upp1', hook: 8, medal: 'bronze' },
-        1339: { name: "王海烨", colorKey: 'upp1', hook: 7 },
+        1339: { name: "王海烨", colorKey: 'upp1', hook: 7, medal: 'bronze' },
         1577: { name: "彭赞滔", colorKey: 'upp1', hook: 7 },
-        18:   { name: "黄诗哲", colorKey: 'upp1', hook: 7 },
+        18:   { name: "黄诗哲", colorKey: 'upp1', hook: 7, medal: 'bronze' },
         735:  { name: "宋成宸", colorKey: 'upp1', hook: 7 },
         880:  { name: "陈统峙", colorKey: 'oth',  hook: 9 },
         874:  { name: "陈霖瑄", colorKey: 'is', hook: 7, medal: 'bronze' },
@@ -350,7 +352,8 @@
         if (
             a.matches('#user-dropdown > a') ||
             a.matches('#user-dropdown > div > a:nth-child(1)') ||
-            a.matches('body > div.ui.fixed.borderless.menu > div > div > a')
+            a.matches('body > div.ui.fixed.borderless.menu > div > div > a') ||
+            a.matches('#form > div > div:nth-child(13) > a')
         ) return;
 
         const href = a.getAttribute('href');
@@ -373,8 +376,9 @@
                 newHTML += ' <span class="bn-icon" title="OI 程序设计能力评级：' + info.hook + ' 级">' + getHookIcon(info.hook) + '</span>';
             }
             if (showMedal && info.medal) {
-                const label = info.medal === 'gold' ? '金牌' : info.medal === 'silver' ? '银牌' : '铜牌';
-                newHTML += ' <span class="bn-icon" title="NOI奖牌：' + label + '">' + getMedalIcon(info.medal) + '</span>';
+                const label = info.medal === 'gold' ? '金牌' : info.medal === 'silver' ? '银牌' : info.medal === 'iron' ? '铁' : '铜牌';
+                if (info.medal != 'iron') newHTML += ' <span class="bn-icon" title="NOI奖牌：' + label + '">' + getMedalIcon(info.medal) + '</span>';
+                // else newHTML += ' <span class="bn-icon" title="荣誉铁">' + getMedalIcon(info.medal) + '</span>';
             }
         } else {
             let original = '';
