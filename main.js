@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      3.9.4.dev.beta
+// @version      3.10.1.dev.beta
 // @description  新增查看他人代码确认弹窗并修复错误
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
@@ -92,7 +92,7 @@
           <label><input type="checkbox" id="bn-check-need" ${checkNeed?'checked':''}/> 查看他人代码前确认</label>
         </div>
         <div class="bn-section">
-          <div class="bn-desc">3.9.4.dev.beta</div>
+          <div class="bn-desc">3.10.1.dev.beta</div>
         </div>
       </div>`;
     document.body.appendChild(container);
@@ -432,7 +432,7 @@
     function showCheckNeedModal(url) {
         const modal = document.createElement('div');
         modal.className = 'ui basic modal check-need-modal transition visible active';
-        modal.style.display = 'block !important';
+        modal.style.display = 'block';
         modal.innerHTML = `
             <div class="ui icon header">
                 <i class="exclamation triangle icon"></i>
@@ -440,33 +440,31 @@
             </div>
             <div class="content">你即将查看他人的代码，请经过深入思考以后，确实难以解决再选择查看。</div>
             <div class="actions">
-                <a class="ui red ok inverted button">确认</a>
+                <a class="ui red ok inverted button" href="${url}">确认</a>
                 <div class="ui green ok inverted button">取消</div>
             </div>`;
         document.body.appendChild(modal);
         const ok = modal.querySelector('.ui.red.ok.inverted.button');
         const cancel = modal.querySelector('.ui.green.ok.inverted.button');
-        ok.addEventListener('click', () => { location.href = url; modal.remove(); });
+        ok.addEventListener('click', () => { modal.remove(); });
         cancel.addEventListener('click', () => { modal.remove(); });
     }
 
     document.addEventListener('click', e => {
         if (!checkNeed) return;
-        const span = e.target.closest('#vueAppFuckSafari > tbody > tr > td:nth-child(3) > a > b > span, body > div:nth-child(2) > div > div.padding > table > tbody > tr > td:nth-child(3) > a > b > span');
-        if (span) {
-            const link = span.closest('a');
-            if (link) {
-                e.preventDefault();
-                showCheckNeedModal(link.href);
-            }
+        const link3 = e.target.closest('#vueAppFuckSafari tbody tr td:nth-child(3) a, body > div:nth-child(2) > div > div.padding > table tbody tr td:nth-child(3) a');
+        if (link3) {
+            e.preventDefault();
+            showCheckNeedModal(link3.href);
             return;
         }
-        const a8 = e.target.closest('#vueAppFuckSafari > tbody > tr > td:nth-child(8) > a');
-        if (a8) {
-            const m = a8.getAttribute('href').match(/\/user\/(\d+)/);
+        const link8 = e.target.closest('#vueAppFuckSafari tbody tr td:nth-child(8) a');
+        if (link8) {
+            const m = link8.getAttribute('href').match(/\/user\/(\d+)/);
             if (!m || m[1] !== myId) {
                 e.preventDefault();
-                showCheckNeedModal(a8.href);
+                showCheckNeedModal(link8.href);
+
             }
         }
     }, true);
