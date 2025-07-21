@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      3.9.5.dev.beta
+// @version      3.10.1.dev.beta
 // @description  新增查看他人代码确认弹窗并修复错误
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
@@ -92,7 +92,7 @@
           <label><input type="checkbox" id="bn-check-need" ${checkNeed?'checked':''}/> 查看他人代码前确认</label>
         </div>
         <div class="bn-section">
-          <div class="bn-desc">3.9.5.dev.beta</div>
+          <div class="bn-desc">3.10.1.dev.beta</div>
         </div>
       </div>`;
     document.body.appendChild(container);
@@ -464,6 +464,7 @@
             if (!m || m[1] !== myId) {
                 e.preventDefault();
                 showCheckNeedModal(link8.href);
+
             }
         }
     }, true);
