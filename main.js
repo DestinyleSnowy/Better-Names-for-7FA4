@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      3.10.1.dev.beta
+// @version      3.10.2.dev.beta
 // @description  新增查看他人代码确认弹窗并修复错误
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
@@ -92,7 +92,7 @@
           <label><input type="checkbox" id="bn-check-need" ${checkNeed?'checked':''}/> 查看他人代码前确认</label>
         </div>
         <div class="bn-section">
-          <div class="bn-desc">3.10.1.dev.beta</div>
+          <div class="bn-desc">3.9.6.dev.beta</div>
         </div>
       </div>`;
     document.body.appendChild(container);
@@ -432,7 +432,7 @@
     function showCheckNeedModal(url) {
         const modal = document.createElement('div');
         modal.className = 'ui basic modal check-need-modal transition visible active';
-        modal.style.display = 'block';
+        modal.setAttribute('style', 'display: block !important;');
         modal.innerHTML = `
             <div class="ui icon header">
                 <i class="exclamation triangle icon"></i>
@@ -452,19 +452,21 @@
 
     document.addEventListener('click', e => {
         if (!checkNeed) return;
-        const link3 = e.target.closest('#vueAppFuckSafari tbody tr td:nth-child(3) a, body > div:nth-child(2) > div > div.padding > table tbody tr td:nth-child(3) a');
+        const link3 = e.target.closest(
+            '#vueAppFuckSafari > tbody > tr > td:nth-child(3) > a, ' +
+            'body > div:nth-child(2) > div > div.padding > table > tbody > tr > td:nth-child(3) > a'
+        );
         if (link3) {
             e.preventDefault();
             showCheckNeedModal(link3.href);
             return;
         }
-        const link8 = e.target.closest('#vueAppFuckSafari tbody tr td:nth-child(8) a');
+        const link8 = e.target.closest('#vueAppFuckSafari > tbody > tr > td:nth-child(8) > a');
         if (link8) {
             const m = link8.getAttribute('href').match(/\/user\/(\d+)/);
             if (!m || m[1] !== myId) {
                 e.preventDefault();
                 showCheckNeedModal(link8.href);
-
             }
         }
     }, true);
