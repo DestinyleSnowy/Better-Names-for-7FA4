@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      3.10.2.dev.beta
-// @description  新增查看他人代码确认弹窗并修复错误
+// @version      3.9.2.dev.beta
+// @description  修复了一些错误
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -57,8 +57,8 @@
       <div id="bn-trigger">⚙️</div>
       <div id="bn-panel">
         <div class="bn-section">
-            <div class="bn-title">【截断功能】</div>
-            <div class="bn-desc">超过长度后自动添加 "..."（中2字、英1字）</div>
+          <div class="bn-title">【截断功能】</div>
+          <div class="bn-desc">超过长度后自动添加 "..."（中2字、英1字）</div>
           <input id="bn-input" type="number" min="1" step="1" value="${isFinite(maxUnits)? maxUnits : ''}" placeholder="正整数">
           <div class="bn-btn-group">
             <button class="bn-btn" id="bn-confirm">确定</button>
@@ -86,13 +86,6 @@
         <div class="bn-section">
           <div class="bn-title">【NOI 奖牌】</div>
           <label><input type="checkbox" id="bn-show-medal" ${showMedal?'checked':''}/> 显示NOI奖牌</label>
-        </div>
-        <div class="bn-section">
-          <div class="bn-title">【代码查看】</div>
-          <label><input type="checkbox" id="bn-check-need" ${checkNeed?'checked':''}/> 查看他人代码前确认</label>
-        </div>
-        <div class="bn-section">
-          <div class="bn-desc">3.9.6.dev.beta</div>
         </div>
       </div>`;
     document.body.appendChild(container);
@@ -338,9 +331,7 @@
         1082: { name: "毛馨仪", colorKey: 'low2', hook: 5 },
         1174: { name: "钟沐霖", colorKey: 'low2', hook: 6 },
         1681: { name: "高云朗", colorKey: 'low2', hook: 5 },
-        1171: { name: "徐静丹", colorKey: 'low2', hook: 5 },
-        2355: { name: "邓皓轩", colorKey: 'low1', hook: 7 },
-        1158: { name: "刘泽宇", colorKey: 'low3', hook: 7 }
+        1171: { name: "徐静丹", colorKey: 'low2', hook: 5 }
     };
 
     function isPageDark() {
