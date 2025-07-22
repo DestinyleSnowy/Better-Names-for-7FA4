@@ -35,8 +35,8 @@
     }
     #bn-container { position: fixed; bottom: 20px; right: 20px; width: 280px; z-index: 10000; }
     #bn-container * { pointer-events: auto; }
-    #bn-trigger { position: absolute; bottom: 0; right: 0; width: 36px; height: 36px; background: linear-gradient(135deg,var(--bn-primary),#6ec1ff); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; cursor: pointer; box-shadow: var(--bn-shadow); transition: transform var(--bn-transition), box-shadow var(--bn-transition); }
-    #bn-trigger:hover { transform: scale(1.1); box-shadow: 0 8px 20px rgba(0,0,0,0.25); }
+    #bn-trigger { position: absolute; bottom: 0; right: 0; width: 32px; height: 32px; background: rgba(0,0,0,0.4); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; cursor: pointer; transition: background 0.2s; }
+    #bn-trigger:hover { background: rgba(0,0,0,0.6); }
     #bn-panel { position: absolute; bottom: 48px; right: 0; width: 100%; padding: 16px; background: var(--bn-bg); backdrop-filter: blur(12px); box-shadow: var(--bn-shadow); border-radius: var(--bn-radius); transform: translateY(10px) scale(0.95); transform-origin: bottom right; opacity: 0; pointer-events: none; transition: transform var(--bn-transition), opacity var(--bn-transition); display: flex; flex-direction: column; gap: 12px; }
     #bn-panel.bn-show { transform: translateY(0) scale(1); opacity: 1; pointer-events: auto; }
     .bn-section { border-bottom: 1px solid #ddd; padding-bottom: 8px; }
