@@ -24,22 +24,30 @@
     const showHook    = GM_getValue('showHook', true);
     const showMedal   = GM_getValue('showMedal', true);
 
-    const css = `
-    #bn-container { position: fixed; bottom: 20px; right: 20px; width: 260px; z-index: 10000; }
+        const css = `
+    :root {
+        --bn-primary: #2185d0;
+        --bn-radius: 8px;
+        --bn-shadow: 0 6px 18px rgba(0,0,0,0.2);
+        --bn-bg: rgba(255,255,255,0.85);
+        --bn-transition: 0.3s cubic-bezier(0.4,0,0.2,1);
+        font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif;
+    }
+    #bn-container { position: fixed; bottom: 20px; right: 20px; width: 280px; z-index: 10000; }
     #bn-container * { pointer-events: auto; }
-    #bn-trigger { position: absolute; bottom: 0; right: 0; width: 32px; height: 32px; background: rgba(0,0,0,0.4); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; cursor: pointer; transition: background 0.2s; }
-    #bn-trigger:hover { background: rgba(0,0,0,0.6); }
-    #bn-panel { position: absolute; bottom: 40px; right: 0; width: 260px; padding: 12px; background: rgba(255,255,255,0.95); box-shadow: 0 2px 8px rgba(0,0,0,0.2); border-radius: 6px; transform: scale(0.8); transform-origin: bottom right; opacity: 0; pointer-events: none; transition: transform 0.2s ease-out, opacity 0.2s ease-out; display: flex; flex-direction: column; gap: 12px; }
-    #bn-panel.bn-show { transform: scale(1); opacity: 1; pointer-events: auto; }
+    #bn-trigger { position: absolute; bottom: 0; right: 0; width: 36px; height: 36px; background: linear-gradient(135deg,var(--bn-primary),#6ec1ff); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; cursor: pointer; box-shadow: var(--bn-shadow); transition: transform var(--bn-transition), box-shadow var(--bn-transition); }
+    #bn-trigger:hover { transform: scale(1.1); box-shadow: 0 8px 20px rgba(0,0,0,0.25); }
+    #bn-panel { position: absolute; bottom: 48px; right: 0; width: 100%; padding: 16px; background: var(--bn-bg); backdrop-filter: blur(12px); box-shadow: var(--bn-shadow); border-radius: var(--bn-radius); transform: translateY(10px) scale(0.95); transform-origin: bottom right; opacity: 0; pointer-events: none; transition: transform var(--bn-transition), opacity var(--bn-transition); display: flex; flex-direction: column; gap: 12px; }
+    #bn-panel.bn-show { transform: translateY(0) scale(1); opacity: 1; pointer-events: auto; }
     .bn-section { border-bottom: 1px solid #ddd; padding-bottom: 8px; }
     .bn-section:last-child { border-bottom: none; }
-    .bn-btn-group { display: flex; flex-wrap: wrap; gap: 4px; }
-    .bn-title { font-weight: bold; margin-bottom: 4px; font-size: 14px; color: #333; }
+    .bn-btn-group { display: flex; flex-wrap: wrap; gap: 8px; }
+    .bn-title { font-weight: 600; margin-bottom: 4px; font-size: 14px; color: #333; }
     .bn-desc  { font-size: 12px; color: #666; margin-bottom: 8px; }
     #bn-panel label { display: block; margin-bottom: 6px; font-size: 13px; }
-    #bn-panel input[type="number"] { width: 100%; padding: 6px; margin-bottom: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
-    #bn-panel .bn-btn { padding: 6px 8px; font-size: 12px; border: none; border-radius: 4px; cursor: pointer; background: #2185d0; color: #fff; transition: background 0.2s; }
-    #bn-panel .bn-btn:hover { background: #1678c2; }
+    #bn-panel input[type="number"] { width: 100%; padding: 6px 8px; margin-bottom: 8px; border: 1px solid #ccc; border-radius: var(--bn-radius); font-size: 14px; }
+    #bn-panel .bn-btn { padding: 6px 10px; font-size: 12px; border: none; border-radius: var(--bn-radius); cursor: pointer; background: var(--bn-primary); color: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.1); transition: background var(--bn-transition), box-shadow var(--bn-transition); }
+    #bn-panel .bn-btn:hover { background: #1678c2; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
     #bn-copy-options { margin-left: 16px; display: ${enableCopy ? 'block' : 'none'}; }
     .bn-icon { margin-left: 2px; vertical-align: middle; display: inline-flex; align-items: center; }
     .bn-icon svg { width: 16px; height: 16px; display: ${enableCopy ? 'block' : 'none'}; }
@@ -49,6 +57,7 @@
     .bn-medal-bronze { background: #e67e22; }
     .bn-medal-iron { background: #767778; }
     `;
+
     const style = document.createElement('style'); style.textContent = css; document.head.appendChild(style);
 
     const container = document.createElement('div'); container.id = 'bn-container';
