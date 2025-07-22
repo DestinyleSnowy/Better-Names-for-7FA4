@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      3.10.1.dev.beta
+// @version      3.10.2.dev.beta
 // @description  修复错误并新增右键菜单
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
@@ -92,7 +92,7 @@
         </div>
         <div class="bn-section">
           <div class="bn-title">【用户菜单】</div>
-          <label><input type="checkbox" id="bn-user-menu" ${enableMenu?'checked':''}/> 右键用户菜单</label>
+          <label><input type="checkbox" id="bn-enable-user-menu" ${enableMenu?'checked':''}/> 右键显示用户菜单</label>
         </div>
         <div class="bn-section">
           <div class="bn-desc">3.10.1.dev.beta</div>
@@ -111,7 +111,7 @@
     const copyOpts = document.getElementById('bn-copy-options');
     const chkHook  = document.getElementById('bn-show-hook');
     const chkMedal = document.getElementById('bn-show-medal');
-    const chkMenu  = document.getElementById('bn-user-menu');
+    const chkMenu  = document.getElementById('bn-enable-user-menu');
 
     let hideTimer = null;
     const showPanel = () => {
