@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      3.9.3.dev.beta
-// @description  修复了一些错误
+// @version      3.10.1.dev.beta
+// @description  修复错误并新增右键菜单
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -23,6 +23,7 @@
     const hideOrig    = GM_getValue('hideOrig', false);
     const showHook    = GM_getValue('showHook', true);
     const showMedal   = GM_getValue('showMedal', true);
+    const enableMenu  = GM_getValue('enableUserMenu', false);
 
     const css = `
     #bn-container { position: fixed; bottom: 20px; right: 20px; width: 260px; z-index: 10000; }
@@ -48,6 +49,9 @@
     .bn-medal-silver { background: #bdc3c7; }
     .bn-medal-bronze { background: #e67e22; }
     .bn-medal-iron { background: #767778; }
+    #bn-user-menu { position: fixed; z-index: 10001; background: rgba(255,255,255,0.95); box-shadow: 0 2px 6px rgba(0,0,0,0.2); border-radius: 4px; padding: 4px 0; display: none; flex-direction: column; }
+    #bn-user-menu a { padding: 6px 12px; color: #333; text-decoration: none; font-size: 13px; white-space: nowrap; }
+    #bn-user-menu a:hover { background: #f0f0f0; }
     `;
     const style = document.createElement('style'); style.textContent = css; document.head.appendChild(style);
 
@@ -87,7 +91,11 @@
           <label><input type="checkbox" id="bn-show-medal" ${showMedal?'checked':''}/> 显示NOI奖牌</label>
         </div>
         <div class="bn-section">
-          <div class="bn-desc">3.9.3.dev.beta</div>
+          <div class="bn-title">【用户菜单】</div>
+          <label><input type="checkbox" id="bn-user-menu" ${enableMenu?'checked':''}/> 右键用户菜单</label>
+        </div>
+        <div class="bn-section">
+          <div class="bn-desc">3.10.1.dev.beta</div>
         </div>
       </div>`;
     document.body.appendChild(container);
@@ -103,6 +111,7 @@
     const copyOpts = document.getElementById('bn-copy-options');
     const chkHook  = document.getElementById('bn-show-hook');
     const chkMedal = document.getElementById('bn-show-medal');
+    const chkMenu  = document.getElementById('bn-user-menu');
 
     let hideTimer = null;
     const showPanel = () => {
@@ -132,6 +141,7 @@
     chkHo.onchange = () => { GM_setValue('hideOrig', chkHo.checked); location.reload(); };
     chkHook.onchange = () => { GM_setValue('showHook', chkHook.checked); location.reload(); };
     chkMedal.onchange = () => { GM_setValue('showMedal', chkMedal.checked); location.reload(); };
+    chkMenu.onchange = () => { GM_setValue('enableUserMenu', chkMenu.checked); location.reload(); };
 
     document.getElementById('bn-cancel').onclick = () => {
         inp.value      = isFinite(maxUnits) ? maxUnits : '';
@@ -141,6 +151,7 @@
         chkHo.checked  = hideOrig;
         chkHook.checked = showHook;
         chkMedal.checked = showMedal;
+        chkMenu.checked = enableMenu;
         copyOpts.style.display = enableCopy ? 'block' : 'none';
     };
     document.getElementById('bn-default').onclick = () => { GM_setValue('maxNameUnits', DEFAULT_MAX_UNITS); location.reload(); };
@@ -155,6 +166,7 @@
         GM_setValue('hideOrig', chkHo.checked);
         GM_setValue('showHook', chkHook.checked);
         GM_setValue('showMedal', chkMedal.checked);
+        GM_setValue('enableUserMenu', chkMenu.checked);
         location.reload();
     };
 
@@ -192,6 +204,38 @@
             }
         };
         ref.parentNode.insertBefore(btn, ref);
+    }
+
+    function initUserMenu() {
+        const menu = document.createElement('div');
+        menu.id = 'bn-user-menu';
+        menu.innerHTML = `
+            <a id="bn-menu-home" href="#">转到主页</a>
+            <a id="bn-menu-sub" href="#">转到提交记录</a>
+            <a id="bn-menu-plan" href="/user_plans/874">转到计划</a>
+        `;
+        document.body.appendChild(menu);
+        const home = menu.querySelector('#bn-menu-home');
+        const sub  = menu.querySelector('#bn-menu-sub');
+        const hide = () => { menu.style.display = 'none'; };
+        document.addEventListener('click', hide);
+        document.addEventListener('contextmenu', e => {
+            const a = e.target.closest('a[href^="/user/"]');
+            if (a) {
+                const m = a.getAttribute('href').match(/^\/user\/(\d+)/);
+                if (m) {
+                    e.preventDefault();
+                    const uid = m[1];
+                    home.href = `/user/${uid}`;
+                    sub.href = `/submissions?contest=&problem_id=&submitter=${uid}&min_score=0&max_score=100&language=&status=`;
+                    menu.style.left = e.pageX + 'px';
+                    menu.style.top = e.pageY + 'px';
+                    menu.style.display = 'flex';
+                    return;
+                }
+            }
+            hide();
+        });
     }
 
 
@@ -418,4 +462,5 @@
     observer.observe(document.body, { childList: true, subtree: true });
 
     if (enableCopy) fEasierClip();
+    if (enableMenu) initUserMenu();
 })();
