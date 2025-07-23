@@ -25,6 +25,16 @@
     const showMedal   = GM_getValue('showMedal', true);
     const enableMenu  = GM_getValue('enableUserMenu', false);
     const COLOR_KEYS = ['low3','low2','low1','upp1','upp2','upp3','is','oth'];
+    const COLOR_LABELS = {
+        low3: 'C25',
+        low2: 'C24',
+        low1: 'C23',
+        is:   'G25',
+        upp1: 'G24',
+        upp2: 'G23',
+        upp3: 'U25',
+        oth:  'cdq'
+    };
     const storedPalette = JSON.parse(GM_getValue('userPalette', '{}'));
     const useCustomColors = GM_getValue('useCustomColors', false);
 
@@ -589,7 +599,7 @@
 
     const colorInputs = COLOR_KEYS.map(k => `
             <div class="bn-color-item">
-                <label>${k}:</label>
+                <label>${COLOR_LABELS[k] || k}:</label>
                 <input type="color" id="bn-color-${k}" value="${palette[k]}">
                 <input type="text" class="bn-color-hex" id="bn-color-${k}-hex" value="${palette[k]}">
             </div>
