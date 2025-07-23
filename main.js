@@ -117,6 +117,7 @@
         transform: scale(0.95) translateY(10px);
         transform-origin: bottom right;
         opacity: 0;
+        visibility: hidden;
         pointer-events: none;
         transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
         overflow: hidden;
@@ -124,6 +125,7 @@
     #bn-panel.bn-show {
         transform: scale(1) translateY(0);
         opacity: 1;
+        visibility: visible;
         pointer-events: auto;
     }
     #bn-panel.bn-expanded {
@@ -772,6 +774,9 @@
     const hidePanel = () => {
         panel.classList.remove('bn-show');
         container.style.pointerEvents = 'none';
+        if (panel.contains(document.activeElement)) {
+            document.activeElement.blur();
+        }
     };
     trigger.addEventListener('mouseenter', showPanel);
     trigger.addEventListener('mouseleave', () => {
