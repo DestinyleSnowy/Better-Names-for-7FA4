@@ -182,13 +182,11 @@
 
     .bn-section {
         padding: 16px 20px;
-        margin-bottom: 12px;
-        border: 1px solid #e6e6e6;
-        border-radius: 8px;
+        border-bottom: 1px solid #f0f0f0;
         transition: background-color 0.2s ease;
     }
     .bn-section:last-child {
-        margin-bottom: 0;
+        border-bottom: none;
     }
     .bn-section:hover {
         background: rgba(248, 249, 250, 0.6);
