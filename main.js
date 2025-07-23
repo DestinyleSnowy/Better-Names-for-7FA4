@@ -212,11 +212,12 @@
         menu.innerHTML = `
             <a id="bn-menu-home" href="#">转到主页</a>
             <a id="bn-menu-sub" href="#">转到提交记录</a>
-            <a id="bn-menu-plan" href="/user_plans/874">转到计划</a>
+            <a id="bn-menu-plan" href="#">转到计划</a>
         `;
         document.body.appendChild(menu);
         const home = menu.querySelector('#bn-menu-home');
         const sub  = menu.querySelector('#bn-menu-sub');
+        const plan = menu.querySelector('#bn-menu-plan');
         const hide = () => { menu.style.display = 'none'; };
         document.addEventListener('click', hide);
         document.addEventListener('contextmenu', e => {
@@ -228,6 +229,7 @@
                     const uid = m[1];
                     home.href = `/user/${uid}`;
                     sub.href = `/submissions?contest=&problem_id=&submitter=${uid}&min_score=0&max_score=100&language=&status=`;
+                    plan.href = `/user_plans/${uid}`;
                     menu.style.left = e.pageX + 'px';
                     menu.style.top = e.pageY + 'px';
                     menu.style.display = 'flex';
