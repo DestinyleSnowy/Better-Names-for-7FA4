@@ -61,35 +61,527 @@
     const palette = Object.assign({}, palettes[mode], useCustomColors ? storedPalette : {});
 
     const css = `
-    #bn-container { position: fixed; bottom: 20px; right: 20px; width: 320px; z-index: 10000; }
-    #bn-container * { pointer-events: auto; }
-    #bn-trigger { position: absolute; bottom: 0; right: 0; width: 32px; height: 32px; background: rgba(0,0,0,0.4); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; cursor: pointer; transition: background 0.2s; }
-    #bn-trigger:hover { background: rgba(0,0,0,0.6); }
-    #bn-panel { position: absolute; bottom: 40px; right: 0; width: 320px; padding: 12px; background: rgba(255,255,255,0.95); box-shadow: 0 2px 8px rgba(0,0,0,0.2); border-radius: 6px; transform: scale(0.8); transform-origin: bottom right; opacity: 0; pointer-events: none; transition: transform 0.2s ease-out, opacity 0.2s ease-out; display: flex; flex-direction: column; gap: 12px; }
-    #bn-panel.bn-show { transform: scale(1); opacity: 1; pointer-events: auto; }
-    .bn-section { border-bottom: 1px solid #ddd; padding-bottom: 8px; }
-    .bn-section:last-child { border-bottom: none; }
-    .bn-btn-group { display: flex; flex-wrap: wrap; gap: 4px; }
-    .bn-color-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
-    .bn-color-item { display: flex; align-items: center; gap: 4px; }
-    .bn-color-item input[type="text"] { width: 70px; }
-    .bn-title { font-weight: bold; margin-bottom: 4px; font-size: 14px; color: #333; }
-    .bn-desc  { font-size: 12px; color: #666; margin-bottom: 8px; }
-    #bn-panel label { display: block; margin-bottom: 6px; font-size: 13px; }
-    #bn-panel input[type="number"] { width: 100%; padding: 6px; margin-bottom: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
-    #bn-panel .bn-btn { padding: 6px 8px; font-size: 12px; border: none; border-radius: 4px; cursor: pointer; background: #2185d0; color: #fff; transition: background 0.2s; }
-    #bn-panel .bn-btn:hover { background: #1678c2; }
-    #bn-copy-options { margin-left: 16px; display: ${enableCopy ? 'block' : 'none'}; }
-    .bn-icon { margin-left: 2px; vertical-align: middle; display: inline-flex; align-items: center; }
-    .bn-icon svg { width: 16px; height: 16px; display: ${enableCopy ? 'block' : 'none'}; }
-    .bn-medal { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; line-height: 16px; border-radius: 50%; color: #fff; font-size: 10px; text-align: center; font-weight: bold; vertical-align: middle; }
-    .bn-medal-gold { background: #f1c40f; }
-    .bn-medal-silver { background: #bdc3c7; }
-    .bn-medal-bronze { background: #e67e22; }
-    .bn-medal-iron { background: #767778; }
-    #bn-user-menu { position: fixed; z-index: 10001; background: rgba(255,255,255,0.95); box-shadow: 0 2px 6px rgba(0,0,0,0.2); border-radius: 4px; padding: 4px 0; display: none; flex-direction: column; }
-    #bn-user-menu a { padding: 6px 12px; color: #333; text-decoration: none; font-size: 13px; white-space: nowrap; }
-    #bn-user-menu a:hover { background: #f0f0f0; }
+    #bn-container {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 280px;
+        z-index: 10000;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    #bn-container.bn-expanded {
+        width: 520px;
+    }
+    #bn-container * {
+        pointer-events: auto;
+        box-sizing: border-box;
+    }
+
+    #bn-trigger {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 48px;
+        height: 48px;
+        background: #fff;
+        border: 1px solid #ddd;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #666;
+        font-size: 18px;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    #bn-trigger:hover {
+        background: #f8f9fa;
+        border-color: #ccc;
+        color: #333;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    }
+
+    #bn-panel {
+        position: absolute;
+        bottom: 58px;
+        right: 0;
+        width: 280px;
+        padding: 0;
+        background: #fff;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+        border: 1px solid #e0e0e0;
+        border-radius: 12px;
+        transform: scale(0.95) translateY(10px);
+        transform-origin: bottom right;
+        opacity: 0;
+        pointer-events: none;
+        transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        overflow: hidden;
+    }
+    #bn-panel.bn-show {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+        pointer-events: auto;
+    }
+    #bn-panel.bn-expanded {
+        width: 520px;
+    }
+
+    .bn-panel-header {
+        padding: 16px 20px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #f1f3f4 100%);
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .bn-panel-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #333;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .bn-panel-subtitle {
+        font-size: 12px;
+        color: #666;
+        margin: 4px 0 0 0;
+    }
+
+    .bn-panel-content {
+        display: flex;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .bn-main-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .bn-color-sidebar {
+        width: 240px;
+        background: #fafbfc;
+        border-left: 1px solid #e9ecef;
+        opacity: 0;
+        transform: translateX(20px);
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        pointer-events: none;
+        display: none;
+    }
+
+    .bn-color-sidebar.bn-show {
+        opacity: 1;
+        transform: translateX(0);
+        pointer-events: auto;
+        display: block;
+    }
+
+    .bn-section {
+        padding: 16px 20px;
+        border-bottom: 1px solid #f0f0f0;
+        transition: background-color 0.2s ease;
+    }
+    .bn-section:last-child {
+        border-bottom: none;
+    }
+    .bn-section:hover {
+        background: rgba(248, 249, 250, 0.6);
+    }
+
+    .bn-title {
+        font-weight: 600;
+        font-size: 14px;
+        color: #495057;
+        margin: 0 0 10px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .bn-icon {
+        width: 16px;
+        height: 16px;
+        opacity: 0.7;
+        flex-shrink: 0;
+    }
+
+    .bn-desc {
+        font-size: 12px;
+        color: #6c757d;
+        margin: 0 0 12px 0;
+        line-height: 1.4;
+    }
+
+    #bn-panel label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: #495057;
+        cursor: pointer;
+        padding: 6px 0;
+        transition: all 0.2s ease;
+        border-radius: 6px;
+        margin: 0 -4px;
+        padding-left: 4px;
+        padding-right: 4px;
+    }
+
+    #bn-panel label:hover {
+        background: rgba(248, 249, 250, 0.8);
+        color: #333;
+    }
+
+    #bn-panel input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        accent-color: #007bff;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+
+    #bn-panel input[type="number"] {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #ced4da;
+        border-radius: 8px;
+        font-size: 13px;
+        background: #fff;
+        margin-bottom: 12px;
+        transition: all 0.2s ease;
+    }
+
+    #bn-panel input[type="number"]:focus {
+        border-color: #007bff;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+        transform: translateY(-1px);
+    }
+
+    .bn-btn-group {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 12px;
+    }
+
+    .bn-btn-group.bn-btn-group-4 {
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        gap: 6px;
+    }
+
+    .bn-btn {
+        padding: 8px 12px;
+        font-size: 12px;
+        font-weight: 500;
+        border: 1px solid #ced4da;
+        border-radius: 6px;
+        cursor: pointer;
+        background: #fff;
+        color: #495057;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .bn-btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
+        transition: left 0.5s ease;
+    }
+
+    .bn-btn:hover::before {
+        left: 100%;
+    }
+
+    .bn-btn:hover {
+        background: #f8f9fa;
+        border-color: #adb5bd;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .bn-btn:active {
+        transform: translateY(0);
+        transition: all 0.1s ease;
+    }
+
+    .bn-btn.bn-btn-primary {
+        background: #007bff;
+        color: #fff;
+        border-color: #007bff;
+    }
+
+    .bn-btn.bn-btn-primary:hover {
+        background: #0056b3;
+        border-color: #0056b3;
+        box-shadow: 0 4px 12px rgba(0,123,255,0.3);
+    }
+
+    .bn-color-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid #e9ecef;
+        background: #fff;
+    }
+
+    .bn-color-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #495057;
+        margin: 0 0 8px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .bn-color-content {
+        padding: 20px;
+    }
+
+    .bn-color-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+
+    .bn-color-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        background: #fff;
+        border-radius: 8px;
+        border: 1px solid #e9ecef;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .bn-color-item::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(248,249,250,0.8), transparent);
+        transition: left 0.6s ease;
+    }
+
+    .bn-color-item:hover::before {
+        left: 100%;
+    }
+
+    .bn-color-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        border-color: #007bff;
+    }
+
+    .bn-color-item label {
+        font-size: 11px;
+        font-weight: 600;
+        color: #6c757d;
+        min-width: 32px;
+        margin: 0;
+        padding: 0;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        flex-shrink: 0;
+    }
+
+    .bn-color-item input[type="color"] {
+        width: 32px;
+        height: 32px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        transition: all 0.2s ease;
+        flex-shrink: 0;
+    }
+
+    .bn-color-item input[type="color"]:hover {
+        transform: scale(1.1);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
+    .bn-color-item input[type="text"] {
+        flex: 1;
+        padding: 6px 10px;
+        border: 1px solid #ced4da;
+        border-radius: 6px;
+        font-size: 11px;
+        font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+        background: #f8f9fa;
+        transition: all 0.2s ease;
+    }
+
+    .bn-color-item input[type="text"]:focus {
+        border-color: #007bff;
+        background: #fff;
+        box-shadow: 0 0 0 2px rgba(0,123,255,0.1);
+        outline: none;
+    }
+
+    .bn-color-actions {
+        display: flex;
+        gap: 8px;
+    }
+
+    .bn-color-actions .bn-btn {
+        flex: 1;
+        padding: 10px 16px;
+        font-size: 12px;
+    }
+
+    #bn-copy-options {
+        margin-left: 24px;
+        display: ${enableCopy ? 'block' : 'none'};
+        padding-top: 8px;
+        border-top: 1px solid #f0f0f0;
+        margin-top: 8px;
+        animation: slideDown 0.3s ease-out;
+    }
+
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes slideUp {
+        from {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        to {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+    }
+
+    .bn-medal {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        color: #fff;
+        font-size: 9px;
+        font-weight: bold;
+        vertical-align: middle;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .bn-medal-gold { background: linear-gradient(135deg, #ffc107 0%, #ff8f00 100%); }
+    .bn-medal-silver { background: linear-gradient(135deg, #6c757d 0%, #495057 100%); }
+    .bn-medal-bronze { background: linear-gradient(135deg, #fd7e14 0%, #dc3545 100%); }
+    .bn-medal-iron { background: linear-gradient(135deg, #495057 0%, #343a40 100%); }
+
+    #bn-user-menu {
+        position: fixed;
+        z-index: 10001;
+        background: #fff;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 8px 0;
+        display: none;
+        flex-direction: column;
+        min-width: 160px;
+        overflow: hidden;
+    }
+    #bn-user-menu a {
+        padding: 10px 16px;
+        color: #495057;
+        text-decoration: none;
+        font-size: 13px;
+        white-space: nowrap;
+        transition: all 0.2s ease;
+        position: relative;
+    }
+    #bn-user-menu a::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        background: #007bff;
+        transform: scaleY(0);
+        transition: transform 0.2s ease;
+    }
+    #bn-user-menu a:hover {
+        background: #f8f9fa;
+        color: #333;
+        padding-left: 20px;
+    }
+    #bn-user-menu a:hover::before {
+        transform: scaleY(1);
+    }
+
+    .bn-version {
+        text-align: center;
+        padding: 12px 20px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #f1f3f4 100%);
+        border-top: 1px solid #e9ecef;
+        font-size: 11px;
+        color: #6c757d;
+        font-weight: 500;
+    }
+
+    /* 图标 SVG */
+    .bn-icon-settings { fill: currentColor; }
+    .bn-icon-crop { stroke: currentColor; stroke-width: 2; fill: none; }
+    .bn-icon-eye { stroke: currentColor; stroke-width: 2; fill: none; }
+    .bn-icon-copy { stroke: currentColor; stroke-width: 2; fill: none; }
+    .bn-icon-hook { stroke: currentColor; stroke-width: 2; fill: none; }
+    .bn-icon-medal { stroke: currentColor; stroke-width: 2; fill: none; }
+    .bn-icon-menu { stroke: currentColor; stroke-width: 2; fill: none; }
+    .bn-icon-palette { stroke: currentColor; stroke-width: 2; fill: none; }
+
+    /* 响应式 */
+    @media (max-width: 600px) {
+        #bn-container {
+            width: 260px;
+            right: 16px;
+            bottom: 16px;
+        }
+
+        #bn-container.bn-expanded {
+            width: calc(100vw - 32px);
+            max-width: 480px;
+        }
+
+        #bn-panel {
+            width: 260px;
+        }
+
+        #bn-panel.bn-expanded {
+            width: calc(100vw - 32px);
+            max-width: 480px;
+        }
+
+        .bn-color-sidebar {
+            width: 200px;
+        }
+    }
     `;
     const style = document.createElement('style'); style.textContent = css; document.head.appendChild(style);
 
@@ -105,56 +597,104 @@
     container.innerHTML = `
       <div id="bn-trigger">⚙️</div>
       <div id="bn-panel">
-        <div class="bn-section">
-            <div class="bn-title">【截断功能】</div>
-            <div class="bn-desc">超过长度后自动添加 "..."（中2字、英1字）</div>
-          <input id="bn-input" type="number" min="1" step="1" value="${isFinite(maxUnits)? maxUnits : ''}" placeholder="正整数">
-          <div class="bn-btn-group">
-            <button class="bn-btn" id="bn-confirm">确定</button>
-            <button class="bn-btn" id="bn-default">恢复默认</button>
-            <button class="bn-btn" id="bn-none">不截断</button>
-            <button class="bn-btn" id="bn-cancel">取消</button>
+        <div class="bn-panel-header">
+          <div class="bn-panel-title">
+            <svg class="bn-icon bn-icon-settings" viewBox="0 0 24 24">
+              <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
+              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+            </svg>
+            Better Names 设置
           </div>
+          <div class="bn-panel-subtitle">自定义用户名显示和界面配置</div>
         </div>
-        <div class="bn-section">
-          <div class="bn-title">【隐藏头像】</div>
-          <label><input type="checkbox" id="bn-hide-avatar" ${hideAvatar?'checked':''}/> 隐藏头像</label>
-        </div>
-        <div class="bn-section">
-          <div class="bn-title">【一键复制】</div>
-          <label><input type="checkbox" id="bn-enable-copy" ${enableCopy?'checked':''}/> 启用复制</label>
-          <div id="bn-copy-options">
-            <label><input type="checkbox" id="bn-copy-notify" ${copyNotify?'checked':''}/> 提示复制成功</label>
-            <label><input type="checkbox" id="bn-hide-orig" ${hideOrig?'checked':''}/> 隐藏原“题目源码”链接</label>
+        <div class="bn-panel-content">
+          <div class="bn-main-content">
+            <div class="bn-section">
+              <div class="bn-title">
+                <svg class="bn-icon bn-icon-crop" viewBox="0 0 24 24">
+                  <path d="M6.13 1L6 16a2 2 0 002 2h15"/>
+                  <path d="M1 6.13L16 6a2 2 0 012 2v15"/>
+                </svg>
+                截断功能
+              </div>
+              <div class="bn-desc">超过长度后自动添加省略号</div>
+              <input id="bn-input" type="number" min="1" step="1" value="${isFinite(maxUnits)? maxUnits : ''}" placeholder="输入正整数">
+              <div class="bn-btn-group bn-btn-group-4">
+                <button class="bn-btn bn-btn-primary" id="bn-confirm">确定</button>
+                <button class="bn-btn" id="bn-default">默认</button>
+                <button class="bn-btn" id="bn-none">不截断</button>
+                <button class="bn-btn" id="bn-cancel">取消</button>
+              </div>
+            </div>
+
+            <div class="bn-section">
+              <div class="bn-title">
+                <svg class="bn-icon bn-icon-eye" viewBox="0 0 24 24">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                显示选项
+              </div>
+              <label><input type="checkbox" id="bn-hide-avatar" ${hideAvatar?'checked':''}/> 隐藏用户头像</label>
+              <label><input type="checkbox" id="bn-show-hook" ${showHook?'checked':''}/> 显示能力钩子</label>
+              <label><input type="checkbox" id="bn-show-medal" ${showMedal?'checked':''}/> 显示竞赛奖牌</label>
+              <label><input type="checkbox" id="bn-enable-user-menu" ${enableMenu?'checked':''}/> 启用用户菜单</label>
+            </div>
+
+            <div class="bn-section">
+              <div class="bn-title">
+                <svg class="bn-icon bn-icon-copy" viewBox="0 0 24 24">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                  <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                </svg>
+                复制功能
+              </div>
+              <label><input type="checkbox" id="bn-enable-copy" ${enableCopy?'checked':''}/> 启用题面复制</label>
+              <div id="bn-copy-options">
+                <label><input type="checkbox" id="bn-copy-notify" ${copyNotify?'checked':''}/> 显示复制提示</label>
+                <label><input type="checkbox" id="bn-hide-orig" ${hideOrig?'checked':''}/> 隐藏原始链接</label>
+              </div>
+            </div>
+
+            <div class="bn-section">
+              <div class="bn-title">
+                <svg class="bn-icon bn-icon-palette" viewBox="0 0 24 24">
+                  <circle cx="13.5" cy="6.5" r=".5"/>
+                  <circle cx="17.5" cy="10.5" r=".5"/>
+                  <circle cx="8.5" cy="7.5" r=".5"/>
+                  <circle cx="6.5" cy="12.5" r=".5"/>
+                  <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 011.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>
+                </svg>
+                颜色配置
+              </div>
+              <label><input type="checkbox" id="bn-use-custom-color" ${useCustomColors?'checked':''}/> 启用自定义颜色</label>
+            </div>
           </div>
-        </div>
-        <div class="bn-section">
-          <div class="bn-title">【显示钩子】</div>
-          <label><input type="checkbox" id="bn-show-hook" ${showHook?'checked':''}/> 显示钩子</label>
-        </div>
-        <div class="bn-section">
-          <div class="bn-title">【NOI 奖牌】</div>
-          <label><input type="checkbox" id="bn-show-medal" ${showMedal?'checked':''}/> 显示NOI奖牌</label>
-        </div>
-        <div class="bn-section">
-          <div class="bn-title">【用户菜单】</div>
-          <label><input type="checkbox" id="bn-enable-user-menu" ${enableMenu?'checked':''}/> 右键显示用户菜单</label>
-        </div>
-        <div class="bn-section">
-          <div class="bn-title">【颜色配置】</div>
-          <label><input type="checkbox" id="bn-use-custom-color" ${useCustomColors?'checked':''}/> 使用自定义颜色</label>
-          <div id="bn-color-panel" style="display:${useCustomColors?'block':'none'}">
-            <div class="bn-color-grid">${colorInputs}</div>
-            <div class="bn-btn-group">
-              <button class="bn-btn" id="bn-color-save">保存</button>
-              <button class="bn-btn" id="bn-color-cancel">取消</button>
-              <button class="bn-btn" id="bn-color-reset">恢复默认</button>
+
+          <div class="bn-color-sidebar" id="bn-color-sidebar">
+            <div class="bn-color-header">
+              <div class="bn-color-title">
+                <svg class="bn-icon bn-icon-palette" viewBox="0 0 24 24">
+                  <circle cx="13.5" cy="6.5" r=".5"/>
+                  <circle cx="17.5" cy="10.5" r=".5"/>
+                  <circle cx="8.5" cy="7.5" r=".5"/>
+                  <circle cx="6.5" cy="12.5" r=".5"/>
+                  <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 011.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>
+                </svg>
+                自定义颜色
+              </div>
+            </div>
+            <div class="bn-color-content">
+              <div class="bn-color-grid">${colorInputs}</div>
+              <div class="bn-color-actions">
+                <button class="bn-btn bn-btn-primary" id="bn-color-save">保存配置</button>
+                <button class="bn-btn" id="bn-color-cancel">取消更改</button>
+                <button class="bn-btn" id="bn-color-reset">重置默认</button>
+              </div>
             </div>
           </div>
         </div>
-        <div class="bn-section">
-          <div class="bn-desc">4.0.0.dev.beta</div>
-        </div>
+        <div class="bn-version">v4.0.0.dev.beta</div>
       </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
@@ -171,24 +711,57 @@
     const chkMedal = document.getElementById('bn-show-medal');
     const chkMenu  = document.getElementById('bn-enable-user-menu');
     const chkUseColor = document.getElementById('bn-use-custom-color');
-    const colorPanel  = document.getElementById('bn-color-panel');
+    const colorSidebar = document.getElementById('bn-color-sidebar');
     const colorPickers = {};
     const hexInputs = {};
+
+    // 初始化颜色选择器
     COLOR_KEYS.forEach(k => {
         colorPickers[k] = document.getElementById(`bn-color-${k}`);
         hexInputs[k]    = document.getElementById(`bn-color-${k}-hex`);
-        colorPickers[k].oninput = () => { hexInputs[k].value = colorPickers[k].value; };
-        hexInputs[k].oninput = () => {
-            const v = hexInputs[k].value.trim();
-            if (/^#?[0-9a-fA-F]{6}$/.test(v)) {
-                const val = v.startsWith('#') ? v : '#' + v;
-                colorPickers[k].value = val;
-            }
-        };
+
+        if (colorPickers[k] && hexInputs[k]) {
+            // 设置初始值
+            colorPickers[k].value = palette[k];
+            hexInputs[k].value = palette[k];
+
+            // 绑定事件
+            colorPickers[k].oninput = () => {
+                hexInputs[k].value = colorPickers[k].value;
+            };
+            hexInputs[k].oninput = () => {
+                const v = hexInputs[k].value.trim();
+                if (/^#?[0-9a-fA-F]{6}$/.test(v)) {
+                    const val = v.startsWith('#') ? v : '#' + v;
+                    colorPickers[k].value = val;
+                }
+            };
+        }
     });
+
     chkUseColor.onchange = () => {
-        colorPanel.style.display = chkUseColor.checked ? 'block' : 'none';
+        const isChecked = chkUseColor.checked;
+        if (isChecked) {
+            container.classList.add('bn-expanded');
+            panel.classList.add('bn-expanded');
+            setTimeout(() => {
+                colorSidebar.classList.add('bn-show');
+            }, 200);
+        } else {
+            colorSidebar.classList.remove('bn-show');
+            setTimeout(() => {
+                container.classList.remove('bn-expanded');
+                panel.classList.remove('bn-expanded');
+            }, 200);
+        }
     };
+
+    // 初始化颜色面板状态
+    if (useCustomColors) {
+        container.classList.add('bn-expanded');
+        panel.classList.add('bn-expanded');
+        colorSidebar.classList.add('bn-show');
+    }
 
     let hideTimer = null;
     const showPanel = () => {
@@ -204,16 +777,28 @@
     trigger.addEventListener('mouseleave', () => {
         hideTimer = setTimeout(() => {
             if (!trigger.matches(':hover') && !panel.matches(':hover') && !container.matches(':hover')) hidePanel();
-        }, 200);
+        }, 300);
     });
     panel.addEventListener('mouseleave', () => {
         hideTimer = setTimeout(() => {
             if (!trigger.matches(':hover') && !panel.matches(':hover') && !container.matches(':hover')) hidePanel();
-        }, 200);
+        }, 300);
     });
 
     chkAv.onchange = () => { GM_setValue('hideAvatar', chkAv.checked); location.reload(); };
-    chkCp.onchange = () => { GM_setValue('enableCopy', chkCp.checked); location.reload(); };
+    chkCp.onchange = () => {
+        GM_setValue('enableCopy', chkCp.checked);
+        if (chkCp.checked) {
+            copyOpts.style.display = 'block';
+            copyOpts.style.animation = 'slideDown 0.3s ease-out';
+        } else {
+            copyOpts.style.animation = 'slideUp 0.3s ease-out';
+            setTimeout(() => {
+                copyOpts.style.display = 'none';
+            }, 300);
+        }
+        location.reload();
+    };
     chkNt.onchange = () => { GM_setValue('copyNotify', chkNt.checked); location.reload(); };
     chkHo.onchange = () => { GM_setValue('hideOrig', chkHo.checked); location.reload(); };
     chkHook.onchange = () => { GM_setValue('showHook', chkHook.checked); location.reload(); };
@@ -248,29 +833,36 @@
     };
     document.getElementById('bn-color-save').onclick = () => {
         const obj = {};
-        for (const k of COLOR_KEYS) {
-            const v = hexInputs[k].value.trim();
-            if (!/^#?[0-9a-fA-F]{6}$/.test(v)) {
-                alert('颜色码格式错误，请输入六位十六进制');
-                return;
+        COLOR_KEYS.forEach(k => {
+            if (colorPickers[k]) {
+                obj[k] = colorPickers[k].value;
             }
-            obj[k] = v.startsWith('#') ? v : '#' + v;
-        }
+        });
         GM_setValue('userPalette', JSON.stringify(obj));
         GM_setValue('useCustomColors', chkUseColor.checked);
         location.reload();
     };
     document.getElementById('bn-color-cancel').onclick = () => {
         chkUseColor.checked = useCustomColors;
-        colorPanel.style.display = useCustomColors ? 'block' : 'none';
+        if (useCustomColors) {
+            container.classList.add('bn-expanded');
+            panel.classList.add('bn-expanded');
+            colorSidebar.classList.add('bn-show');
+        } else {
+            colorSidebar.classList.remove('bn-show');
+            container.classList.remove('bn-expanded');
+            panel.classList.remove('bn-expanded');
+        }
         COLOR_KEYS.forEach(k => {
-            colorPickers[k].value = palette[k];
-            hexInputs[k].value = palette[k];
+            if (colorPickers[k] && hexInputs[k]) {
+                colorPickers[k].value = palette[k];
+                hexInputs[k].value = palette[k];
+            }
         });
     };
     document.getElementById('bn-color-reset').onclick = () => {
         GM_setValue('userPalette', '{}');
-        GM_setValue('useCustomColors', false);
+        GM_setValue('useCustomColors', true);
         location.reload();
     };
 
@@ -345,14 +937,14 @@
     }
 
 
-    const HOOK_GREEN = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="#5eb95e" style="margin-bottom: -3px;"><path d="M16 8C16 6.84375 15.25 5.84375 14.1875 5.4375C14.6562 4.4375 14.4688 3.1875 13.6562 2.34375C12.8125 1.53125 11.5625 1.34375 10.5625 1.8125C10.1562 0.75 9.15625 0 8 0C6.8125 0 5.8125 0.75 5.40625 1.8125C4.40625 1.34375 3.15625 1.53125 2.34375 2.34375C1.5 3.1875 1.3125 4.4375 1.78125 5.4375C0.71875 5.84375 0 6.84375 0 8C0 9.1875 0.71875 10.1875 1.78125 10.5938C1.3125 11.5938 1.5 12.8438 2.34375 13.6562C3.15625 14.5 4.40625 14.6875 5.40625 14.2188C5.8125 15.2812 6.8125 16 8 16C9.15625 16 10.1562 15.2812 10.5625 14.2188C11.5938 14.6875 12.8125 14.5 13.6562 13.6562C14.4688 12.8438 14.6562 11.5938 14.1875 10.5938C15.25 10.1875 16 9.1875 16 8ZM11.4688 6.625L7.375 10.6875C7.21875 10.8438 7 10.8125 6.875 10.6875L4.5 8.3125C4.375 8.1875 4.375 7.96875 4.5 7.8125L5.3125 7C5.46875 6.875 5.6875 6.875 5.8125 7.03125L7.125 8.34375L10.1562 5.34375C10.3125 5.1875 10.5312 5.1875 10.6562 5.34375L11.4688 6.15625C11.5938 6.28125 11.5938 6.5 11.4688 6.625Z"></path></svg>';
-    const HOOK_BLUE  = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="#3498db" style="margin-bottom: -3px;"><path d="M16 8C16 6.84375 15.25 5.84375 14.1875 5.4375C14.6562 4.4375 14.4688 3.1875 13.6562 2.34375C12.8125 1.53125 11.5625 1.34375 10.5625 1.8125C10.1562 0.75 9.15625 0 8 0C6.8125 0 5.8125 0.75 5.40625 1.8125C4.40625 1.34375 3.15625 1.53125 2.34375 2.34375C1.5 3.1875 1.3125 4.4375 1.78125 5.4375C0.71875 5.84375 0 6.84375 0 8C0 9.1875 0.71875 10.1875 1.78125 10.5938C1.3125 11.5938 1.5 12.8438 2.34375 13.6562C3.15625 14.5 4.40625 14.6875 5.40625 14.2188C5.8125 15.2812 6.8125 16 8 16C9.15625 16 10.1562 15.2812 10.5625 14.2188C11.5938 14.6875 12.8125 14.5 13.6562 13.6562C14.4688 12.8438 14.6562 11.5938 14.1875 10.5938C15.25 10.1875 16 9.1875 16 8ZM11.4688 6.625L7.375 10.6875C7.21875 10.8438 7 10.8125 6.875 10.6875L4.5 8.3125C4.375 8.1875 4.375 7.96875 4.5 7.8125L5.3125 7C5.46875 6.875 5.6875 6.875 5.8125 7.03125L7.125 8.34375L10.1562 5.34375C10.3125 5.1875 10.5312 5.1875 10.6562 5.34375L11.4688 6.15625C11.5938 6.28125 11.5938 6.5 11.4688 6.625Z"></path></svg>';
-    const HOOK_GOLD  = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="#ffc116" style="margin-bottom: -3px;"><path d="M16 8C16 6.84375 15.25 5.84375 14.1875 5.4375C14.6562 4.4375 14.4688 3.1875 13.6562 2.34375C12.8125 1.53125 11.5625 1.34375 10.5625 1.8125C10.1562 0.75 9.15625 0 8 0C6.8125 0 5.8125 0.75 5.40625 1.8125C4.40625 1.34375 3.15625 1.53125 2.34375 2.34375C1.5 3.1875 1.3125 4.4375 1.78125 5.4375C0.71875 5.84375 0 6.84375 0 8C0 9.1875 0.71875 10.1875 1.78125 10.5938C1.3125 11.5938 1.5 12.8438 2.34375 13.6562C3.15625 14.5 4.40625 14.6875 5.40625 14.2188C5.8125 15.2812 6.8125 16 8 16C9.15625 16 10.1562 15.2812 10.5625 14.2188C11.5938 14.6875 12.8125 14.5 13.6562 13.6562C14.4688 12.8438 14.6562 11.5938 14.1875 10.5938C15.25 10.1875 16 9.1875 16 8ZM11.4688 6.625L7.375 10.6875C7.21875 10.8438 7 10.8125 6.875 10.6875L4.5 8.3125C4.375 8.1875 4.375 7.96875 4.5 7.8125L5.3125 7C5.46875 6.875 5.6875 6.875 5.8125 7.03125L7.125 8.34375L10.1562 5.34375C10.3125 5.1875 10.5312 5.1875 10.6562 5.34375L11.4688 6.15625C11.5938 6.28125 11.5938 6.5 11.4688 6.625Z"></path></svg>';
+    const HOOK_GREEN = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 16 16" fill="#28a745" style="margin-bottom: -2px;"><path d="M16 8C16 6.84375 15.25 5.84375 14.1875 5.4375C14.6562 4.4375 14.4688 3.1875 13.6562 2.34375C12.8125 1.53125 11.5625 1.34375 10.5625 1.8125C10.1562 0.75 9.15625 0 8 0C6.8125 0 5.8125 0.75 5.40625 1.8125C4.40625 1.34375 3.15625 1.53125 2.34375 2.34375C1.5 3.1875 1.3125 4.4375 1.78125 5.4375C0.71875 5.84375 0 6.84375 0 8C0 9.1875 0.71875 10.1875 1.78125 10.5938C1.3125 11.5938 1.5 12.8438 2.34375 13.6562C3.15625 14.5 4.40625 14.6875 5.40625 14.2188C5.8125 15.2812 6.8125 16 8 16C9.15625 16 10.1562 15.2812 10.5625 14.2188C11.5938 14.6875 12.8125 14.5 13.6562 13.6562C14.4688 12.8438 14.6562 11.5938 14.1875 10.5938C15.25 10.1875 16 9.1875 16 8ZM11.4688 6.625L7.375 10.6875C7.21875 10.8438 7 10.8125 6.875 10.6875L4.5 8.3125C4.375 8.1875 4.375 7.96875 4.5 7.8125L5.3125 7C5.46875 6.875 5.6875 6.875 5.8125 7.03125L7.125 8.34375L10.1562 5.34375C10.3125 5.1875 10.5312 5.1875 10.6562 5.34375L11.4688 6.15625C11.5938 6.28125 11.5938 6.5 11.4688 6.625Z"></path></svg>';
+    const HOOK_BLUE  = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 16 16" fill="#007bff" style="margin-bottom: -2px;"><path d="M16 8C16 6.84375 15.25 5.84375 14.1875 5.4375C14.6562 4.4375 14.4688 3.1875 13.6562 2.34375C12.8125 1.53125 11.5625 1.34375 10.5625 1.8125C10.1562 0.75 9.15625 0 8 0C6.8125 0 5.8125 0.75 5.40625 1.8125C4.40625 1.34375 3.15625 1.53125 2.34375 2.34375C1.5 3.1875 1.3125 4.4375 1.78125 5.4375C0.71875 5.84375 0 6.84375 0 8C0 9.1875 0.71875 10.1875 1.78125 10.5938C1.3125 11.5938 1.5 12.8438 2.34375 13.6562C3.15625 14.5 4.40625 14.6875 5.40625 14.2188C5.8125 15.2812 6.8125 16 8 16C9.15625 16 10.1562 15.2812 10.5625 14.2188C11.5938 14.6875 12.8125 14.5 13.6562 13.6562C14.4688 12.8438 14.6562 11.5938 14.1875 10.5938C15.25 10.1875 16 9.1875 16 8ZM11.4688 6.625L7.375 10.6875C7.21875 10.8438 7 10.8125 6.875 10.6875L4.5 8.3125C4.375 8.1875 4.375 7.96875 4.5 7.8125L5.3125 7C5.46875 6.875 5.6875 6.875 5.8125 7.03125L7.125 8.34375L10.1562 5.34375C10.3125 5.1875 10.5312 5.1875 10.6562 5.34375L11.4688 6.15625C11.5938 6.28125 11.5938 6.5 11.4688 6.625Z"></path></svg>';
+    const HOOK_GOLD  = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 16 16" fill="#ffc107" style="margin-bottom: -2px;"><path d="M16 8C16 6.84375 15.25 5.84375 14.1875 5.4375C14.6562 4.4375 14.4688 3.1875 13.6562 2.34375C12.8125 1.53125 11.5625 1.34375 10.5625 1.8125C10.1562 0.75 9.15625 0 8 0C6.8125 0 5.8125 0.75 5.40625 1.8125C4.40625 1.34375 3.15625 1.53125 2.34375 2.34375C1.5 3.1875 1.3125 4.4375 1.78125 5.4375C0.71875 5.84375 0 6.84375 0 8C0 9.1875 0.71875 10.1875 1.78125 10.5938C1.3125 11.5938 1.5 12.8438 2.34375 13.6562C3.15625 14.5 4.40625 14.6875 5.40625 14.2188C5.8125 15.2812 6.8125 16 8 16C9.15625 16 10.1562 15.2812 10.5625 14.2188C11.5938 14.6875 12.8125 14.5 13.6562 13.6562C14.4688 12.8438 14.6562 11.5938 14.1875 10.5938C15.25 10.1875 16 9.1875 16 8ZM11.4688 6.625L7.375 10.6875C7.21875 10.8438 7 10.8125 6.875 10.6875L4.5 8.3125C4.375 8.1875 4.375 7.96875 4.5 7.8125L5.3125 7C5.46875 6.875 5.6875 6.875 5.8125 7.03125L7.125 8.34375L10.1562 5.34375C10.3125 5.1875 10.5312 5.1875 10.6562 5.34375L11.4688 6.15625C11.5938 6.28125 11.5938 6.5 11.4688 6.625Z"></path></svg>';
     const MEDAL_ICONS = {
-        gold: '<span class="bn-medal bn-medal-gold"></span>',
-        silver: '<span class="bn-medal bn-medal-silver"></span>',
-        bronze: '<span class="bn-medal bn-medal-bronze"></span>',
-        iron: '<span class="bn-medal bn-medal-iron"></span>'
+        gold: '<span class="bn-medal bn-medal-gold">金</span>',
+        silver: '<span class="bn-medal bn-medal-silver">银</span>',
+        bronze: '<span class="bn-medal bn-medal-bronze">铜</span>',
+        iron: '<span class="bn-medal bn-medal-iron">铁</span>'
     };
 
     function getMedalIcon(type) {
