@@ -26,6 +26,39 @@
     const enableMenu  = GM_getValue('enableUserMenu', false);
     const COLOR_KEYS = ['low3','low2','low1','upp1','upp2','upp3','is','oth'];
     const storedPalette = JSON.parse(GM_getValue('userPalette', '{}'));
+    const useCustomColors = GM_getValue('useCustomColors', false);
+
+    const palettes = {
+        dark: {
+            low3:  'rgb(255, 111, 111)',
+            low2:  'rgb(255, 157, 118)',
+            low1:  'rgb(255, 218, 117)',
+            upp1:  'rgb(191, 255, 132)',
+            upp2:  'rgb(136, 255, 182)',
+            upp3:  'rgb(161, 159, 252)',
+            is:    'rgb(218, 162, 255)',
+            oth:   'rgb(204, 204, 204)'
+        },
+        light: {
+            low3:  'rgb(255, 1, 1)',
+            low2:  'rgb(255, 102, 41)',
+            low1:  'rgb(255, 187, 0)',
+            upp1:  'rgb(98, 202, 0)',
+            upp2:  'rgb(0, 185, 114)',
+            upp3:  'rgb(153, 0, 255)',
+            is:    'rgb(202, 0, 202)',
+            oth:   'rgb(90, 90, 90)'
+        }
+    };
+
+    function isPageDark() {
+        const bg = getComputedStyle(document.body).backgroundColor;
+        const [r,g,b] = bg.slice(bg.indexOf('(')+1,-1).split(',').map(Number);
+        return (0.299*r + 0.587*g + 0.114*b) < 128;
+    }
+
+    const mode    = isPageDark() ? 'dark' : 'light';
+    const palette = Object.assign({}, palettes[mode], useCustomColors ? storedPalette : {});
 
     const css = `
     #bn-container { position: fixed; bottom: 20px; right: 20px; width: 260px; z-index: 10000; }
@@ -37,6 +70,9 @@
     .bn-section { border-bottom: 1px solid #ddd; padding-bottom: 8px; }
     .bn-section:last-child { border-bottom: none; }
     .bn-btn-group { display: flex; flex-wrap: wrap; gap: 4px; }
+    .bn-color-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+    .bn-color-item { display: flex; align-items: center; gap: 4px; }
+    .bn-color-item input[type="text"] { width: 70px; }
     .bn-title { font-weight: bold; margin-bottom: 4px; font-size: 14px; color: #333; }
     .bn-desc  { font-size: 12px; color: #666; margin-bottom: 8px; }
     #bn-panel label { display: block; margin-bottom: 6px; font-size: 13px; }
@@ -58,7 +94,11 @@
     const style = document.createElement('style'); style.textContent = css; document.head.appendChild(style);
 
     const colorInputs = COLOR_KEYS.map(k => `
-            <label>${k}: <input type="color" id="bn-color-${k}" value="${palette[k]}"></label>
+            <div class="bn-color-item">
+                <label>${k}:</label>
+                <input type="color" id="bn-color-${k}" value="${palette[k]}">
+                <input type="text" class="bn-color-hex" id="bn-color-${k}-hex" value="${palette[k]}">
+            </div>
         `).join('');
 
     const container = document.createElement('div'); container.id = 'bn-container';
@@ -102,10 +142,14 @@
         </div>
         <div class="bn-section">
           <div class="bn-title">【颜色配置】</div>
-          ${colorInputs}
-          <div class="bn-btn-group">
-            <button class="bn-btn" id="bn-color-save">保存配色</button>
-            <button class="bn-btn" id="bn-color-reset">恢复默认</button>
+          <label><input type="checkbox" id="bn-use-custom-color" ${useCustomColors?'checked':''}/> 使用自定义颜色</label>
+          <div id="bn-color-panel" style="display:${useCustomColors?'block':'none'}">
+            <div class="bn-color-grid">${colorInputs}</div>
+            <div class="bn-btn-group">
+              <button class="bn-btn" id="bn-color-save">保存</button>
+              <button class="bn-btn" id="bn-color-cancel">取消</button>
+              <button class="bn-btn" id="bn-color-reset">恢复默认</button>
+            </div>
           </div>
         </div>
         <div class="bn-section">
@@ -126,8 +170,25 @@
     const chkHook  = document.getElementById('bn-show-hook');
     const chkMedal = document.getElementById('bn-show-medal');
     const chkMenu  = document.getElementById('bn-enable-user-menu');
+    const chkUseColor = document.getElementById('bn-use-custom-color');
+    const colorPanel  = document.getElementById('bn-color-panel');
     const colorPickers = {};
-    COLOR_KEYS.forEach(k => { colorPickers[k] = document.getElementById(`bn-color-${k}`); });
+    const hexInputs = {};
+    COLOR_KEYS.forEach(k => {
+        colorPickers[k] = document.getElementById(`bn-color-${k}`);
+        hexInputs[k]    = document.getElementById(`bn-color-${k}-hex`);
+        colorPickers[k].oninput = () => { hexInputs[k].value = colorPickers[k].value; };
+        hexInputs[k].oninput = () => {
+            const v = hexInputs[k].value.trim();
+            if (/^#?[0-9a-fA-F]{6}$/.test(v)) {
+                const val = v.startsWith('#') ? v : '#' + v;
+                colorPickers[k].value = val;
+            }
+        };
+    });
+    chkUseColor.onchange = () => {
+        colorPanel.style.display = chkUseColor.checked ? 'block' : 'none';
+    };
 
     let hideTimer = null;
     const showPanel = () => {
@@ -189,10 +250,20 @@
         const obj = {};
         COLOR_KEYS.forEach(k => { obj[k] = colorPickers[k].value; });
         GM_setValue('userPalette', JSON.stringify(obj));
+        GM_setValue('useCustomColors', chkUseColor.checked);
         location.reload();
+    };
+    document.getElementById('bn-color-cancel').onclick = () => {
+        chkUseColor.checked = useCustomColors;
+        colorPanel.style.display = useCustomColors ? 'block' : 'none';
+        COLOR_KEYS.forEach(k => {
+            colorPickers[k].value = palette[k];
+            hexInputs[k].value = palette[k];
+        });
     };
     document.getElementById('bn-color-reset').onclick = () => {
         GM_setValue('userPalette', '{}');
+        GM_setValue('useCustomColors', true);
         location.reload();
     };
 
@@ -288,30 +359,6 @@
         return HOOK_GOLD;
     }
 
-
-    const palettes = {
-        dark: {
-            low3:  'rgb(255, 111, 111)',
-            low2:  'rgb(255, 157, 118)',
-            low1:  'rgb(255, 218, 117)',
-            upp1:  'rgb(191, 255, 132)',
-            upp2:  'rgb(136, 255, 182)',
-            upp3:  'rgb(161, 159, 252)',
-            is:    'rgb(218, 162, 255)',
-            oth:   'rgb(204, 204, 204)'
-        },
-        light: {
-            low3:  'rgb(255, 1, 1)',
-            low2:  'rgb(255, 102, 41)',
-            low1:  'rgb(255, 187, 0)',
-            upp1:  'rgb(98, 202, 0)',
-            upp2:  'rgb(0, 185, 114)',
-            upp3:  'rgb(153, 0, 255)',
-            is:    'rgb(202, 0, 202)',
-            oth:   'rgb(90, 90, 90)'
-        }
-    };
-
     const users = {
         1458: { name: "彭博彦", colorKey: 'low3', hook: 5 },
         966:  { name: "公子文", colorKey: 'low1', hook: 5 },
@@ -404,16 +451,9 @@
         1171: { name: "徐静丹", colorKey: 'low2', hook: 5 },
         2355: { name: "邓皓轩", colorKey: 'low1', hook: 7 },
         1158: { name: "刘泽宇", colorKey: 'low3', hook: 7 },
-        2375: { name: "佘佳霖", colorKey: 'upp1', hook: 4 }
+        2375: { name: "佘佳霖", colorKey: 'upp1', hook: 4 },
+        1150: { name: "黄梓轩", colorKey: 'upp1', hook: 7 }
     };
-
-    function isPageDark() {
-        const bg = getComputedStyle(document.body).backgroundColor;
-        const [r,g,b] = bg.slice(bg.indexOf('(')+1,-1).split(',').map(Number);
-        return (0.299*r + 0.587*g + 0.114*b) < 128;
-    }
-    const mode    = isPageDark() ? 'dark' : 'light';
-    const palette = Object.assign({}, palettes[mode], storedPalette);
 
     function truncateByUnits(str, maxU) {
         if (!isFinite(maxU)) return str;
