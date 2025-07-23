@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      3.10.3.dev.beta
-// @description  修复了一些错误
+// @version      4.0.0.dev.beta
+// @description  新增自定义配色面板并修复若干问题
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -24,6 +24,8 @@
     const showHook    = GM_getValue('showHook', true);
     const showMedal   = GM_getValue('showMedal', true);
     const enableMenu  = GM_getValue('enableUserMenu', false);
+    const COLOR_KEYS = ['low3','low2','low1','upp1','upp2','upp3','is','oth'];
+    const storedPalette = JSON.parse(GM_getValue('userPalette', '{}'));
 
     const css = `
     #bn-container { position: fixed; bottom: 20px; right: 20px; width: 260px; z-index: 10000; }
@@ -54,6 +56,10 @@
     #bn-user-menu a:hover { background: #f0f0f0; }
     `;
     const style = document.createElement('style'); style.textContent = css; document.head.appendChild(style);
+
+    const colorInputs = COLOR_KEYS.map(k => `
+            <label>${k}: <input type="color" id="bn-color-${k}" value="${palette[k]}"></label>
+        `).join('');
 
     const container = document.createElement('div'); container.id = 'bn-container';
     container.innerHTML = `
@@ -95,7 +101,15 @@
           <label><input type="checkbox" id="bn-enable-user-menu" ${enableMenu?'checked':''}/> 右键显示用户菜单</label>
         </div>
         <div class="bn-section">
-          <div class="bn-desc">3.10.3.dev.beta</div>
+          <div class="bn-title">【颜色配置】</div>
+          ${colorInputs}
+          <div class="bn-btn-group">
+            <button class="bn-btn" id="bn-color-save">保存配色</button>
+            <button class="bn-btn" id="bn-color-reset">恢复默认</button>
+          </div>
+        </div>
+        <div class="bn-section">
+          <div class="bn-desc">4.0.0.dev.beta</div>
         </div>
       </div>`;
     document.body.appendChild(container);
@@ -112,6 +126,8 @@
     const chkHook  = document.getElementById('bn-show-hook');
     const chkMedal = document.getElementById('bn-show-medal');
     const chkMenu  = document.getElementById('bn-enable-user-menu');
+    const colorPickers = {};
+    COLOR_KEYS.forEach(k => { colorPickers[k] = document.getElementById(`bn-color-${k}`); });
 
     let hideTimer = null;
     const showPanel = () => {
@@ -167,6 +183,16 @@
         GM_setValue('showHook', chkHook.checked);
         GM_setValue('showMedal', chkMedal.checked);
         GM_setValue('enableUserMenu', chkMenu.checked);
+        location.reload();
+    };
+    document.getElementById('bn-color-save').onclick = () => {
+        const obj = {};
+        COLOR_KEYS.forEach(k => { obj[k] = colorPickers[k].value; });
+        GM_setValue('userPalette', JSON.stringify(obj));
+        location.reload();
+    };
+    document.getElementById('bn-color-reset').onclick = () => {
+        GM_setValue('userPalette', '{}');
         location.reload();
     };
 
@@ -387,7 +413,7 @@
         return (0.299*r + 0.587*g + 0.114*b) < 128;
     }
     const mode    = isPageDark() ? 'dark' : 'light';
-    const palette = palettes[mode];
+    const palette = Object.assign({}, palettes[mode], storedPalette);
 
     function truncateByUnits(str, maxU) {
         if (!isFinite(maxU)) return str;
