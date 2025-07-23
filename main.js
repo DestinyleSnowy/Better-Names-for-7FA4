@@ -831,7 +831,7 @@
         }, 300);
     });
 
-    const checkChanged = () => {
+    function checkChanged() {
         const ti = parseInt(titleInp.value, 10);
         const ui = parseInt(userInp.value, 10);
         const changed =
@@ -842,7 +842,7 @@
             (!chkTitleTr.checked && enableTitleTruncate) ||
             (!chkUserTr.checked && enableUserTruncate);
         confirmBox.style.display = changed ? 'block' : 'none';
-    };
+    }
 
     chkTitleTr.onchange = () => {
         if (chkTitleTr.checked) {
