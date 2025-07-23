@@ -14,6 +14,11 @@
 (function() {
     'use strict';
 
+    let inited = false;
+    function init() {
+        if (inited || !document.body) return;
+        inited = true;
+
     function init() {
 
     const DEFAULT_MAX_UNITS = 10;
@@ -111,6 +116,14 @@
     #bn-user-menu a:hover { background: #f0f0f0; }
     `;
     const style = document.createElement('style'); style.textContent = css; document.head.appendChild(style);
+
+    const colorInputs = COLOR_KEYS.map(k => `
+            <div class="bn-color-item">
+                <label>${k}:</label>
+                <input type="color" id="bn-color-${k}" value="${palette[k]}">
+                <input type="text" class="bn-color-hex" id="bn-color-${k}-hex" value="${palette[k]}">
+            </div>
+        `).join('');
 
     const colorInputs = COLOR_KEYS.map(k => `
             <div class="bn-color-item">
@@ -585,6 +598,7 @@
     if (enableMenu) initUserMenu();
     }
 
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-    else init();
+    if (document.readyState !== 'loading') init();
+    document.addEventListener('DOMContentLoaded', init);
+    window.addEventListener('load', init);
 })();
