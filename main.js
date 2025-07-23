@@ -14,6 +14,8 @@
 (function() {
     'use strict';
 
+    function init() {
+
     const DEFAULT_MAX_UNITS = 10;
     const storedUnits = GM_getValue('maxNameUnits', DEFAULT_MAX_UNITS);
     const maxUnits    = (storedUnits === 'none') ? Infinity : parseInt(storedUnits, 10);
@@ -109,6 +111,14 @@
     #bn-user-menu a:hover { background: #f0f0f0; }
     `;
     const style = document.createElement('style'); style.textContent = css; document.head.appendChild(style);
+
+    const colorInputs = COLOR_KEYS.map(k => `
+            <div class="bn-color-item">
+                <label>${k}:</label>
+                <input type="color" id="bn-color-${k}" value="${palette[k]}">
+                <input type="text" class="bn-color-hex" id="bn-color-${k}-hex" value="${palette[k]}">
+            </div>
+        `).join('');
 
     const colorInputs = COLOR_KEYS.map(k => `
             <div class="bn-color-item">
@@ -573,4 +583,8 @@
 
     if (enableCopy) fEasierClip();
     if (enableMenu) initUserMenu();
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
 })();
