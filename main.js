@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      4.0.0.dev.beta
-// @description  TODO
+// @version      4.1.0.dev.beta
+// @description  优化截断面板并支持题目名截断
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -17,6 +17,7 @@
     const DEFAULT_MAX_UNITS = 10;
     const storedUnits = GM_getValue('maxNameUnits', DEFAULT_MAX_UNITS);
     const maxUnits    = (storedUnits === 'none') ? Infinity : parseInt(storedUnits, 10);
+    const enableTruncate = isFinite(maxUnits);
     const hideAvatar  = GM_getValue('hideAvatar', false);
     const enableCopy  = GM_getValue('enableCopy', false);
     const copyNotify  = GM_getValue('copyNotify', false);
@@ -466,6 +467,15 @@
         animation: slideDown 0.3s ease-out;
     }
 
+    #bn-truncate-options {
+        margin-left: 24px;
+        display: ${enableTruncate ? 'block' : 'none'};
+        padding-top: 8px;
+        border-top: 1px solid #f0f0f0;
+        margin-top: 8px;
+        animation: slideDown 0.3s ease-out;
+    }
+
     @keyframes slideDown {
         from {
             opacity: 0;
@@ -629,13 +639,16 @@
                 </svg>
                 截断功能
               </div>
-              <div class="bn-desc">超过长度后自动添加省略号</div>
-              <input id="bn-input" type="number" min="1" step="1" value="${isFinite(maxUnits)? maxUnits : ''}" placeholder="输入正整数">
-              <div class="bn-btn-group bn-btn-group-4">
-                <button class="bn-btn bn-btn-primary" id="bn-confirm">确定</button>
-                <button class="bn-btn" id="bn-default">默认</button>
-                <button class="bn-btn" id="bn-cancel">取消</button>
-                <button class="bn-btn" id="bn-none">禁用</button>
+              <label><input type="checkbox" id="bn-enable-truncate" ${enableTruncate?'checked':''}/> 启用截断</label>
+              <div id="bn-truncate-options">
+                <div class="bn-desc">超过长度后自动添加省略号</div>
+                <input id="bn-input" type="number" min="1" step="1" value="${isFinite(maxUnits)? maxUnits : ''}" placeholder="输入正整数">
+                <div class="bn-btn-group bn-btn-group-4">
+                  <button class="bn-btn bn-btn-primary" id="bn-confirm">确定</button>
+                  <button class="bn-btn" id="bn-default">默认</button>
+                  <button class="bn-btn" id="bn-cancel">取消</button>
+                  <button class="bn-btn" id="bn-none">禁用</button>
+                </div>
               </div>
             </div>
 
@@ -706,7 +719,7 @@
             </div>
           </div>
         </div>
-        <div class="bn-version">v4.0.0.dev.beta</div>
+        <div class="bn-version">v4.1.0.dev.beta</div>
       </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
@@ -714,6 +727,8 @@
     const trigger  = document.getElementById('bn-trigger');
     const panel    = document.getElementById('bn-panel');
     const inp      = document.getElementById('bn-input');
+    const chkTr    = document.getElementById('bn-enable-truncate');
+    const truncOpts = document.getElementById('bn-truncate-options');
     const chkAv    = document.getElementById('bn-hide-avatar');
     const chkCp    = document.getElementById('bn-enable-copy');
     const chkNt    = document.getElementById('bn-copy-notify');
@@ -726,6 +741,9 @@
     const colorSidebar = document.getElementById('bn-color-sidebar');
     const colorPickers = {};
     const hexInputs = {};
+
+    truncOpts.style.display = enableTruncate ? 'block' : 'none';
+    copyOpts.style.display  = enableCopy ? 'block' : 'none';
 
     // 初始化颜色选择器
     COLOR_KEYS.forEach(k => {
@@ -800,6 +818,18 @@
         }, 300);
     });
 
+    chkTr.onchange = () => {
+        if (chkTr.checked) {
+            truncOpts.style.display = 'block';
+            truncOpts.style.animation = 'slideDown 0.3s ease-out';
+            if (storedUnits === 'none') GM_setValue('maxNameUnits', DEFAULT_MAX_UNITS);
+        } else {
+            truncOpts.style.animation = 'slideUp 0.3s ease-out';
+            setTimeout(() => { truncOpts.style.display = 'none'; }, 300);
+            GM_setValue('maxNameUnits', 'none');
+        }
+        location.reload();
+    };
     chkAv.onchange = () => { GM_setValue('hideAvatar', chkAv.checked); location.reload(); };
     chkCp.onchange = () => {
         GM_setValue('enableCopy', chkCp.checked);
@@ -822,6 +852,7 @@
 
     document.getElementById('bn-cancel').onclick = () => {
         inp.value      = isFinite(maxUnits) ? maxUnits : '';
+        chkTr.checked  = enableTruncate;
         chkAv.checked  = hideAvatar;
         chkCp.checked  = enableCopy;
         chkNt.checked  = copyNotify;
@@ -830,13 +861,18 @@
         chkMedal.checked = showMedal;
         chkMenu.checked = enableMenu;
         copyOpts.style.display = enableCopy ? 'block' : 'none';
+        truncOpts.style.display = enableTruncate ? 'block' : 'none';
     };
     document.getElementById('bn-default').onclick = () => { GM_setValue('maxNameUnits', DEFAULT_MAX_UNITS); location.reload(); };
     document.getElementById('bn-none').onclick    = () => { GM_setValue('maxNameUnits', 'none'); location.reload(); };
     document.getElementById('bn-confirm').onclick = () => {
-        const v = parseInt(inp.value, 10);
-        if (isNaN(v) || v <= 0) { alert('请输入大于 0 的正整数'); inp.value = isFinite(maxUnits)? maxUnits : ''; return; }
-        GM_setValue('maxNameUnits', v);
+        if (chkTr.checked) {
+            const v = parseInt(inp.value, 10);
+            if (isNaN(v) || v <= 0) { alert('请输入大于 0 的正整数'); inp.value = isFinite(maxUnits)? maxUnits : ''; return; }
+            GM_setValue('maxNameUnits', v);
+        } else {
+            GM_setValue('maxNameUnits', 'none');
+        }
         GM_setValue('hideAvatar', chkAv.checked);
         GM_setValue('enableCopy', chkCp.checked);
         GM_setValue('copyNotify', chkNt.checked);
@@ -1128,7 +1164,26 @@
         a.insertAdjacentHTML('beforeend', newHTML);
     }
 
+    function processProblemTitle(span) {
+        let prefix = '';
+        const b = span.querySelector('b');
+        if (b) {
+            const idText = b.textContent;
+            prefix = b.outerHTML + ' ';
+        }
+        let text = '';
+        span.childNodes.forEach(n => { if (n.nodeType === Node.TEXT_NODE) text += n.textContent; });
+        text = text.trim();
+        if (b && text.startsWith(b.textContent)) {
+            text = text.slice(b.textContent.length).trim();
+        }
+        const truncated = truncateByUnits(text, maxUnits);
+        Array.from(span.childNodes).forEach(n => { if (n.nodeType === Node.TEXT_NODE) span.removeChild(n); });
+        span.innerHTML = prefix + truncated;
+    }
+
     document.querySelectorAll('a[href^="/user/"]').forEach(processUserLink);
+    document.querySelectorAll('#vueAppFuckSafari > tbody > tr > td:nth-child(2) > a > span').forEach(processProblemTitle);
 
     const observer = new MutationObserver(mutations => {
         for (const mut of mutations) {
@@ -1137,8 +1192,13 @@
                 if (node.matches && node.matches('a[href^="/user/"]')) {
                     processUserLink(node);
                 }
+                if (node.matches && node.matches('#vueAppFuckSafari > tbody > tr > td:nth-child(2) > a > span')) {
+                    processProblemTitle(node);
+                }
                 node.querySelectorAll &&
                     node.querySelectorAll('a[href^="/user/"]').forEach(processUserLink);
+                node.querySelectorAll &&
+                    node.querySelectorAll('#vueAppFuckSafari > tbody > tr > td:nth-child(2) > a > span').forEach(processProblemTitle);
             });
         }
     });
