@@ -2,7 +2,7 @@
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
 // @version      4.0.0.dev.beta
-// @description  新增自定义配色面板并修复若干问题
+// @description  TODO
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
