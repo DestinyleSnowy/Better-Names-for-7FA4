@@ -15,9 +15,12 @@
     'use strict';
 
     const DEFAULT_MAX_UNITS = 10;
-    const storedUnits = GM_getValue('maxNameUnits', DEFAULT_MAX_UNITS);
-    const maxUnits    = (storedUnits === 'none') ? Infinity : parseInt(storedUnits, 10);
-    const enableTruncate = isFinite(maxUnits);
+    const storedTitleUnits = GM_getValue('maxTitleUnits', DEFAULT_MAX_UNITS);
+    const storedUserUnits  = GM_getValue('maxUserUnits', DEFAULT_MAX_UNITS);
+    const maxTitleUnits = (storedTitleUnits === 'none') ? Infinity : parseInt(storedTitleUnits, 10);
+    const maxUserUnits  = (storedUserUnits === 'none') ? Infinity : parseInt(storedUserUnits, 10);
+    const enableTitleTruncate = isFinite(maxTitleUnits);
+    const enableUserTruncate  = isFinite(maxUserUnits);
     const hideAvatar  = GM_getValue('hideAvatar', false);
     const enableCopy  = GM_getValue('enableCopy', false);
     const copyNotify  = GM_getValue('copyNotify', false);
@@ -467,13 +470,18 @@
         animation: slideDown 0.3s ease-out;
     }
 
-    #bn-truncate-options {
+    #bn-title-options, #bn-user-options {
         margin-left: 24px;
-        display: ${enableTruncate ? 'block' : 'none'};
         padding-top: 8px;
         border-top: 1px solid #f0f0f0;
         margin-top: 8px;
         animation: slideDown 0.3s ease-out;
+    }
+    #bn-title-options {
+        display: ${enableTitleTruncate ? 'block' : 'none'};
+    }
+    #bn-user-options {
+        display: ${enableUserTruncate ? 'block' : 'none'};
     }
 
     @keyframes slideDown {
@@ -639,17 +647,15 @@
                 </svg>
                 截断功能
               </div>
-              <label><input type="checkbox" id="bn-enable-truncate" ${enableTruncate?'checked':''}/> 启用截断</label>
-              <div id="bn-truncate-options">
-                <div class="bn-desc">超过长度后自动添加省略号</div>
-                <input id="bn-input" type="number" min="1" step="1" value="${isFinite(maxUnits)? maxUnits : ''}" placeholder="输入正整数">
-                <div class="bn-btn-group bn-btn-group-4">
-                  <button class="bn-btn bn-btn-primary" id="bn-confirm">确定</button>
-                  <button class="bn-btn" id="bn-default">默认</button>
-                  <button class="bn-btn" id="bn-cancel">取消</button>
-                  <button class="bn-btn" id="bn-none">禁用</button>
-                </div>
+              <label><input type="checkbox" id="bn-enable-title-truncate" ${enableTitleTruncate?'checked':''}/> 启用题目名截断</label>
+              <div id="bn-title-options">
+                <label>截断长度：<input id="bn-title-input" type="number" min="1" step="1" value="${isFinite(maxTitleUnits)? maxTitleUnits : ''}" placeholder="输入正整数"></label>
               </div>
+              <label><input type="checkbox" id="bn-enable-user-truncate" ${enableUserTruncate?'checked':''}/> 启用用户名截断</label>
+              <div id="bn-user-options">
+                <label>截断长度：<input id="bn-user-input" type="number" min="1" step="1" value="${isFinite(maxUserUnits)? maxUserUnits : ''}" placeholder="输入正整数"></label>
+              </div>
+              <div id="bn-truncate-confirm" style="display:none;margin-top:8px;"><button class="bn-btn bn-btn-primary" id="bn-truncate-save">确认并刷新</button></div>
             </div>
 
             <div class="bn-section">
@@ -726,9 +732,14 @@
 
     const trigger  = document.getElementById('bn-trigger');
     const panel    = document.getElementById('bn-panel');
-    const inp      = document.getElementById('bn-input');
-    const chkTr    = document.getElementById('bn-enable-truncate');
-    const truncOpts = document.getElementById('bn-truncate-options');
+    const titleInp   = document.getElementById('bn-title-input');
+    const userInp    = document.getElementById('bn-user-input');
+    const chkTitleTr = document.getElementById('bn-enable-title-truncate');
+    const chkUserTr  = document.getElementById('bn-enable-user-truncate');
+    const titleOpts  = document.getElementById('bn-title-options');
+    const userOpts   = document.getElementById('bn-user-options');
+    const btnTrSave  = document.getElementById('bn-truncate-save');
+    const confirmBox = document.getElementById('bn-truncate-confirm');
     const chkAv    = document.getElementById('bn-hide-avatar');
     const chkCp    = document.getElementById('bn-enable-copy');
     const chkNt    = document.getElementById('bn-copy-notify');
@@ -742,8 +753,10 @@
     const colorPickers = {};
     const hexInputs = {};
 
-    truncOpts.style.display = enableTruncate ? 'block' : 'none';
+    titleOpts.style.display = enableTitleTruncate ? 'block' : 'none';
+    userOpts.style.display  = enableUserTruncate ? 'block' : 'none';
     copyOpts.style.display  = enableCopy ? 'block' : 'none';
+    checkChanged();
 
     // 初始化颜色选择器
     COLOR_KEYS.forEach(k => {
@@ -818,18 +831,41 @@
         }, 300);
     });
 
-    chkTr.onchange = () => {
-        if (chkTr.checked) {
-            truncOpts.style.display = 'block';
-            truncOpts.style.animation = 'slideDown 0.3s ease-out';
-            if (storedUnits === 'none') GM_setValue('maxNameUnits', DEFAULT_MAX_UNITS);
+    function checkChanged() {
+        const ti = parseInt(titleInp.value, 10);
+        const ui = parseInt(userInp.value, 10);
+        const changed =
+            chkTitleTr.checked !== enableTitleTruncate ||
+            chkUserTr.checked !== enableUserTruncate ||
+            (chkTitleTr.checked && ti !== maxTitleUnits) ||
+            (chkUserTr.checked && ui !== maxUserUnits) ||
+            (!chkTitleTr.checked && enableTitleTruncate) ||
+            (!chkUserTr.checked && enableUserTruncate);
+        confirmBox.style.display = changed ? 'block' : 'none';
+    }
+
+    chkTitleTr.onchange = () => {
+        if (chkTitleTr.checked) {
+            titleOpts.style.display = 'block';
+            titleOpts.style.animation = 'slideDown 0.3s ease-out';
         } else {
-            truncOpts.style.animation = 'slideUp 0.3s ease-out';
-            setTimeout(() => { truncOpts.style.display = 'none'; }, 300);
-            GM_setValue('maxNameUnits', 'none');
+            titleOpts.style.animation = 'slideUp 0.3s ease-out';
+            setTimeout(() => { titleOpts.style.display = 'none'; }, 300);
         }
-        location.reload();
+        checkChanged();
     };
+    chkUserTr.onchange = () => {
+        if (chkUserTr.checked) {
+            userOpts.style.display = 'block';
+            userOpts.style.animation = 'slideDown 0.3s ease-out';
+        } else {
+            userOpts.style.animation = 'slideUp 0.3s ease-out';
+            setTimeout(() => { userOpts.style.display = 'none'; }, 300);
+        }
+        checkChanged();
+    };
+    titleInp.oninput = checkChanged;
+    userInp.oninput = checkChanged;
     chkAv.onchange = () => { GM_setValue('hideAvatar', chkAv.checked); location.reload(); };
     chkCp.onchange = () => {
         GM_setValue('enableCopy', chkCp.checked);
@@ -850,36 +886,21 @@
     chkMedal.onchange = () => { GM_setValue('showMedal', chkMedal.checked); location.reload(); };
     chkMenu.onchange = () => { GM_setValue('enableUserMenu', chkMenu.checked); location.reload(); };
 
-    document.getElementById('bn-cancel').onclick = () => {
-        inp.value      = isFinite(maxUnits) ? maxUnits : '';
-        chkTr.checked  = enableTruncate;
-        chkAv.checked  = hideAvatar;
-        chkCp.checked  = enableCopy;
-        chkNt.checked  = copyNotify;
-        chkHo.checked  = hideOrig;
-        chkHook.checked = showHook;
-        chkMedal.checked = showMedal;
-        chkMenu.checked = enableMenu;
-        copyOpts.style.display = enableCopy ? 'block' : 'none';
-        truncOpts.style.display = enableTruncate ? 'block' : 'none';
-    };
-    document.getElementById('bn-default').onclick = () => { GM_setValue('maxNameUnits', DEFAULT_MAX_UNITS); location.reload(); };
-    document.getElementById('bn-none').onclick    = () => { GM_setValue('maxNameUnits', 'none'); location.reload(); };
-    document.getElementById('bn-confirm').onclick = () => {
-        if (chkTr.checked) {
-            const v = parseInt(inp.value, 10);
-            if (isNaN(v) || v <= 0) { alert('请输入大于 0 的正整数'); inp.value = isFinite(maxUnits)? maxUnits : ''; return; }
-            GM_setValue('maxNameUnits', v);
+    btnTrSave.onclick = () => {
+        if (chkTitleTr.checked) {
+            const v = parseInt(titleInp.value, 10);
+            if (isNaN(v) || v <= 0) { alert('请输入大于 0 的正整数'); return; }
+            GM_setValue('maxTitleUnits', v);
         } else {
-            GM_setValue('maxNameUnits', 'none');
+            GM_setValue('maxTitleUnits', 'none');
         }
-        GM_setValue('hideAvatar', chkAv.checked);
-        GM_setValue('enableCopy', chkCp.checked);
-        GM_setValue('copyNotify', chkNt.checked);
-        GM_setValue('hideOrig', chkHo.checked);
-        GM_setValue('showHook', chkHook.checked);
-        GM_setValue('showMedal', chkMedal.checked);
-        GM_setValue('enableUserMenu', chkMenu.checked);
+        if (chkUserTr.checked) {
+            const v = parseInt(userInp.value, 10);
+            if (isNaN(v) || v <= 0) { alert('请输入大于 0 的正整数'); return; }
+            GM_setValue('maxUserUnits', v);
+        } else {
+            GM_setValue('maxUserUnits', 'none');
+        }
         location.reload();
     };
     document.getElementById('bn-color-save').onclick = () => {
@@ -1155,7 +1176,7 @@
                 if (n.nodeType === Node.TEXT_NODE) original += n.textContent;
             });
             original = original.trim();
-            newHTML = (img ? '&nbsp;' : '') + truncateByUnits(original, maxUnits);
+            newHTML = (img ? '&nbsp;' : '') + truncateByUnits(original, maxUserUnits);
         }
 
         Array.from(a.childNodes).forEach(n => {
@@ -1177,7 +1198,7 @@
         if (b && text.startsWith(b.textContent)) {
             text = text.slice(b.textContent.length).trim();
         }
-        const truncated = truncateByUnits(text, maxUnits);
+        const truncated = truncateByUnits(text, maxTitleUnits);
         Array.from(span.childNodes).forEach(n => { if (n.nodeType === Node.TEXT_NODE) span.removeChild(n); });
         span.innerHTML = prefix + truncated;
     }
