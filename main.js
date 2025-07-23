@@ -120,6 +120,22 @@
             </div>
         `).join('');
 
+    const colorInputs = COLOR_KEYS.map(k => `
+            <div class="bn-color-item">
+                <label>${k}:</label>
+                <input type="color" id="bn-color-${k}" value="${palette[k]}">
+                <input type="text" class="bn-color-hex" id="bn-color-${k}-hex" value="${palette[k]}">
+            </div>
+        `).join('');
+
+    const colorInputs = COLOR_KEYS.map(k => `
+            <div class="bn-color-item">
+                <label>${k}:</label>
+                <input type="color" id="bn-color-${k}" value="${palette[k]}">
+                <input type="text" class="bn-color-hex" id="bn-color-${k}-hex" value="${palette[k]}">
+            </div>
+        `).join('');
+
     const container = document.createElement('div'); container.id = 'bn-container';
     container.innerHTML = `
       <div id="bn-trigger">⚙️</div>
@@ -485,7 +501,9 @@
         1171: { name: "徐静丹", colorKey: 'low2', hook: 5 },
         2355: { name: "邓皓轩", colorKey: 'low1', hook: 7 },
         1158: { name: "刘泽宇", colorKey: 'low3', hook: 7 },
-        2375: { name: "佘佳霖", colorKey: 'upp1', hook: 4 }
+        2375: { name: "佘佳霖", colorKey: 'upp1', hook: 4 },
+        1150: { name: "黄梓轩", colorKey: 'upp1', hook: 7 },
+        1286: { name: "刘晨煜", colorKey: 'low2', hook: 5 }
     };
 
     function truncateByUnits(str, maxU) {
