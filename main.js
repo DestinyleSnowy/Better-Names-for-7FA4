@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      3.10.2.dev.beta
-// @description  修复错误并新增右键菜单
+// @version      3.10.3.dev.beta
+// @description  修复了一些错误
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -95,7 +95,7 @@
           <label><input type="checkbox" id="bn-enable-user-menu" ${enableMenu?'checked':''}/> 右键显示用户菜单</label>
         </div>
         <div class="bn-section">
-          <div class="bn-desc">3.10.1.dev.beta</div>
+          <div class="bn-desc">3.10.3.dev.beta</div>
         </div>
       </div>`;
     document.body.appendChild(container);
@@ -377,7 +377,8 @@
         1681: { name: "高云朗", colorKey: 'low2', hook: 5 },
         1171: { name: "徐静丹", colorKey: 'low2', hook: 5 },
         2355: { name: "邓皓轩", colorKey: 'low1', hook: 7 },
-        1158: { name: "刘泽宇", colorKey: 'low3', hook: 7 }
+        1158: { name: "刘泽宇", colorKey: 'low3', hook: 7 },
+        2375: { name: "佘佳霖", colorKey: 'upp1', hook: 4 }
     };
 
     function isPageDark() {
