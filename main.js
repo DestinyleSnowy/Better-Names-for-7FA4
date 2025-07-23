@@ -30,24 +30,24 @@
 
     const palettes = {
         dark: {
-            low3:  'rgb(255, 111, 111)',
-            low2:  'rgb(255, 157, 118)',
-            low1:  'rgb(255, 218, 117)',
-            upp1:  'rgb(191, 255, 132)',
-            upp2:  'rgb(136, 255, 182)',
-            upp3:  'rgb(161, 159, 252)',
-            is:    'rgb(218, 162, 255)',
-            oth:   'rgb(204, 204, 204)'
+            low3:  '#ff6f6f',
+            low2:  '#ff9d76',
+            low1:  '#ffda75',
+            upp1:  '#bfff84',
+            upp2:  '#88ffb6',
+            upp3:  '#a19ffc',
+            is:    '#daa2ff',
+            oth:   '#cccccc'
         },
         light: {
-            low3:  'rgb(255, 1, 1)',
-            low2:  'rgb(255, 102, 41)',
-            low1:  'rgb(255, 187, 0)',
-            upp1:  'rgb(98, 202, 0)',
-            upp2:  'rgb(0, 185, 114)',
-            upp3:  'rgb(153, 0, 255)',
-            is:    'rgb(202, 0, 202)',
-            oth:   'rgb(90, 90, 90)'
+            low3:  '#ff0101',
+            low2:  '#ff6629',
+            low1:  '#ffbb00',
+            upp1:  '#62ca00',
+            upp2:  '#00b972',
+            upp3:  '#9900ff',
+            is:    '#ca00ca',
+            oth:   '#5a5a5a'
         }
     };
 
@@ -61,11 +61,11 @@
     const palette = Object.assign({}, palettes[mode], useCustomColors ? storedPalette : {});
 
     const css = `
-    #bn-container { position: fixed; bottom: 20px; right: 20px; width: 260px; z-index: 10000; }
+    #bn-container { position: fixed; bottom: 20px; right: 20px; width: 320px; z-index: 10000; }
     #bn-container * { pointer-events: auto; }
     #bn-trigger { position: absolute; bottom: 0; right: 0; width: 32px; height: 32px; background: rgba(0,0,0,0.4); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; cursor: pointer; transition: background 0.2s; }
     #bn-trigger:hover { background: rgba(0,0,0,0.6); }
-    #bn-panel { position: absolute; bottom: 40px; right: 0; width: 260px; padding: 12px; background: rgba(255,255,255,0.95); box-shadow: 0 2px 8px rgba(0,0,0,0.2); border-radius: 6px; transform: scale(0.8); transform-origin: bottom right; opacity: 0; pointer-events: none; transition: transform 0.2s ease-out, opacity 0.2s ease-out; display: flex; flex-direction: column; gap: 12px; }
+    #bn-panel { position: absolute; bottom: 40px; right: 0; width: 320px; padding: 12px; background: rgba(255,255,255,0.95); box-shadow: 0 2px 8px rgba(0,0,0,0.2); border-radius: 6px; transform: scale(0.8); transform-origin: bottom right; opacity: 0; pointer-events: none; transition: transform 0.2s ease-out, opacity 0.2s ease-out; display: flex; flex-direction: column; gap: 12px; }
     #bn-panel.bn-show { transform: scale(1); opacity: 1; pointer-events: auto; }
     .bn-section { border-bottom: 1px solid #ddd; padding-bottom: 8px; }
     .bn-section:last-child { border-bottom: none; }
@@ -248,7 +248,14 @@
     };
     document.getElementById('bn-color-save').onclick = () => {
         const obj = {};
-        COLOR_KEYS.forEach(k => { obj[k] = colorPickers[k].value; });
+        for (const k of COLOR_KEYS) {
+            const v = hexInputs[k].value.trim();
+            if (!/^#?[0-9a-fA-F]{6}$/.test(v)) {
+                alert('颜色码格式错误，请输入六位十六进制');
+                return;
+            }
+            obj[k] = v.startsWith('#') ? v : '#' + v;
+        }
         GM_setValue('userPalette', JSON.stringify(obj));
         GM_setValue('useCustomColors', chkUseColor.checked);
         location.reload();
@@ -263,7 +270,7 @@
     };
     document.getElementById('bn-color-reset').onclick = () => {
         GM_setValue('userPalette', '{}');
-        GM_setValue('useCustomColors', true);
+        GM_setValue('useCustomColors', false);
         location.reload();
     };
 
