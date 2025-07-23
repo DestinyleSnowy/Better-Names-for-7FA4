@@ -51,6 +51,17 @@
         }
     };
 
+    function rgbToHex(str) {
+        const m = str.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+        if (!m) return str;
+        const toHex = n => Number(n).toString(16).padStart(2, '0');
+        return '#' + toHex(m[1]) + toHex(m[2]) + toHex(m[3]);
+    }
+
+    function isValidHex(v) {
+        return /^#[0-9a-fA-F]{6}$/.test(v);
+    }
+
     function isPageDark() {
         const bg = getComputedStyle(document.body).backgroundColor;
         const [r,g,b] = bg.slice(bg.indexOf('(')+1,-1).split(',').map(Number);
@@ -58,7 +69,11 @@
     }
 
     const mode    = isPageDark() ? 'dark' : 'light';
-    const palette = Object.assign({}, palettes[mode], useCustomColors ? storedPalette : {});
+    const palette = {};
+    COLOR_KEYS.forEach(k => {
+        const base = (useCustomColors && storedPalette[k]) ? storedPalette[k] : palettes[mode][k];
+        palette[k] = rgbToHex(base);
+    });
 
     const css = `
     #bn-container { position: fixed; bottom: 20px; right: 20px; width: 260px; z-index: 10000; }
@@ -70,9 +85,11 @@
     .bn-section { border-bottom: 1px solid #ddd; padding-bottom: 8px; }
     .bn-section:last-child { border-bottom: none; }
     .bn-btn-group { display: flex; flex-wrap: wrap; gap: 4px; }
-    .bn-color-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+    .bn-color-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 4px; }
     .bn-color-item { display: flex; align-items: center; gap: 4px; }
-    .bn-color-item input[type="text"] { width: 70px; }
+    .bn-color-item input[type="color"] { width: 32px; padding: 0; }
+    .bn-color-item input[type="text"] { width: 60px; }
+    .bn-invalid { border-color: red; }
     .bn-title { font-weight: bold; margin-bottom: 4px; font-size: 14px; color: #333; }
     .bn-desc  { font-size: 12px; color: #666; margin-bottom: 8px; }
     #bn-panel label { display: block; margin-bottom: 6px; font-size: 13px; }
@@ -92,6 +109,14 @@
     #bn-user-menu a:hover { background: #f0f0f0; }
     `;
     const style = document.createElement('style'); style.textContent = css; document.head.appendChild(style);
+
+    const colorInputs = COLOR_KEYS.map(k => `
+            <div class="bn-color-item">
+                <label>${k}:</label>
+                <input type="color" id="bn-color-${k}" value="${palette[k]}">
+                <input type="text" class="bn-color-hex" id="bn-color-${k}-hex" value="${palette[k]}">
+            </div>
+        `).join('');
 
     const colorInputs = COLOR_KEYS.map(k => `
             <div class="bn-color-item">
@@ -177,12 +202,18 @@
     COLOR_KEYS.forEach(k => {
         colorPickers[k] = document.getElementById(`bn-color-${k}`);
         hexInputs[k]    = document.getElementById(`bn-color-${k}-hex`);
-        colorPickers[k].oninput = () => { hexInputs[k].value = colorPickers[k].value; };
+        colorPickers[k].oninput = () => {
+            hexInputs[k].value = colorPickers[k].value;
+            hexInputs[k].classList.remove('bn-invalid');
+        };
         hexInputs[k].oninput = () => {
             const v = hexInputs[k].value.trim();
-            if (/^#?[0-9a-fA-F]{6}$/.test(v)) {
+            if (isValidHex(v.startsWith('#') ? v : '#' + v)) {
                 const val = v.startsWith('#') ? v : '#' + v;
                 colorPickers[k].value = val;
+                hexInputs[k].classList.remove('bn-invalid');
+            } else {
+                hexInputs[k].classList.add('bn-invalid');
             }
         };
     });
@@ -248,22 +279,31 @@
     };
     document.getElementById('bn-color-save').onclick = () => {
         const obj = {};
-        COLOR_KEYS.forEach(k => { obj[k] = colorPickers[k].value; });
+        for (const k of COLOR_KEYS) {
+            const hex = hexInputs[k].value.trim();
+            const val = hex.startsWith('#') ? hex : '#' + hex;
+            if (!isValidHex(val)) {
+                alert(`颜色代码不合法: ${hex}`);
+                return;
+            }
+            obj[k] = val;
+        }
         GM_setValue('userPalette', JSON.stringify(obj));
         GM_setValue('useCustomColors', chkUseColor.checked);
         location.reload();
     };
     document.getElementById('bn-color-cancel').onclick = () => {
         chkUseColor.checked = useCustomColors;
-        colorPanel.style.display = useCustomColors ? 'block' : 'none';
         COLOR_KEYS.forEach(k => {
             colorPickers[k].value = palette[k];
             hexInputs[k].value = palette[k];
+            hexInputs[k].classList.remove('bn-invalid');
         });
+        colorPanel.style.display = chkUseColor.checked ? 'block' : 'none';
     };
     document.getElementById('bn-color-reset').onclick = () => {
         GM_setValue('userPalette', '{}');
-        GM_setValue('useCustomColors', true);
+        GM_setValue('useCustomColors', false);
         location.reload();
     };
 
@@ -452,7 +492,8 @@
         2355: { name: "邓皓轩", colorKey: 'low1', hook: 7 },
         1158: { name: "刘泽宇", colorKey: 'low3', hook: 7 },
         2375: { name: "佘佳霖", colorKey: 'upp1', hook: 4 },
-        1150: { name: "黄梓轩", colorKey: 'upp1', hook: 7 }
+        1150: { name: "黄梓轩", colorKey: 'upp1', hook: 7 },
+        1286: { name: "刘晨煜", colorKey: 'low2', hook: 5 }
     };
 
     function truncateByUnits(str, maxU) {
