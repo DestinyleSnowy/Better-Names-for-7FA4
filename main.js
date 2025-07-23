@@ -451,7 +451,8 @@
         1171: { name: "徐静丹", colorKey: 'low2', hook: 5 },
         2355: { name: "邓皓轩", colorKey: 'low1', hook: 7 },
         1158: { name: "刘泽宇", colorKey: 'low3', hook: 7 },
-        2375: { name: "佘佳霖", colorKey: 'upp1', hook: 4 }
+        2375: { name: "佘佳霖", colorKey: 'upp1', hook: 4 },
+        1150: { name: "黄梓轩", colorKey: 'upp1', hook: 7 }
     };
 
     function truncateByUnits(str, maxU) {
