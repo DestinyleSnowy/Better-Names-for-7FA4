@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      4.2.1
-// @description  优化截断面板并新增固定面板功能，钉住面板后刷新也保持显示
+// @version      4.2.2
+// @description  进行了一些细节优化
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
