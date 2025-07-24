@@ -79,13 +79,13 @@
         position: fixed;
         bottom: 20px;
         right: 20px;
-        width: 280px;
+        width: 320px;
         z-index: 10000;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
     #bn-container.bn-expanded {
-        width: 520px;
+        width: 560px;
     }
     #bn-container * {
         pointer-events: auto;
@@ -122,7 +122,7 @@
         position: absolute;
         bottom: 58px;
         right: 0;
-        width: 280px;
+        width: 320px;
         padding: 0;
         background: #fff;
         box-shadow: 0 8px 32px rgba(0,0,0,0.12);
@@ -143,7 +143,7 @@
         pointer-events: auto;
     }
     #bn-panel.bn-expanded {
-        width: 520px;
+        width: 560px;
     }
 
     .bn-panel-header {
@@ -197,7 +197,7 @@
     }
 
     .bn-section {
-        padding: 16px 20px;
+        padding: 12px 20px;
         border-bottom: 1px solid #f0f0f0;
         transition: background-color 0.2s ease;
     }
@@ -239,7 +239,7 @@
         font-size: 13px;
         color: #495057;
         cursor: pointer;
-        padding: 6px 0;
+        padding: 4px 0;
         transition: all 0.2s ease;
         border-radius: 6px;
         margin: 0 -4px;
@@ -261,13 +261,13 @@
     }
 
     #bn-panel input[type="number"] {
-        width: 100%;
-        padding: 10px 12px;
+        width: 72px;
+        padding: 6px 8px;
         border: 1px solid #ced4da;
         border-radius: 8px;
         font-size: 13px;
         background: #fff;
-        margin-bottom: 12px;
+        margin-bottom: 8px;
         transition: all 0.2s ease;
     }
 
@@ -589,23 +589,23 @@
     /* 响应式 */
     @media (max-width: 600px) {
         #bn-container {
-            width: 260px;
+            width: 300px;
             right: 16px;
             bottom: 16px;
         }
 
         #bn-container.bn-expanded {
             width: calc(100vw - 32px);
-            max-width: 480px;
+            max-width: 520px;
         }
 
         #bn-panel {
-            width: 260px;
+            width: 300px;
         }
 
         #bn-panel.bn-expanded {
             width: calc(100vw - 32px);
-            max-width: 480px;
+            max-width: 520px;
         }
 
         .bn-color-sidebar {
