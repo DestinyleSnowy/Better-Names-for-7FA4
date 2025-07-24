@@ -1109,12 +1109,14 @@
         menu.id = 'bn-user-menu';
         menu.innerHTML = `
             <a id="bn-menu-home" href="#">转到主页</a>
-            <a id="bn-menu-sub" href="#">转到提交记录</a>
+            <a id="bn-menu-sub-problem" href="#" style="display:none;">转到该题提交记录</a>
+            <a id="bn-menu-sub-all" href="#">转到提交记录</a>
             <a id="bn-menu-plan" href="#">转到计划</a>
         `;
         document.body.appendChild(menu);
         const home = menu.querySelector('#bn-menu-home');
-        const sub  = menu.querySelector('#bn-menu-sub');
+        const subProblem = menu.querySelector('#bn-menu-sub-problem');
+        const subAll = menu.querySelector('#bn-menu-sub-all');
         const plan = menu.querySelector('#bn-menu-plan');
         const hide = () => { menu.style.display = 'none'; };
         document.addEventListener('click', hide);
@@ -1129,7 +1131,15 @@
                     let pid = '';
                     const pm = location.search.match(/problem_id=(\d+)/);
                     if (pm) pid = pm[1];
-                    sub.href = `/submissions?contest=&problem_id=${pid}&submitter=${uid}&min_score=0&max_score=100&language=&status=`;
+                    if (pid) {
+                        subProblem.style.display = 'block';
+                        subProblem.href = `/submissions?contest=&problem_id=${pid}&submitter=${uid}&min_score=0&max_score=100&language=&status=`;
+                        subAll.textContent = '转到所有提交记录';
+                    } else {
+                        subProblem.style.display = 'none';
+                        subAll.textContent = '转到提交记录';
+                    }
+                    subAll.href = `/submissions?contest=&problem_id=&submitter=${uid}&min_score=0&max_score=100&language=&status=`;
                     plan.href = `/user_plans/${uid}`;
                     menu.style.left = e.pageX + 'px';
                     menu.style.top = e.pageY + 'px';
