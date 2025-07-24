@@ -788,7 +788,6 @@
     const colorPickers = {};
     const hexInputs = {};
 
-
     pinBtn.classList.toggle('bn-pinned', pinned);
     if (pinned) {
         panel.classList.add('bn-show');
