@@ -180,6 +180,59 @@
         transform: rotate(45deg);
     }
 
+    #bn-pin {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        color: #999;
+        transition: color 0.2s, transform 0.2s;
+    }
+    #bn-pin svg {
+        width: 100%;
+        height: 100%;
+        fill: currentColor;
+    }
+    #bn-pin:hover {
+        color: #333;
+        transform: scale(1.2);
+    }
+    #bn-pin.bn-pinned {
+        color: #007bff;
+        transform: rotate(45deg);
+    }
+    #bn-pin {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        color: #999;
+        transition: color 0.2s, transform 0.2s;
+    }
+    #bn-pin svg {
+        width: 100%;
+        height: 100%;
+        fill: currentColor;
+    }
+    #bn-pin:hover {
+        color: #333;
+        transform: scale(1.2);
+    }
+    #bn-pin.bn-pinned {
+        color: #007bff;
+        transform: rotate(45deg);
+    }
+
     .bn-panel-title {
         font-size: 16px;
         font-weight: 600;
@@ -759,7 +812,7 @@
             </div>
           </div>
         </div>
-        <div class="bn-version">v4.2.1</div>
+        <div class="bn-version">v4.2.1.dev.beta</div>
       </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
@@ -873,6 +926,28 @@
         hideTimer = setTimeout(() => {
             if (!pinned && !trigger.matches(':hover') && !panel.matches(':hover') && !container.matches(':hover')) hidePanel();
         }, 300);
+    });
+
+    pinBtn.addEventListener('click', () => {
+        pinned = !pinned;
+        GM_setValue('panelPinned', pinned);
+        pinBtn.classList.toggle('bn-pinned', pinned);
+        if (pinned) {
+            showPanel();
+        } else if (!trigger.matches(':hover') && !panel.matches(':hover')) {
+            hidePanel();
+        }
+    });
+
+    pinBtn.addEventListener('click', () => {
+        pinned = !pinned;
+        GM_setValue('panelPinned', pinned);
+        pinBtn.classList.toggle('bn-pinned', pinned);
+        if (pinned) {
+            showPanel();
+        } else if (!trigger.matches(':hover') && !panel.matches(':hover')) {
+            hidePanel();
+        }
     });
 
     pinBtn.addEventListener('click', () => {
