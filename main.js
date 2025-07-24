@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      4.2.3
-// @description  进行了一些细节优化
+// @version      4.2.4
+// @description  添加了一些用户
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -25,8 +25,8 @@
     const enableCopy  = GM_getValue('enableCopy', false);
     const copyNotify  = GM_getValue('copyNotify', false);
     const hideOrig    = GM_getValue('hideOrig', false);
-    const showHook    = GM_getValue('showHook', true);
-    const showMedal   = GM_getValue('showMedal', true);
+    const showHook    = GM_getValue('showHook', false);
+    const showMedal   = GM_getValue('showMedal', false);
     const enableMenu  = GM_getValue('enableUserMenu', false);
     const COLOR_KEYS = ['low3','low2','low1','upp1','upp2','upp3','is','oth'];
     const COLOR_LABELS = {
@@ -812,7 +812,7 @@
             </div>
           </div>
         </div>
-        <div class="bn-version">v4.2.3.dev.beta</div>
+        <div class="bn-version">v4.2.4.dev.beta</div>
       </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
@@ -1268,7 +1268,8 @@
         1158: { name: "刘泽宇", colorKey: 'low3', hook: 7 },
         2375: { name: "佘佳霖", colorKey: 'upp1', hook: 4 },
         1150: { name: "黄梓轩", colorKey: 'upp1', hook: 7 },
-        1286: { name: "刘晨煜", colorKey: 'low2', hook: 5 }
+        1286: { name: "刘晨煜", colorKey: 'low2', hook: 5 },
+        758:  { name: "胡越",   colorKey: 'upp3', hook: 8 }
     };
 
     function truncateByUnits(str, maxU) {
