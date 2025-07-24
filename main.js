@@ -1126,7 +1126,10 @@
                     e.preventDefault();
                     const uid = m[1];
                     home.href = `/user/${uid}`;
-                    sub.href = `/submissions?contest=&problem_id=&submitter=${uid}&min_score=0&max_score=100&language=&status=`;
+                    let pid = '';
+                    const pm = location.search.match(/problem_id=(\d+)/);
+                    if (pm) pid = pm[1];
+                    sub.href = `/submissions?contest=&problem_id=${pid}&submitter=${uid}&min_score=0&max_score=100&language=&status=`;
                     plan.href = `/user_plans/${uid}`;
                     menu.style.left = e.pageX + 'px';
                     menu.style.top = e.pageY + 'px';
