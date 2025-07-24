@@ -1129,7 +1129,8 @@
                     const uid = m[1];
                     home.href = `/user/${uid}`;
                     let pid = '';
-                    const pm = location.search.match(/problem_id=(\d+)/);
+                    let pm = location.search.match(/problem_id=(\d+)/);
+                    if (!pm) pm = location.pathname.match(/\/problem\/(\d+)/);
                     if (pm) pid = pm[1];
                     if (pid) {
                         subProblem.style.display = 'block';
