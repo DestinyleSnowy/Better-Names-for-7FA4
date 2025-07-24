@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      4.2.0
-// @description  优化截断面板并新增固定面板功能
+// @version      4.2.1
+// @description  优化截断面板并新增固定面板功能，钉住面板后刷新也保持显示
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -759,7 +759,7 @@
             </div>
           </div>
         </div>
-        <div class="bn-version">v4.2.0</div>
+        <div class="bn-version">v4.2.1</div>
       </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
@@ -788,6 +788,11 @@
     const colorPickers = {};
     const hexInputs = {};
 
+    pinBtn.classList.toggle('bn-pinned', pinned);
+    if (pinned) {
+        panel.classList.add('bn-show');
+        container.style.pointerEvents = 'auto';
+    }
 
     titleOpts.style.display = enableTitleTruncate ? 'block' : 'none';
     userOpts.style.display  = enableUserTruncate ? 'block' : 'none';
@@ -843,7 +848,7 @@
     }
 
     let hideTimer = null;
-    let pinned = false;
+    let pinned = GM_getValue('panelPinned', false);
     const showPanel = () => {
         clearTimeout(hideTimer);
         panel.classList.add('bn-show');
@@ -871,6 +876,7 @@
 
     pinBtn.addEventListener('click', () => {
         pinned = !pinned;
+        GM_setValue('panelPinned', pinned);
         pinBtn.classList.toggle('bn-pinned', pinned);
         if (pinned) {
             showPanel();
