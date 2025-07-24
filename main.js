@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      4.2.2
+// @version      4.2.3
 // @description  进行了一些细节优化
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
@@ -812,7 +812,7 @@
             </div>
           </div>
         </div>
-        <div class="bn-version">v4.2.1.dev.beta</div>
+        <div class="bn-version">v4.2.3.dev.beta</div>
       </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
