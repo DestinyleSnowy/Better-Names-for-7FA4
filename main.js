@@ -261,7 +261,7 @@
     }
 
     #bn-panel input[type="number"] {
-        width: 100%;
+        width: 96px;
         padding: 8px 10px;
         border: 1px solid #ced4da;
         border-radius: 8px;
