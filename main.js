@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      4.2.4
+// @version      4.2.5.dev.beta
 // @description  添加了一些用户
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
@@ -28,7 +28,7 @@
     const showHook    = GM_getValue('showHook', false);
     const showMedal   = GM_getValue('showMedal', false);
     const enableMenu  = GM_getValue('enableUserMenu', false);
-    const COLOR_KEYS = ['low3','low2','low1','upp1','upp2','upp3','is','oth'];
+    const COLOR_KEYS = ['low3','low2','low1', 'is','upp1','upp2','upp3', 'upp4', 'upp5', 'oth'];
     const COLOR_LABELS = {
         low3: 'C25',
         low2: 'C24',
@@ -37,6 +37,8 @@
         upp1: 'G24',
         upp2: 'G23',
         upp3: 'U25',
+        upp4: 'U24',
+        upp5: 'U23',
         oth:  'cdq'
     };
     const storedPalette = JSON.parse(GM_getValue('userPalette', '{}'));
@@ -51,7 +53,9 @@
             upp2:  '#88ffb6',
             upp3:  '#a19ffc',
             is:    '#daa2ff',
-            oth:   '#cccccc'
+            oth:   '#cccccc',
+            upp4:  '#000cff',
+            upp5:  '#896e00'
         },
         light: {
             low3:  '#ff0101',
@@ -61,7 +65,9 @@
             upp2:  '#00b972',
             upp3:  '#9900ff',
             is:    '#ca00ca',
-            oth:   '#5a5a5a'
+            oth:   '#5a5a5a',
+            upp4:  '#000cff',
+            upp5:  '#896e00'
         }
     };
 
@@ -812,7 +818,7 @@
             </div>
           </div>
         </div>
-        <div class="bn-version">v4.2.4.dev.beta</div>
+        <div class="bn-version">v4.2.5.dev.beta</div>
       </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
@@ -1269,7 +1275,21 @@
         2375: { name: "佘佳霖", colorKey: 'upp1', hook: 4 },
         1150: { name: "黄梓轩", colorKey: 'upp1', hook: 7 },
         1286: { name: "刘晨煜", colorKey: 'low2', hook: 5 },
-        758:  { name: "胡越",   colorKey: 'upp3', hook: 8 }
+        758:  { name: "胡越",   colorKey: 'upp3', hook: 8 },
+        23:   { name: "黄皓坤", colorKey: 'upp2', hook: 6 },
+        867:  { name: "李卓恒", colorKey: 'upp3', hook: 7 },
+        709:  { name: "龚信维", colorKey: 'upp3', hook: 7 },
+        718:  { name: "吴雨松", colorKey: 'upp4', hook: 9 },
+        650:  { name: "李钰曦", colorKey: 'upp4', hook: 9 },
+        717:  { name: "蒋宇恒", colorKey: 'upp4', hook: 7 },
+        721:  { name: "江来",   colorKey: 'upp4', hook: 6 },
+        757:  { name: "邱志匀", colorKey: 'upp4', hook: 7 },
+        999:  { name: "聂文涛", colorKey: 'upp2', hook: 5 },
+        668:  { name: "张子川", colorKey: 'upp1', hook: 6 },
+        152:  { name: "马平川", colorKey: 'upp5', hook: 9, medal: 'silver' },
+        151:  { name: "程书涵", colorKey: 'upp5', hook: 9 },
+        831:  { name: "王曦田", colorKey: 'upp3', hook: 6 },
+        15:   { name: "黄嘉玮", colorKey: 'upp2', hook: 7 }
     };
 
     function truncateByUnits(str, maxU) {
