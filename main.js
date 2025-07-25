@@ -39,7 +39,7 @@
         upp3: '大2025级',
         upp4: '大2024级',
         upp5: '大2023级',
-        oth:  'cdq'
+        oth:  '成都七中'
     };
     const GRADE_LABELS = {
         is: '高2025级',
@@ -50,7 +50,8 @@
         upp5: '大2023级',
         low3: '初2025级',
         low2: '初2024级',
-        low1: '初2023级'
+        low1: '初2023级',
+        oth:  '成都七中'
     };
     const storedPalette = JSON.parse(GM_getValue('userPalette', '{}'));
     const useCustomColors = GM_getValue('useCustomColors', false);
