@@ -45,18 +45,6 @@
     const useCustomColors = GM_getValue('useCustomColors', false);
 
     const palettes = {
-        dark: {
-            low3:  '#ff6f6f',
-            low2:  '#ff9d76',
-            low1:  '#ffda75',
-            upp1:  '#bfff84',
-            upp2:  '#88ffb6',
-            upp3:  '#a19ffc',
-            is:    '#daa2ff',
-            oth:   '#cccccc',
-            upp4:  '#000cff',
-            upp5:  '#896e00'
-        },
         light: {
             low3:  '#ff0101',
             low2:  '#ff6629',
@@ -71,14 +59,7 @@
         }
     };
 
-    function isPageDark() {
-        const bg = getComputedStyle(document.body).backgroundColor;
-        const [r,g,b] = bg.slice(bg.indexOf('(')+1,-1).split(',').map(Number);
-        return (0.299*r + 0.587*g + 0.114*b) < 128;
-    }
-
-    const mode    = isPageDark() ? 'dark' : 'light';
-    const palette = Object.assign({}, palettes[mode], useCustomColors ? storedPalette : {});
+    const palette = Object.assign({}, palettes.light, useCustomColors ? storedPalette : {});
 
     const css = `
     #bn-container {
@@ -453,15 +434,15 @@
     .bn-color-grid {
         display: grid;
         grid-template-columns: 1fr;
-        gap: 12px;
+        gap: 8px;
         margin-bottom: 20px;
     }
 
     .bn-color-item {
         display: flex;
         align-items: center;
-        gap: 12px;
-        padding: 12px;
+        gap: 8px;
+        padding: 8px;
         background: #fff;
         border-radius: 8px;
         border: 1px solid #e9ecef;
