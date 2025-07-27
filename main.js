@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      v4.2.7.dev.beta
-// @description  改进用户名展示，支持年级提示和自定义颜色
+// @version      v4.3.0.dev.beta
+// @description  改进用户名展示，支持年级提示、自定义颜色与界面圆角
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -28,6 +28,8 @@
     const showHook    = GM_getValue('showHook', false);
     const showMedal   = GM_getValue('showMedal', false);
     const enableMenu  = GM_getValue('enableUserMenu', false);
+    const enableRound = GM_getValue('enableRound', false);
+    const roundRadius = parseInt(GM_getValue('roundRadius', 8), 10);
     const COLOR_KEYS = ['low3','low2','low1', 'is','upp1','upp2','upp3', 'upp4', 'upp5', 'oth'];
     const COLOR_LABELS = {
         low3: '初2025级',
@@ -89,6 +91,9 @@
     #bn-container * {
         pointer-events: auto;
         box-sizing: border-box;
+    }
+    body.bn-rounded * {
+        border-radius: ${roundRadius}px !important;
     }
 
     #bn-trigger {
@@ -550,7 +555,7 @@
         animation: slideDown 0.3s ease-out;
     }
 
-    #bn-title-options, #bn-user-options {
+    #bn-title-options, #bn-user-options, #bn-round-options {
         margin-left: 24px;
         padding-top: 8px;
         border-top: 1px solid #f0f0f0;
@@ -562,6 +567,9 @@
     }
     #bn-user-options {
         display: ${enableUserTruncate ? 'block' : 'none'};
+    }
+    #bn-round-options {
+        display: ${enableRound ? 'block' : 'none'};
     }
 
     @keyframes slideDown {
@@ -665,6 +673,7 @@
     .bn-icon-medal { stroke: currentColor; stroke-width: 2; fill: none; }
     .bn-icon-menu { stroke: currentColor; stroke-width: 2; fill: none; }
     .bn-icon-palette { stroke: currentColor; stroke-width: 2; fill: none; }
+    .bn-icon-round { stroke: currentColor; stroke-width: 2; fill: none; }
     .bn-icon-pin { fill: currentColor; }
 
     /* 响应式 */
@@ -775,6 +784,19 @@
 
             <div class="bn-section">
               <div class="bn-title">
+                <svg class="bn-icon bn-icon-round" viewBox="0 0 24 24">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                </svg>
+                界面圆角
+              </div>
+              <label><input type="checkbox" id="bn-enable-round" ${enableRound?'checked':''}/> 启用界面圆角</label>
+              <div id="bn-round-options">
+                <label>圆角大小：<input id="bn-round-input" type="number" min="0" step="1" value="${roundRadius}" placeholder="像素"></label>
+              </div>
+            </div>
+
+            <div class="bn-section">
+              <div class="bn-title">
                 <svg class="bn-icon bn-icon-palette" viewBox="0 0 24 24">
                   <circle cx="13.5" cy="6.5" r=".5"/>
                   <circle cx="17.5" cy="10.5" r=".5"/>
@@ -811,7 +833,7 @@
             </div>
           </div>
         </div>
-        <div class="bn-version">v4.2.7.dev.beta</div>
+        <div class="bn-version">v4.3.0.dev.beta</div>
       </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
@@ -836,6 +858,9 @@
     const chkHook  = document.getElementById('bn-show-hook');
     const chkMedal = document.getElementById('bn-show-medal');
     const chkMenu  = document.getElementById('bn-enable-user-menu');
+    const chkRound = document.getElementById('bn-enable-round');
+    const roundInp = document.getElementById('bn-round-input');
+    const roundOpts = document.getElementById('bn-round-options');
     const chkUseColor = document.getElementById('bn-use-custom-color');
     const colorSidebar = document.getElementById('bn-color-sidebar');
     const colorPickers = {};
@@ -851,6 +876,8 @@
     titleOpts.style.display = enableTitleTruncate ? 'block' : 'none';
     userOpts.style.display  = enableUserTruncate ? 'block' : 'none';
     copyOpts.style.display  = enableCopy ? 'block' : 'none';
+    roundOpts.style.display = enableRound ? 'block' : 'none';
+    if (enableRound) document.body.classList.add('bn-rounded');
     checkChanged();
 
     // 初始化颜色选择器
@@ -1014,6 +1041,13 @@
     chkHook.onchange = () => { GM_setValue('showHook', chkHook.checked); location.reload(); };
     chkMedal.onchange = () => { GM_setValue('showMedal', chkMedal.checked); location.reload(); };
     chkMenu.onchange = () => { GM_setValue('enableUserMenu', chkMenu.checked); location.reload(); };
+    chkRound.onchange = () => { GM_setValue('enableRound', chkRound.checked); location.reload(); };
+    roundInp.onchange = () => {
+        const v = parseInt(roundInp.value, 10);
+        if (isNaN(v) || v < 0) { alert('请输入非负整数'); return; }
+        GM_setValue('roundRadius', v);
+        location.reload();
+    };
 
     btnTrSave.onclick = () => {
         if (chkTitleTr.checked) {
