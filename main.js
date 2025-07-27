@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      v4.2.7.dev.beta
-// @description  改进用户名展示，支持年级提示和自定义颜色
+// @version      v4.3.0.dev.beta
+// @description  改进界面设置逻辑，统一保存配置并取消自动刷新
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -541,6 +541,16 @@
         font-size: 12px;
     }
 
+    .bn-save-actions {
+        display: none;
+        padding: 12px 20px;
+        border-top: 1px solid #e9ecef;
+        background: #fff;
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+    }
+
     #bn-copy-options {
         margin-left: 24px;
         display: ${enableCopy ? 'block' : 'none'};
@@ -741,7 +751,6 @@
               <div id="bn-user-options">
                 <label>截断长度：<input id="bn-user-input" type="number" min="1" step="1" value="${isFinite(maxUserUnits)? maxUserUnits : ''}" placeholder="输入正整数"></label>
               </div>
-              <div id="bn-truncate-confirm" style="display:none;margin-top:8px;"><button class="bn-btn bn-btn-primary" id="bn-truncate-save">确认并刷新</button></div>
             </div>
 
             <div class="bn-section">
@@ -804,14 +813,16 @@
             <div class="bn-color-content">
               <div class="bn-color-grid">${colorInputs}</div>
               <div class="bn-color-actions">
-                <button class="bn-btn bn-btn-primary" id="bn-color-save">保存配置</button>
-                <button class="bn-btn" id="bn-color-cancel">取消更改</button>
                 <button class="bn-btn" id="bn-color-reset">重置默认</button>
               </div>
             </div>
           </div>
         </div>
-        <div class="bn-version">v4.2.7.dev.beta</div>
+        <div class="bn-save-actions" id="bn-save-actions">
+          <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
+          <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
+        </div>
+        <div class="bn-version">v4.3.0.dev.beta</div>
       </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
@@ -826,8 +837,6 @@
     const chkUserTr  = document.getElementById('bn-enable-user-truncate');
     const titleOpts  = document.getElementById('bn-title-options');
     const userOpts   = document.getElementById('bn-user-options');
-    const btnTrSave  = document.getElementById('bn-truncate-save');
-    const confirmBox = document.getElementById('bn-truncate-confirm');
     const chkAv    = document.getElementById('bn-hide-avatar');
     const chkCp    = document.getElementById('bn-enable-copy');
     const chkNt    = document.getElementById('bn-copy-notify');
@@ -838,8 +847,25 @@
     const chkMenu  = document.getElementById('bn-enable-user-menu');
     const chkUseColor = document.getElementById('bn-use-custom-color');
     const colorSidebar = document.getElementById('bn-color-sidebar');
+    const saveActions = document.getElementById('bn-save-actions');
     const colorPickers = {};
     const hexInputs = {};
+
+    const originalConfig = {
+        titleTruncate: enableTitleTruncate,
+        userTruncate: enableUserTruncate,
+        maxTitleUnits,
+        maxUserUnits,
+        hideAvatar,
+        enableCopy,
+        copyNotify,
+        hideOrig,
+        showHook,
+        showMedal,
+        enableMenu,
+        useCustomColors,
+        palette: Object.assign({}, palette)
+    };
 
 
     pinBtn.classList.toggle('bn-pinned', pinned);
@@ -866,6 +892,7 @@
             // 绑定事件
             colorPickers[k].oninput = () => {
                 hexInputs[k].value = colorPickers[k].value;
+                checkChanged();
             };
             hexInputs[k].oninput = () => {
                 const v = hexInputs[k].value.trim();
@@ -873,6 +900,7 @@
                     const val = v.startsWith('#') ? v : '#' + v;
                     colorPickers[k].value = val;
                 }
+                checkChanged();
             };
         }
     });
@@ -892,6 +920,7 @@
                 panel.classList.remove('bn-expanded');
             }, 200);
         }
+        checkChanged();
     };
 
     // 初始化颜色面板状态
@@ -963,14 +992,27 @@
     function checkChanged() {
         const ti = parseInt(titleInp.value, 10);
         const ui = parseInt(userInp.value, 10);
+        const paletteChanged = COLOR_KEYS.some(k => {
+            return colorPickers[k] &&
+                colorPickers[k].value.toLowerCase() !== (originalConfig.palette[k] || '').toLowerCase();
+        });
         const changed =
-            chkTitleTr.checked !== enableTitleTruncate ||
-            chkUserTr.checked !== enableUserTruncate ||
-            (chkTitleTr.checked && ti !== maxTitleUnits) ||
-            (chkUserTr.checked && ui !== maxUserUnits) ||
-            (!chkTitleTr.checked && enableTitleTruncate) ||
-            (!chkUserTr.checked && enableUserTruncate);
-        confirmBox.style.display = changed ? 'block' : 'none';
+            chkTitleTr.checked !== originalConfig.titleTruncate ||
+            chkUserTr.checked !== originalConfig.userTruncate ||
+            (chkTitleTr.checked && ti !== originalConfig.maxTitleUnits) ||
+            (chkUserTr.checked && ui !== originalConfig.maxUserUnits) ||
+            (!chkTitleTr.checked && originalConfig.titleTruncate) ||
+            (!chkUserTr.checked && originalConfig.userTruncate) ||
+            chkAv.checked !== originalConfig.hideAvatar ||
+            chkCp.checked !== originalConfig.enableCopy ||
+            chkNt.checked !== originalConfig.copyNotify ||
+            chkHo.checked !== originalConfig.hideOrig ||
+            chkHook.checked !== originalConfig.showHook ||
+            chkMedal.checked !== originalConfig.showMedal ||
+            chkMenu.checked !== originalConfig.enableMenu ||
+            chkUseColor.checked !== originalConfig.useCustomColors ||
+            paletteChanged;
+        saveActions.style.display = changed ? 'flex' : 'none';
     }
 
     chkTitleTr.onchange = () => {
@@ -995,10 +1037,10 @@
     };
     titleInp.oninput = checkChanged;
     userInp.oninput = checkChanged;
-    chkAv.onchange = () => { GM_setValue('hideAvatar', chkAv.checked); location.reload(); };
+    chkAv.onchange = checkChanged;
     chkCp.onchange = () => {
-        GM_setValue('enableCopy', chkCp.checked);
-        if (chkCp.checked) {
+        const isChecked = chkCp.checked;
+        if (isChecked) {
             copyOpts.style.display = 'block';
             copyOpts.style.animation = 'slideDown 0.3s ease-out';
         } else {
@@ -1007,15 +1049,29 @@
                 copyOpts.style.display = 'none';
             }, 300);
         }
-        location.reload();
+        checkChanged();
     };
-    chkNt.onchange = () => { GM_setValue('copyNotify', chkNt.checked); location.reload(); };
-    chkHo.onchange = () => { GM_setValue('hideOrig', chkHo.checked); location.reload(); };
-    chkHook.onchange = () => { GM_setValue('showHook', chkHook.checked); location.reload(); };
-    chkMedal.onchange = () => { GM_setValue('showMedal', chkMedal.checked); location.reload(); };
-    chkMenu.onchange = () => { GM_setValue('enableUserMenu', chkMenu.checked); location.reload(); };
+    chkNt.onchange = checkChanged;
+    chkHo.onchange = checkChanged;
+    chkHook.onchange = checkChanged;
+    chkMedal.onchange = checkChanged;
+    chkMenu.onchange = checkChanged;
 
-    btnTrSave.onclick = () => {
+    document.getElementById('bn-color-reset').onclick = () => {
+        COLOR_KEYS.forEach(k => {
+            if (colorPickers[k] && hexInputs[k]) {
+                colorPickers[k].value = palettes.light[k];
+                hexInputs[k].value = palettes.light[k];
+            }
+        });
+        chkUseColor.checked = true;
+        container.classList.add('bn-expanded');
+        panel.classList.add('bn-expanded');
+        colorSidebar.classList.add('bn-show');
+        checkChanged();
+    };
+
+    document.getElementById('bn-save-config').onclick = () => {
         if (chkTitleTr.checked) {
             const v = parseInt(titleInp.value, 10);
             if (isNaN(v) || v <= 0) { alert('请输入大于 0 的正整数'); return; }
@@ -1030,9 +1086,15 @@
         } else {
             GM_setValue('maxUserUnits', 'none');
         }
-        location.reload();
-    };
-    document.getElementById('bn-color-save').onclick = () => {
+
+        GM_setValue('hideAvatar', chkAv.checked);
+        GM_setValue('enableCopy', chkCp.checked);
+        GM_setValue('copyNotify', chkNt.checked);
+        GM_setValue('hideOrig', chkHo.checked);
+        GM_setValue('showHook', chkHook.checked);
+        GM_setValue('showMedal', chkMedal.checked);
+        GM_setValue('enableUserMenu', chkMenu.checked);
+
         const obj = {};
         COLOR_KEYS.forEach(k => {
             if (colorPickers[k]) {
@@ -1043,9 +1105,25 @@
         GM_setValue('useCustomColors', chkUseColor.checked);
         location.reload();
     };
-    document.getElementById('bn-color-cancel').onclick = () => {
-        chkUseColor.checked = useCustomColors;
-        if (useCustomColors) {
+
+    document.getElementById('bn-cancel-changes').onclick = () => {
+        chkTitleTr.checked = originalConfig.titleTruncate;
+        chkUserTr.checked = originalConfig.userTruncate;
+        titleInp.value = isFinite(originalConfig.maxTitleUnits) ? originalConfig.maxTitleUnits : '';
+        userInp.value = isFinite(originalConfig.maxUserUnits) ? originalConfig.maxUserUnits : '';
+        chkAv.checked = originalConfig.hideAvatar;
+        chkCp.checked = originalConfig.enableCopy;
+        chkNt.checked = originalConfig.copyNotify;
+        chkHo.checked = originalConfig.hideOrig;
+        chkHook.checked = originalConfig.showHook;
+        chkMedal.checked = originalConfig.showMedal;
+        chkMenu.checked = originalConfig.enableMenu;
+        chkUseColor.checked = originalConfig.useCustomColors;
+
+        titleOpts.style.display = chkTitleTr.checked ? 'block' : 'none';
+        userOpts.style.display  = chkUserTr.checked ? 'block' : 'none';
+        copyOpts.style.display  = chkCp.checked ? 'block' : 'none';
+        if (chkUseColor.checked) {
             container.classList.add('bn-expanded');
             panel.classList.add('bn-expanded');
             colorSidebar.classList.add('bn-show');
@@ -1056,15 +1134,11 @@
         }
         COLOR_KEYS.forEach(k => {
             if (colorPickers[k] && hexInputs[k]) {
-                colorPickers[k].value = palette[k];
-                hexInputs[k].value = palette[k];
+                colorPickers[k].value = originalConfig.palette[k];
+                hexInputs[k].value = originalConfig.palette[k];
             }
         });
-    };
-    document.getElementById('bn-color-reset').onclick = () => {
-        GM_setValue('userPalette', '{}');
-        GM_setValue('useCustomColors', true);
-        location.reload();
+        checkChanged();
     };
 
     function fEasierClip() {
