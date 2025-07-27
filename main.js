@@ -95,6 +95,10 @@
     body.bn-rounded * {
         border-radius: ${roundRadius}px !important;
     }
+    /* 避免表格内部圆角影响布局 */
+    body.bn-rounded table * {
+        border-radius: 0 !important;
+    }
 
     #bn-trigger {
         position: absolute;
