@@ -78,15 +78,13 @@
         position: fixed;
         bottom: 20px;
         right: 20px;
-        width: 320px;
-        max-width: calc(100vw - 40px);
+        width: min(320px, calc(100vw - 40px));
         z-index: 10000;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
     #bn-container.bn-expanded {
-        width: 560px;
-        max-width: calc(100vw - 40px);
+        width: min(560px, calc(100vw - 40px));
     }
     #bn-container * {
         pointer-events: auto;
@@ -123,8 +121,7 @@
         position: absolute;
         bottom: 58px;
         right: 0;
-        width: 320px;
-        max-width: calc(100vw - 40px);
+        width: min(320px, calc(100vw - 40px));
         padding: 0;
         background: #fff;
         box-shadow: 0 8px 32px rgba(0,0,0,0.12);
@@ -145,8 +142,7 @@
         pointer-events: auto;
     }
     #bn-panel.bn-expanded {
-        width: 560px;
-        max-width: calc(100vw - 40px);
+        width: min(560px, calc(100vw - 40px));
     }
 
     .bn-panel-header {
@@ -674,25 +670,21 @@
     /* 响应式 */
     @media (max-width: 600px) {
         #bn-container {
-            width: 300px;
-            max-width: calc(100vw - 32px);
+            width: min(300px, calc(100vw - 32px));
             right: 16px;
             bottom: 16px;
         }
 
         #bn-container.bn-expanded {
             width: calc(100vw - 32px);
-            max-width: calc(100vw - 32px);
         }
 
         #bn-panel {
-            width: 300px;
-            max-width: calc(100vw - 32px);
+            width: min(300px, calc(100vw - 32px));
         }
 
         #bn-panel.bn-expanded {
             width: calc(100vw - 32px);
-            max-width: calc(100vw - 32px);
         }
 
         .bn-color-sidebar {
