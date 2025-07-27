@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      v4.2.7.dev.beta
-// @description  改进用户名展示，支持年级提示和自定义颜色
+// @version      v4.3.0.dev.beta
+// @description  优化设置面板自适应页面宽度，改进用户名展示并支持年级提示与自定义颜色
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -79,12 +79,14 @@
         bottom: 20px;
         right: 20px;
         width: 320px;
+        max-width: calc(100vw - 40px);
         z-index: 10000;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
     #bn-container.bn-expanded {
         width: 560px;
+        max-width: calc(100vw - 40px);
     }
     #bn-container * {
         pointer-events: auto;
@@ -122,6 +124,7 @@
         bottom: 58px;
         right: 0;
         width: 320px;
+        max-width: calc(100vw - 40px);
         padding: 0;
         background: #fff;
         box-shadow: 0 8px 32px rgba(0,0,0,0.12);
@@ -143,6 +146,7 @@
     }
     #bn-panel.bn-expanded {
         width: 560px;
+        max-width: calc(100vw - 40px);
     }
 
     .bn-panel-header {
@@ -671,22 +675,24 @@
     @media (max-width: 600px) {
         #bn-container {
             width: 300px;
+            max-width: calc(100vw - 32px);
             right: 16px;
             bottom: 16px;
         }
 
         #bn-container.bn-expanded {
             width: calc(100vw - 32px);
-            max-width: 520px;
+            max-width: calc(100vw - 32px);
         }
 
         #bn-panel {
             width: 300px;
+            max-width: calc(100vw - 32px);
         }
 
         #bn-panel.bn-expanded {
             width: calc(100vw - 32px);
-            max-width: 520px;
+            max-width: calc(100vw - 32px);
         }
 
         .bn-color-sidebar {
@@ -811,7 +817,7 @@
             </div>
           </div>
         </div>
-        <div class="bn-version">v4.2.7.dev.beta</div>
+        <div class="bn-version">v4.3.0.dev.beta</div>
       </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
