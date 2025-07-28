@@ -2,7 +2,7 @@
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
 // @version      v4.3.1.dev.beta
-// @description  修复标题以 L 开头时复制功能无效的问题
+// @description  修复了一些问题
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -1143,17 +1143,22 @@
 
     function fEasierClip() {
         if (!/\/problem\//.test(location.pathname)) return;
-        let ref = document.querySelector('div.ui.buttons.right.floated > a:nth-child(1)');
-        if (!ref) {
+        let link = document.querySelector('div.ui.buttons.right.floated > a');
+        if (!link) {
             const grids = document.querySelectorAll('div.ui.center.aligned.grid');
             for (const g of grids) {
-                const cand = g.querySelector('div.ui.buttons.right.floated > a:nth-child(1)');
-                if (cand) { ref = cand; break; }
+                const candBox = g.querySelector('div.ui.buttons.right.floated');
+                if (candBox && candBox.firstElementChild && candBox.firstElementChild.tagName === 'A') {
+                    link = candBox.firstElementChild;
+                    break;
+                }
             }
+        } else if (link.previousSibling) {
+            link = link.parentElement && link.parentElement.firstElementChild;
         }
-        if (!ref) return;
+        if (!link) return;
         if (hideOrig) {
-            ref.style.display = 'none';
+            link.style.display = 'none';
         }
         const btn = document.createElement('a');
         btn.className = 'small ui button';
@@ -1181,7 +1186,7 @@
                 GM_notification({ text: '复制失败：' + e, timeout: 3000 });
             }
         };
-        ref.parentNode.insertBefore(btn, ref);
+        link.parentNode.insertBefore(btn, link);
     }
 
     function initUserMenu() {
