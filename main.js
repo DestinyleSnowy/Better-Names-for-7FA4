@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      v4.3.0.dev.beta
-// @description  改进界面设置逻辑，统一保存配置并取消自动刷新
+// @version      v4.3.1.dev.beta
+// @description  修复标题以 L 开头时复制功能无效的问题
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -822,7 +822,7 @@
           <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
           <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
         </div>
-        <div class="bn-version">v4.3.0.dev.beta</div>
+        <div class="bn-version">v4.3.1.dev.beta</div>
       </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
@@ -1142,11 +1142,23 @@
     };
 
     function fEasierClip() {
-        if (!/problem\/\d+$/.test(location.href)) return;
-        const ref = document.querySelector("body > div:nth-child(2) > div > div:nth-child(8) > div:nth-child(1) > div > div.ui.buttons.right.floated > a:nth-child(1)");
-        if (!ref) return;
+        if (!/\/problem\//.test(location.pathname)) return;
+        let link = document.querySelector('div.ui.buttons.right.floated > a');
+        if (!link) {
+            const grids = document.querySelectorAll('div.ui.center.aligned.grid');
+            for (const g of grids) {
+                const candBox = g.querySelector('div.ui.buttons.right.floated');
+                if (candBox && candBox.firstElementChild && candBox.firstElementChild.tagName === 'A') {
+                    link = candBox.firstElementChild;
+                    break;
+                }
+            }
+        } else if (link.previousSibling) {
+            link = link.parentElement && link.parentElement.firstElementChild;
+        }
+        if (!link) return;
         if (hideOrig) {
-            ref.style.display = 'none';
+            link.style.display = 'none';
         }
         const btn = document.createElement('a');
         btn.className = 'small ui button';
@@ -1174,7 +1186,7 @@
                 GM_notification({ text: '复制失败：' + e, timeout: 3000 });
             }
         };
-        ref.parentNode.insertBefore(btn, ref);
+        link.parentNode.insertBefore(btn, link);
     }
 
     function initUserMenu() {
