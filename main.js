@@ -2,7 +2,7 @@
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
 // @version      v4.3.1.dev.beta
-// @description  修复标题以 L 开头时复制功能无效的问题
+// @description  修复了一些问题
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
