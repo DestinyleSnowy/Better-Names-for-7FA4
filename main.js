@@ -1143,11 +1143,12 @@
 
     function fEasierClip() {
         if (!/\/problem\//.test(location.pathname)) return;
-        let ref = document.querySelector("body > div:nth-child(2) > div > div:nth-child(8) > div:nth-child(1) > div > div.ui.buttons.right.floated > a:nth-child(1)");
+        let ref = document.querySelector('div.ui.buttons.right.floated > a:nth-child(1)');
         if (!ref) {
-            const grid = document.querySelector("body > div:nth-child(2) > div > div.ui.center.aligned.grid");
-            if (grid) {
-                ref = grid.querySelector("div.ui.buttons.right.floated a");
+            const grids = document.querySelectorAll('div.ui.center.aligned.grid');
+            for (const g of grids) {
+                const cand = g.querySelector('div.ui.buttons.right.floated > a:nth-child(1)');
+                if (cand) { ref = cand; break; }
             }
         }
         if (!ref) return;
