@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      v4.3.0.dev.beta
-// @description  改进界面设置逻辑，统一保存配置并取消自动刷新
+// @version      v4.3.1.dev.beta
+// @description  修复标题以 L 开头时复制功能无效的问题
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -822,7 +822,7 @@
           <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
           <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
         </div>
-        <div class="bn-version">v4.3.0.dev.beta</div>
+        <div class="bn-version">v4.3.1.dev.beta</div>
       </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
@@ -1142,8 +1142,15 @@
     };
 
     function fEasierClip() {
-        if (!/problem\/\d+$/.test(location.href)) return;
-        const ref = document.querySelector("body > div:nth-child(2) > div > div:nth-child(8) > div:nth-child(1) > div > div.ui.buttons.right.floated > a:nth-child(1)");
+        if (!/\/problem\//.test(location.pathname)) return;
+        let ref = document.querySelector('div.ui.buttons.right.floated > a:nth-child(1)');
+        if (!ref) {
+            const grids = document.querySelectorAll('div.ui.center.aligned.grid');
+            for (const g of grids) {
+                const cand = g.querySelector('div.ui.buttons.right.floated > a:nth-child(1)');
+                if (cand) { ref = cand; break; }
+            }
+        }
         if (!ref) return;
         if (hideOrig) {
             ref.style.display = 'none';
