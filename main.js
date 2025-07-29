@@ -1002,28 +1002,6 @@
         }
     });
 
-    pinBtn.addEventListener('click', () => {
-        pinned = !pinned;
-        GM_setValue('panelPinned', pinned);
-        pinBtn.classList.toggle('bn-pinned', pinned);
-        if (pinned) {
-            showPanel();
-        } else if (!trigger.matches(':hover') && !panel.matches(':hover')) {
-            hidePanel();
-        }
-    });
-
-    pinBtn.addEventListener('click', () => {
-        pinned = !pinned;
-        GM_setValue('panelPinned', pinned);
-        pinBtn.classList.toggle('bn-pinned', pinned);
-        if (pinned) {
-            showPanel();
-        } else if (!trigger.matches(':hover') && !panel.matches(':hover')) {
-            hidePanel();
-        }
-    });
-
     function checkChanged() {
         const ti = parseInt(titleInp.value, 10);
         const ui = parseInt(userInp.value, 10);
@@ -1563,9 +1541,10 @@
     autoExit: 'planAdder.autoExit'
   };
 
+  const enablePlanAdder = GM_getValue('enablePlanAdder', false);
   let modeOn   = !!GM_getValue(KEY.mode, false);
   let selected = new Map((GM_getValue(KEY.selected, []) || []).map(o => [o.pid, o.code]));
-  let autoExit = initialAutoExit;
+  let autoExit = GM_getValue(KEY.autoExit, false);
   let observer = null;
 
   /* ========= 小工具 ========= */
