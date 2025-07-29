@@ -1506,11 +1506,13 @@
     mode:     'planAdder.mode',
     selected: 'planAdder.selected.v4', // [{pid, code}]
     date:     'planAdder.date',
-    barPos:   'planAdder.barPos'
+    barPos:   'planAdder.barPos',
+    autoExit: 'planAdder.autoExit'
   };
 
   let modeOn   = !!GM_getValue(KEY.mode, false);
   let selected = new Map((GM_getValue(KEY.selected, []) || []).map(o => [o.pid, o.code]));
+  let autoExit = !!GM_getValue(KEY.autoExit, false);
   let observer = null;
 
   /* ========= 小工具 ========= */
@@ -1617,6 +1619,15 @@
     h.checked = ids.length && ids.every(id=>selected.has(id));
   }
 
+  function clearSelections(){
+    selected.clear();
+    persist();
+    $$('.padder-cell input').forEach(cb=>cb.checked=false);
+    $$(SEL.rows).forEach(r=>r.classList.remove('padder-selected'));
+    syncHeader();
+    count();
+  }
+
   /* ========= 工具条 ========= */
   function toolbar(){
     if($('#plan-bar')) return;
@@ -1627,6 +1638,7 @@
         <label>日期：<input type="date" id="pad-date"></label>
         <button class="ui mini button" id="pad-copy">复制编号</button>
         <button class="ui mini button" id="pad-clear">清空</button>
+        <label title="成功后退出并清空"><input type="checkbox" id="pad-auto" style="vertical-align:middle;">完成后退出</label>
         <button class="ui mini primary button" id="pad-ok">确定（<span id="pad-count">0</span>）</button>
       </div>`;
     document.body.appendChild(bar);
@@ -1642,7 +1654,8 @@
     const date=$('#pad-date'); date.value=GM_getValue(KEY.date)||tomorrowISO();
     date.onchange=()=>GM_setValue(KEY.date,date.value);
     $('#pad-copy').onclick=()=>{ GM_setClipboard(JSON.stringify({date:date.value,codes:[...selected.values()]},null,2)); notify(`已复制 ${selected.size} 个编号`); };
-    $('#pad-clear').onclick=()=>{ if(!selected.size||!confirm('确认清空？')) return; selected.clear(); persist(); $$('.padder-cell input').forEach(cb=>cb.checked=false); $$(SEL.rows).forEach(r=>r.classList.remove('padder-selected')); syncHeader(); count(); };
+    $('#pad-clear').onclick=()=>{ if(!selected.size||!confirm('确认清空？')) return; clearSelections(); };
+    const cbAuto=$('#pad-auto'); cbAuto.checked=autoExit; cbAuto.onchange=()=>{ autoExit=cbAuto.checked; GM_setValue(KEY.autoExit,autoExit); };
     $('#pad-ok').onclick=submitPlan;
 
     count();
@@ -1726,9 +1739,16 @@
         'X-Requested-With':'XMLHttpRequest',
         'Accept':'application/json',
         'Origin': CFG.base,
-        'Referer': `${CFG.base}/user_plans/${uid}`
+      'Referer': `${CFG.base}/user_plans/${uid}`
       }
     });
+  }
+
+  function afterSuccess(){
+    if(autoExit){
+      clearSelections();
+      exitMode();
+    }
   }
 
   /* ========= 主流程 ========= */
@@ -1760,7 +1780,7 @@
       await postPlan(body, uid);
       const after = await fetchPlanJSON({ uid, epoch });
       const ok = union.every(x => after.problemIds.includes(x));
-      if (ok) { notify(`保存成功：加入 ${addIds.length} 题（共 ${union.length} 题）`); return; }
+      if (ok) { notify(`保存成功：加入 ${addIds.length} 题（共 ${union.length} 题）`); afterSuccess(); return; }
       log('一次性写入后校验未通过，进入逐条补齐');
     }catch(e){
       log('一次性写入失败：', e.message);
@@ -1776,7 +1796,7 @@
       }
       const final = await fetchPlanJSON({ uid, epoch });
       const ok2 = union.every(x => final.problemIds.includes(x));
-      if (ok2) { notify(`保存成功（逐条补齐）：加入 ${addIds.length} 题（共 ${union.length} 题）`); return; }
+      if (ok2) { notify(`保存成功（逐条补齐）：加入 ${addIds.length} 题（共 ${union.length} 题）`); afterSuccess(); return; }
     }catch(e){
       log('逐条补齐失败：', e.message);
     }
@@ -1785,11 +1805,12 @@
   }
 
   /* ========= 模式切换 ========= */
-  function enterMode(){ modeOn=true; GM_setValue(KEY.mode,true); insertSelectColumn(); toolbar(); observe(); }
+  function enterMode(){ modeOn=true; GM_setValue(KEY.mode,true); insertSelectColumn(); toolbar(); observe();
+    const b=$('#plan-toggle'); if(b) b.textContent='退出【添加计划】'; }
   function exitMode(){ modeOn=false; GM_setValue(KEY.mode,false);
     $('#plan-bar')?.remove(); $('#padder-th')?.remove();
     $$(SEL.rows).forEach(r=>{ r.classList.remove('padder-selected'); r.querySelector('td.padder-cell')?.remove(); });
-  }
+    const b=$('#plan-toggle'); if(b) b.textContent='进入【添加计划】'; }
 
   /* ========= 启动 ========= */
   (function start(){ toggleButton(); if(modeOn) enterMode(); })();
