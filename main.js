@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      v4.3.1.dev.beta
+// @version      v5.0.0.preview.beta
 // @description  修复了一些问题
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
@@ -9,6 +9,9 @@
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_notification
+// @grant        GM_addStyle
+// @grant        GM_setClipboard
+// @grant        GM_xmlhttpRequest
 // ==/UserScript==
 
 (function() {
@@ -822,7 +825,7 @@
           <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
           <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
         </div>
-        <div class="bn-version">v4.3.1.dev.beta</div>
+        <div class="bn-version">v5.0.0.preview.beta</div>
       </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
@@ -1477,4 +1480,338 @@
 
     if (enableCopy) fEasierClip();
     if (enableMenu) initUserMenu();
+})();
+(function () {
+  'use strict';
+
+  /* ========= 配置 ========= */
+  const CFG = {
+    base: 'http://in.7fa4.cn:8888',
+    tzOffsetHours: 8,  // 服务端按北京时间切日
+    DEBUG: true,       // 控制台详细日志
+    DELIM: '|'         // 题目分隔符（关键）
+  };
+
+  /* ========= 选择器 ========= */
+  const SEL = {
+    table:  'table.ui.very.basic.center.aligned.table',
+    thead:  'table.ui.very.basic.center.aligned.table thead > tr',
+    tbody:  'table.ui.very.basic.center.aligned.table tbody',
+    rows:   'table.ui.very.basic.center.aligned.table tbody > tr',
+    linkIn: 'a[href^="/problem/"]'
+  };
+
+  /* ========= 存储 ========= */
+  const KEY = {
+    mode:     'planAdder.mode',
+    selected: 'planAdder.selected.v4', // [{pid, code}]
+    date:     'planAdder.date',
+    barPos:   'planAdder.barPos',
+    autoExit: 'planAdder.autoExit'
+  };
+
+  let modeOn   = !!GM_getValue(KEY.mode, false);
+  let selected = new Map((GM_getValue(KEY.selected, []) || []).map(o => [o.pid, o.code]));
+  let autoExit = !!GM_getValue(KEY.autoExit, false);
+  let observer = null;
+
+  /* ========= 小工具 ========= */
+  const $  = (s, r=document) => r.querySelector(s);
+  const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+  const log = (...a) => CFG.DEBUG && console.log('[PlanAdder]', ...a);
+  const txt = el => (el ? el.textContent.trim() : '');
+
+  const tomorrowISO = () => {
+    const d = new Date(); d.setDate(d.getDate()+1);
+    return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())).toISOString().slice(0,10);
+  };
+  const offsetStr = h => {
+    const s=h>=0?'+':'-', a=Math.abs(h);
+    return `${s}${String(Math.floor(a)).padStart(2,'0')}:${String(Math.round((a-Math.floor(a))*60)).padStart(2,'0')}`;
+  };
+  const dateToEpoch = (iso,tz)=>Math.floor(new Date(`${iso}T00:00:00${offsetStr(tz)}`).getTime()/1000);
+
+  const notify  = m => GM_notification({ text:m, timeout:2600 });
+  const persist = () => GM_setValue(KEY.selected,[...selected].map(([pid,code])=>({pid,code})));
+
+  function getUserId(){
+    const a = document.querySelector('a[href^="/user_plans/"]');
+    return a ? (a.href.match(/\/user_plans\/(\d+)/)||[])[1] : null;
+  }
+
+  function codeColIndex(){
+    const ths = $$(SEL.thead + ' > th');
+    for (let i=0;i<ths.length;i++){
+      if (txt(ths[i]).replace(/\s+/g,'').includes('编号')) return i+1;
+    }
+    return null;
+  }
+  const pidFromRow  = r => (r.querySelector(SEL.linkIn)?.href.match(/\/problem\/(\d+)/)||[])[1] || null;
+  const codeFromRow = r => {
+    const idx = codeColIndex();
+    if (!idx) return null;
+    const td = r.querySelector(`td:nth-child(${idx})`);
+    return txt(td?.querySelector('b')||td);
+  };
+
+  /* ========= 顶部按钮 ========= */
+  function toggleButton(){
+    const host = $('.ui.grid .row .four.wide.right.aligned.column') || document.body;
+    if ($('#plan-toggle', host)) return;
+    const btn = document.createElement('button');
+    btn.id='plan-toggle'; btn.className='ui mini button'; btn.style.marginLeft='8px';
+    btn.textContent = modeOn?'退出【添加计划】':'进入【添加计划】';
+    btn.onclick = () => { modeOn?exitMode():enterMode(); btn.textContent=modeOn?'退出【添加计划】':'进入【添加计划】'; };
+    host.appendChild(btn);
+  }
+
+  /* ========= 选择列 ========= */
+  function insertSelectColumn(){
+    const tr = $(SEL.thead);
+    if (tr && !$('#padder-th', tr)){
+      const th = document.createElement('th');
+      th.id='padder-th'; th.className='collapsing'; th.style.whiteSpace='nowrap';
+      th.innerHTML = `<label title="本页全选"><input id="padder-all" type="checkbox" style="vertical-align:middle;"><span style="margin-left:4px;font-weight:normal;">全选</span></label>`;
+      tr.prepend(th);
+      $('#padder-all').onchange = e=>{
+        const on = e.target.checked;
+        $$(SEL.rows).forEach(row=>{
+          const pid = +pidFromRow(row); if(!pid) return;
+          let cell = row.querySelector('td.padder-cell');
+          if(!cell){ cell=makeCell(row,pid); row.prepend(cell); }
+          const cb = cell.firstChild; cb.checked=on;
+          toggleSelect(row,pid,on,true);
+        });
+        count();
+      };
+    }
+    $$(SEL.rows).forEach(row=>{
+      const pid = +pidFromRow(row); if(!pid) return;
+      if (!row.querySelector('td.padder-cell')){
+        const cell=makeCell(row,pid); row.prepend(cell);
+      }
+      const on = selected.has(pid);
+      row.querySelector('td.padder-cell input').checked = on;
+      row.classList.toggle('padder-selected', on);
+    });
+    syncHeader();
+  }
+  function makeCell(row,pid){
+    const td=document.createElement('td');
+    td.className='padder-cell'; td.style.textAlign='center'; td.style.padding='6px';
+    td.innerHTML=`<input type="checkbox" style="vertical-align:middle;">`;
+    const cb=td.firstChild;
+    cb.checked=selected.has(pid);
+    cb.onchange=()=>{ toggleSelect(row,pid,cb.checked,false); count(); };
+    row.classList.toggle('padder-selected', cb.checked);
+    return td;
+  }
+  function toggleSelect(row,pid,on,fromHeader){
+    const code = codeFromRow(row) || `#${pid}`;
+    on ? selected.set(pid, code) : selected.delete(pid);
+    row.classList.toggle('padder-selected', on);
+    if(!fromHeader) syncHeader();
+    persist();
+  }
+  function syncHeader(){
+    const h=$('#padder-all'); if(!h) return;
+    const ids=$$(SEL.rows).map(pidFromRow).filter(Boolean).map(Number);
+    h.checked = ids.length && ids.every(id=>selected.has(id));
+  }
+
+  function clearSelections(){
+    selected.clear();
+    persist();
+    $$('.padder-cell input').forEach(cb=>cb.checked=false);
+    $$(SEL.rows).forEach(r=>r.classList.remove('padder-selected'));
+    syncHeader();
+    count();
+  }
+
+  /* ========= 工具条 ========= */
+  function toolbar(){
+    if($('#plan-bar')) return;
+    const bar=document.createElement('div'); bar.id='plan-bar';
+    bar.innerHTML=`
+      <div class="padder">
+        <span id="pad-handle" title="拖拽">⠿</span>
+        <label>日期：<input type="date" id="pad-date"></label>
+        <button class="ui mini button" id="pad-copy">复制编号</button>
+        <button class="ui mini button" id="pad-clear">清空</button>
+        <label title="成功后退出并清空"><input type="checkbox" id="pad-auto" style="vertical-align:middle;">完成后退出</label>
+        <button class="ui mini primary button" id="pad-ok">确定（<span id="pad-count">0</span>）</button>
+      </div>`;
+    document.body.appendChild(bar);
+
+    GM_addStyle(`
+      #plan-bar{position:fixed;right:16px;bottom:120px;z-index:9999;background:#fff;border:1px solid #ddd;border-radius:10px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.12);min-width:460px;max-width:90vw;}
+      #plan-bar .padder{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+      #pad-handle{cursor:move;opacity:.7}
+      th#padder-th,td.padder-cell{width:46px;}
+      .padder-selected{background:rgba(0,150,255,.06)!important;}
+    `);
+
+    const date=$('#pad-date'); date.value=GM_getValue(KEY.date)||tomorrowISO();
+    date.onchange=()=>GM_setValue(KEY.date,date.value);
+    $('#pad-copy').onclick=()=>{ GM_setClipboard(JSON.stringify({date:date.value,codes:[...selected.values()]},null,2)); notify(`已复制 ${selected.size} 个编号`); };
+    $('#pad-clear').onclick=()=>{ if(!selected.size||!confirm('确认清空？')) return; clearSelections(); };
+    const cbAuto=$('#pad-auto'); cbAuto.checked=autoExit; cbAuto.onchange=()=>{ autoExit=cbAuto.checked; GM_setValue(KEY.autoExit,autoExit); };
+    $('#pad-ok').onclick=submitPlan;
+
+    count();
+    const pos=GM_getValue(KEY.barPos,null);
+    if(pos){ bar.style.left=pos.left; bar.style.top=pos.top; bar.style.right='auto'; bar.style.bottom='auto'; }
+    drag(bar, $('#pad-handle'));
+  }
+  function count(){ const el=$('#pad-count'); if(el) el.textContent=selected.size; }
+  function drag(el, handle){
+    let sx,sy,sl,st,d=false;
+    handle.onmousedown=e=>{
+      d=true; sx=e.clientX; sy=e.clientY; const r=el.getBoundingClientRect(); sl=r.left; st=r.top;
+      el.style.right='auto'; el.style.bottom='auto';
+      window.onmousemove=ev=>{ if(!d) return; const L=Math.max(0,Math.min(window.innerWidth-el.offsetWidth,sl+ev.clientX-sx)); const T=Math.max(0,Math.min(window.innerHeight-el.offsetHeight,st+ev.clientY-sy)); el.style.left=L+'px'; el.style.top=T+'px'; };
+      window.onmouseup=()=>{ d=false; window.onmousemove=null; window.onmouseup=null; GM_setValue(KEY.barPos,{left:el.style.left,top:el.style.top}); };
+      e.preventDefault();
+    };
+  }
+
+  /* ========= 观察列表 ========= */
+  function observe(){
+    const root=$(SEL.tbody)||document.body;
+    observer?.disconnect();
+    observer=new MutationObserver(()=>{ if(modeOn) insertSelectColumn(); });
+    observer.observe(root,{childList:true,subtree:true});
+  }
+
+  /* ========= 网络 ========= */
+  function gmFetch(opts){
+    return new Promise((res,rej)=>{
+      GM_xmlhttpRequest({
+        ...opts, withCredentials:true,
+        onload:r=>{
+          log(opts.method||'GET', opts.url, r.status, (r.responseText||'').slice(0,160));
+          r.status>=200&&r.status<300 ? res(r) : rej(new Error(`HTTP ${r.status}: ${(r.responseText||'').slice(0,200)}`));
+        },
+        onerror:e=>rej(new Error(e.error||'网络错误'))
+      });
+    });
+  }
+
+  // 读取当天计划（JSON）：拿 id 与现有 problem_ids 数组
+  async function fetchPlanJSON({ uid, epoch }) {
+    const r = await gmFetch({
+      url: CFG.base + `/user_plan?user_id=${uid}&date=${epoch}&type=day&format=json`,
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json',
+        'Referer': `${CFG.base}/user_plans/${uid}`
+      }
+    });
+    let j = {};
+    try { j = JSON.parse(r.responseText || '{}'); } catch {}
+    const up = j.user_plan || {};
+    const arr = String(up.problem_ids || '')
+      .split(/[|,\s]+/)    // 兼容 | / , / 空白 分隔
+      .map(x => Number(x))
+      .filter(Boolean);
+    return { id: up.id || up.plan_id || '', problemIds: arr };
+  }
+
+  // 构造提交体（始终携带 id；一次性并集；使用 | 分隔）
+  function buildBody({ id, epoch, uid, values }) {
+    const p = new URLSearchParams();
+    if (id) p.set('id', String(id));
+    p.set('type','day');
+    p.set('date', String(epoch));
+    p.set('user_id', String(uid));
+    p.set('plan',''); p.set('result',''); p.set('tweak','');
+    p.set('problem_ids', values.join(CFG.DELIM));  // 用 | 分隔的数字ID
+    return p.toString();
+  }
+
+  function postPlan(body, uid){
+    return gmFetch({
+      url: CFG.base + '/user_plan',
+      method:'POST',
+      data: body,
+      headers:{
+        'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8',
+        'X-Requested-With':'XMLHttpRequest',
+        'Accept':'application/json',
+        'Origin': CFG.base,
+      'Referer': `${CFG.base}/user_plans/${uid}`
+      }
+    });
+  }
+
+  function afterSuccess(){
+    if(autoExit){
+      clearSelections();
+      exitMode();
+    }
+  }
+
+  /* ========= 主流程 ========= */
+  async function submitPlan(){
+    if(!selected.size) return notify('请先勾选题目');
+
+    const iso   = $('#pad-date')?.value || tomorrowISO();
+    const epoch = dateToEpoch(iso, CFG.tzOffsetHours);
+    const uid   = getUserId(); if(!uid){ notify('无法识别 user_id，请先点顶部“计划”再回来'); return; }
+
+    // 待添加的“数字ID”
+    const addIds = [...selected.keys()].map(Number);
+    if(!addIds.length) return notify('未解析到数字ID');
+
+    if(!confirm(`将提交 ${addIds.length} 个题到 ${iso}？`)) return;
+
+    // 1) 读取现有 plan → id + 已有IDs
+    const meta = await fetchPlanJSON({ uid, epoch });
+    const planId = meta.id;
+    const set = new Set(meta.problemIds);
+    addIds.forEach(i=>set.add(i));
+    const union = [...set];
+
+    log('planId =', planId || '(空)', 'existing=', meta.problemIds, 'union=', union);
+
+    // 2) 首选：一次性并集（携带 id，problem_ids="id|id|id"）
+    try{
+      const body = buildBody({ id: planId, epoch, uid, values: union });
+      await postPlan(body, uid);
+      const after = await fetchPlanJSON({ uid, epoch });
+      const ok = union.every(x => after.problemIds.includes(x));
+      if (ok) { notify(`保存成功：加入 ${addIds.length} 题（共 ${union.length} 题）`); afterSuccess(); return; }
+      log('一次性写入后校验未通过，进入逐条补齐');
+    }catch(e){
+      log('一次性写入失败：', e.message);
+    }
+
+    // 3) 逐条补齐（每次都写“当前并集”，避免覆盖；同样用 | 分隔）
+    try{
+      for(const id of addIds){
+        const latest = await fetchPlanJSON({ uid, epoch });
+        const s2 = new Set(latest.problemIds); s2.add(id);
+        const body2 = buildBody({ id: latest.id || planId, epoch, uid, values: [...s2] });
+        await postPlan(body2, uid);
+      }
+      const final = await fetchPlanJSON({ uid, epoch });
+      const ok2 = union.every(x => final.problemIds.includes(x));
+      if (ok2) { notify(`保存成功（逐条补齐）：加入 ${addIds.length} 题（共 ${union.length} 题）`); afterSuccess(); return; }
+    }catch(e){
+      log('逐条补齐失败：', e.message);
+    }
+
+    notify('提交未生效：请把 Network 中 POST /user_plan 的 Form Data 与 Response 发我继续适配');
+  }
+
+  /* ========= 模式切换 ========= */
+  function enterMode(){ modeOn=true; GM_setValue(KEY.mode,true); insertSelectColumn(); toolbar(); observe();
+    const b=$('#plan-toggle'); if(b) b.textContent='退出【添加计划】'; }
+  function exitMode(){ modeOn=false; GM_setValue(KEY.mode,false);
+    $('#plan-bar')?.remove(); $('#padder-th')?.remove();
+    $$(SEL.rows).forEach(r=>{ r.classList.remove('padder-selected'); r.querySelector('td.padder-cell')?.remove(); });
+    const b=$('#plan-toggle'); if(b) b.textContent='进入【添加计划】'; }
+
+  /* ========= 启动 ========= */
+  (function start(){ toggleButton(); if(modeOn) enterMode(); })();
 })();
