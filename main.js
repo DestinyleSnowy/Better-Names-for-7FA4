@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      v5.0.0.rc.1
+// @version      v5.0.0.rc.2
 // @description  Better Names v5.0.0.rc.1
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
@@ -856,7 +856,7 @@
           <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
           <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
         </div>
-        <div class="bn-version">v5.0.0.rc.1</div>
+        <div class="bn-version">v5.0.0.rc.2</div>
       </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
