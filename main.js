@@ -33,6 +33,7 @@
     const enableMenu  = GM_getValue('enableUserMenu', false);
     const enablePlanAdder = GM_getValue('enablePlanAdder', false);
     const initialAutoExit = GM_getValue('planAdder.autoExit', false);
+    let autoExit = initialAutoExit;
     const COLOR_KEYS = ['low3','low2','low1', 'is','upp1','upp2','upp3', 'upp4', 'upp5', 'oth'];
     const COLOR_LABELS = {
         low3: '初2025级',
@@ -1682,8 +1683,11 @@
       .padder-selected{background:rgba(0,150,255,.06)!important;}
     `);
 
-    const date=$('#pad-date'); date.value=GM_getValue(KEY.date)||tomorrowISO();
-    date.onchange=()=>GM_setValue(KEY.date,date.value);
+    const date=$('#pad-date');
+    const tomorrow=tomorrowISO();
+    date.min = tomorrow;
+    date.value = GM_getValue(KEY.date, tomorrow);
+    date.onchange=()=>{ if(date.value<tomorrow) date.value=tomorrow; GM_setValue(KEY.date,date.value); };
     $('#pad-copy').onclick=()=>{ GM_setClipboard(JSON.stringify({date:date.value,codes:[...selected.values()]},null,2)); notify(`已复制 ${selected.size} 个编号`); };
     $('#pad-clear').onclick=()=>{ if(!selected.size||!confirm('确认清空？')) return; clearSelections(); };
     $('#pad-ok').onclick=submitPlan;
