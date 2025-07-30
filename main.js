@@ -90,7 +90,7 @@
         transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
     #bn-container.bn-expanded {
-        width: 960px;
+        width: 1200px;
     }
     #bn-container * {
         pointer-events: auto;
@@ -133,6 +133,7 @@
         box-shadow: 0 8px 32px rgba(0,0,0,0.12);
         border: 1px solid #e0e0e0;
         border-radius: 12px;
+        height: calc(100vh - 80px);
         max-height: calc(100vh - 80px);
         overflow-y: auto;
         transform: scale(0.95) translateY(10px);
@@ -150,7 +151,7 @@
         pointer-events: auto;
     }
     #bn-panel.bn-expanded {
-        width: 960px;
+        width: 1200px;
     }
 
     .bn-panel-header {
@@ -270,7 +271,7 @@
     }
 
     .bn-color-sidebar {
-        width: 240px;
+        width: 480px;
         background: #fafbfc;
         border-left: 1px solid #e9ecef;
         opacity: 0;
