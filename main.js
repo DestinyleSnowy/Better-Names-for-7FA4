@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      v5.0.0.rc.1
+// @version      v5.0.0.rc.2
 // @description  Better Names v5.0.0.rc.1
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
@@ -84,13 +84,13 @@
         position: fixed;
         bottom: 20px;
         right: 20px;
-        width: 720px;
+        width: 480px;
         z-index: 10000;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
     #bn-container.bn-expanded {
-        width: 1200px;
+        width: 960px;
     }
     #bn-container * {
         pointer-events: auto;
@@ -127,7 +127,7 @@
         position: absolute;
         bottom: 58px;
         right: 0;
-        width: 720px;
+        width: 480px;
         padding: 0;
         background: #fff;
         box-shadow: 0 8px 32px rgba(0,0,0,0.12);
@@ -150,7 +150,7 @@
         pointer-events: auto;
     }
     #bn-panel.bn-expanded {
-        width: 1200px;
+        width: 960px;
     }
 
     .bn-panel-header {
@@ -263,7 +263,7 @@
 
     .bn-main-content {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(2, 1fr);
         gap: 12px;
         flex: 1;
         min-width: 0;
@@ -856,7 +856,7 @@
           <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
           <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
         </div>
-        <div class="bn-version">v5.0.0.rc.1</div>
+        <div class="bn-version">v5.0.0.rc.2</div>
       </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
