@@ -133,7 +133,8 @@
         box-shadow: 0 8px 32px rgba(0,0,0,0.12);
         border: 1px solid #e0e0e0;
         border-radius: 12px;
-        max-height: calc(100vh - 100px);
+        height: calc(100vh - 80px);
+        max-height: calc(100vh - 80px);
         overflow-y: auto;
         transform: scale(0.95) translateY(10px);
         transform-origin: bottom right;
@@ -455,7 +456,7 @@
 
     .bn-color-grid {
         display: grid;
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, 1fr);
         gap: 8px;
         margin-bottom: 20px;
     }
