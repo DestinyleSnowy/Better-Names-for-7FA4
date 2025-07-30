@@ -1122,7 +1122,7 @@
         GM_setValue('showMedal', chkMedal.checked);
         GM_setValue('enableUserMenu', chkMenu.checked);
         GM_setValue('enablePlanAdder', chkPlan.checked);
-        GM_setValue(KEY.autoExit, chkPlanAuto.checked);
+        GM_setValue('planAdder.autoExit', chkPlanAuto.checked);
         autoExit = chkPlanAuto.checked;
 
         const obj = {};
