@@ -985,16 +985,19 @@
         }
     };
     trigger.addEventListener('mouseenter', showPanel);
-    trigger.addEventListener('mouseleave', () => {
+    const maybeHidePanel = () => {
         hideTimer = setTimeout(() => {
-            if (!pinned && !trigger.matches(':hover') && !panel.matches(':hover') && !container.matches(':hover')) hidePanel();
+            if (!pinned &&
+                !trigger.matches(':hover') &&
+                !panel.matches(':hover') &&
+                !container.matches(':hover')) {
+                hidePanel();
+            }
         }, 300);
-    });
-    panel.addEventListener('mouseleave', () => {
-        hideTimer = setTimeout(() => {
-            if (!pinned && !trigger.matches(':hover') && !panel.matches(':hover') && !container.matches(':hover')) hidePanel();
-        }, 300);
-    });
+    };
+
+    trigger.addEventListener('mouseleave', maybeHidePanel);
+    panel.addEventListener('mouseleave', maybeHidePanel);
 
     pinBtn.addEventListener('click', () => {
         pinned = !pinned;
@@ -1035,58 +1038,28 @@
         saveActions.style.display = changed ? 'flex' : 'none';
     }
 
-    chkTitleTr.onchange = () => {
-        if (chkTitleTr.checked) {
-            titleOpts.style.display = 'block';
-            titleOpts.style.animation = 'slideDown 0.3s ease-out';
+    function toggleOption(chk, el) {
+        if (chk.checked) {
+            el.style.display = 'block';
+            el.style.animation = 'slideDown 0.3s ease-out';
         } else {
-            titleOpts.style.animation = 'slideUp 0.3s ease-out';
-            setTimeout(() => { titleOpts.style.display = 'none'; }, 300);
+            el.style.animation = 'slideUp 0.3s ease-out';
+            setTimeout(() => { el.style.display = 'none'; }, 300);
         }
-        checkChanged();
-    };
-    chkUserTr.onchange = () => {
-        if (chkUserTr.checked) {
-            userOpts.style.display = 'block';
-            userOpts.style.animation = 'slideDown 0.3s ease-out';
-        } else {
-            userOpts.style.animation = 'slideUp 0.3s ease-out';
-            setTimeout(() => { userOpts.style.display = 'none'; }, 300);
-        }
-        checkChanged();
-    };
+    }
+
+    chkTitleTr.onchange = () => { toggleOption(chkTitleTr, titleOpts); checkChanged(); };
+    chkUserTr.onchange  = () => { toggleOption(chkUserTr, userOpts); checkChanged(); };
     titleInp.oninput = checkChanged;
     userInp.oninput = checkChanged;
     chkAv.onchange = checkChanged;
-    chkCp.onchange = () => {
-        const isChecked = chkCp.checked;
-        if (isChecked) {
-            copyOpts.style.display = 'block';
-            copyOpts.style.animation = 'slideDown 0.3s ease-out';
-        } else {
-            copyOpts.style.animation = 'slideUp 0.3s ease-out';
-            setTimeout(() => {
-                copyOpts.style.display = 'none';
-            }, 300);
-        }
-        checkChanged();
-    };
+    chkCp.onchange = () => { toggleOption(chkCp, copyOpts); checkChanged(); };
     chkNt.onchange = checkChanged;
     chkHo.onchange = checkChanged;
     chkHook.onchange = checkChanged;
     chkMedal.onchange = checkChanged;
     chkMenu.onchange = checkChanged;
-    chkPlan.onchange = () => {
-        const on = chkPlan.checked;
-        if (on) {
-            planOpts.style.display = 'block';
-            planOpts.style.animation = 'slideDown 0.3s ease-out';
-        } else {
-            planOpts.style.animation = 'slideUp 0.3s ease-out';
-            setTimeout(() => { planOpts.style.display = 'none'; }, 300);
-        }
-        checkChanged();
-    };
+    chkPlan.onchange = () => { toggleOption(chkPlan, planOpts); checkChanged(); };
     chkPlanAuto.onchange = () => { autoExit = chkPlanAuto.checked; checkChanged(); };
 
     document.getElementById('bn-color-reset').onclick = () => {
