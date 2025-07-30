@@ -84,13 +84,13 @@
         position: fixed;
         bottom: 20px;
         right: 20px;
-        width: 320px;
+        width: 720px;
         z-index: 10000;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
     #bn-container.bn-expanded {
-        width: 560px;
+        width: 1200px;
     }
     #bn-container * {
         pointer-events: auto;
@@ -127,19 +127,21 @@
         position: absolute;
         bottom: 58px;
         right: 0;
-        width: 320px;
+        width: 720px;
         padding: 0;
         background: #fff;
         box-shadow: 0 8px 32px rgba(0,0,0,0.12);
         border: 1px solid #e0e0e0;
         border-radius: 12px;
+        max-height: calc(100vh - 80px);
+        overflow-y: auto;
         transform: scale(0.95) translateY(10px);
         transform-origin: bottom right;
         opacity: 0;
         visibility: hidden;
         pointer-events: none;
         transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-        overflow: hidden;
+
     }
     #bn-panel.bn-show {
         transform: scale(1) translateY(0);
@@ -148,7 +150,7 @@
         pointer-events: auto;
     }
     #bn-panel.bn-expanded {
-        width: 560px;
+        width: 1200px;
     }
 
     .bn-panel-header {
@@ -260,12 +262,15 @@
     }
 
     .bn-main-content {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
         flex: 1;
         min-width: 0;
     }
 
     .bn-color-sidebar {
-        width: 240px;
+        width: 480px;
         background: #fafbfc;
         border-left: 1px solid #e9ecef;
         opacity: 0;
@@ -283,12 +288,11 @@
     }
 
     .bn-section {
-        padding: 12px 20px;
-        border-bottom: 1px solid #f0f0f0;
+        padding: 12px 16px;
+        border: 1px solid #f0f0f0;
+        border-radius: 8px;
+        background: #fff;
         transition: background-color 0.2s ease;
-    }
-    .bn-section:last-child {
-        border-bottom: none;
     }
     .bn-section:hover {
         background: rgba(248, 249, 250, 0.6);
@@ -451,7 +455,7 @@
 
     .bn-color-grid {
         display: grid;
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, 1fr);
         gap: 8px;
         margin-bottom: 20px;
     }
@@ -1544,7 +1548,11 @@
 
   const enablePlanAdder = GM_getValue('enablePlanAdder', false);
   let modeOn   = !!GM_getValue(KEY.mode, false);
-  let selected = new Map((GM_getValue(KEY.selected, []) || []).map(o => [o.pid, o.code]));
+  let selected = new Map(
+    (GM_getValue(KEY.selected, []) || [])
+      .filter(o => o.code && !/^L/i.test(o.code))
+      .map(o => [o.pid, o.code])
+  );
   let autoExit = GM_getValue(KEY.autoExit, false);
   let observer = null;
 
@@ -1558,6 +1566,31 @@
     const d = new Date(); d.setDate(d.getDate()+1);
     return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())).toISOString().slice(0,10);
   };
+
+  function patchDatePicker(){
+    const change = () => {
+      document.querySelectorAll('button,span,a,div').forEach(btn => {
+        if(btn.textContent && btn.textContent.trim() === '今天' && !btn.dataset.bnTomorrow){
+          btn.dataset.bnTomorrow = '1';
+          btn.textContent = '明天';
+          btn.addEventListener('click', () => {
+            setTimeout(() => {
+              const active = document.activeElement;
+              if(active && active.tagName === 'INPUT' && active.type === 'date'){
+                const t = tomorrowISO();
+                active.value = t;
+                active.dispatchEvent(new Event('input', {bubbles:true}));
+                active.dispatchEvent(new Event('change', {bubbles:true}));
+              }
+            }, 0);
+          }, true);
+        }
+      });
+    };
+    const mo = new MutationObserver(change);
+    mo.observe(document.body, {childList:true, subtree:true});
+    change();
+  }
   const offsetStr = h => {
     const s=h>=0?'+':'-', a=Math.abs(h);
     return `${s}${String(Math.floor(a)).padStart(2,'0')}:${String(Math.round((a-Math.floor(a))*60)).padStart(2,'0')}`;
@@ -1586,6 +1619,10 @@
     const td = r.querySelector(`td:nth-child(${idx})`);
     return txt(td?.querySelector('b')||td);
   };
+  const skipRow = r => {
+    const c = codeFromRow(r);
+    return c && /^L/i.test(c);
+  };
 
   /* ========= 顶部按钮 ========= */
   function toggleButton(){
@@ -1609,9 +1646,10 @@
       $('#padder-all').onchange = e=>{
         const on = e.target.checked;
         $$(SEL.rows).forEach(row=>{
-          const pid = +pidFromRow(row); if(!pid) return;
+          const pid = +pidFromRow(row); if(!pid || skipRow(row)) return;
           let cell = row.querySelector('td.padder-cell');
-          if(!cell){ cell=makeCell(row,pid); row.prepend(cell); }
+          if(!cell){ cell=makeCell(row,pid); if(cell) row.prepend(cell); }
+          if(!cell) return;
           const cb = cell.firstChild; cb.checked=on;
           toggleSelect(row,pid,on,true);
         });
@@ -1619,17 +1657,19 @@
       };
     }
     $$(SEL.rows).forEach(row=>{
-      const pid = +pidFromRow(row); if(!pid) return;
+      const pid = +pidFromRow(row); if(!pid || skipRow(row)) { row.querySelector('td.padder-cell')?.remove(); return; }
       if (!row.querySelector('td.padder-cell')){
-        const cell=makeCell(row,pid); row.prepend(cell);
+        const cell=makeCell(row,pid); if(cell) row.prepend(cell);
       }
       const on = selected.has(pid);
-      row.querySelector('td.padder-cell input').checked = on;
+      const cb = row.querySelector('td.padder-cell input');
+      if (cb) { cb.checked = on; }
       row.classList.toggle('padder-selected', on);
     });
     syncHeader();
   }
   function makeCell(row,pid){
+    if (skipRow(row)) return null;
     const td=document.createElement('td');
     td.className='padder-cell'; td.style.textAlign='center'; td.style.padding='6px';
     td.innerHTML=`<input type="checkbox" style="vertical-align:middle;">`;
@@ -1640,6 +1680,7 @@
     return td;
   }
   function toggleSelect(row,pid,on,fromHeader){
+    if (skipRow(row)) return;
     const code = codeFromRow(row) || `#${pid}`;
     on ? selected.set(pid, code) : selected.delete(pid);
     row.classList.toggle('padder-selected', on);
@@ -1648,7 +1689,11 @@
   }
   function syncHeader(){
     const h=$('#padder-all'); if(!h) return;
-    const ids=$$(SEL.rows).map(pidFromRow).filter(Boolean).map(Number);
+    const ids=$$(SEL.rows)
+      .filter(r=>!skipRow(r))
+      .map(pidFromRow)
+      .filter(Boolean)
+      .map(Number);
     h.checked = ids.length && ids.every(id=>selected.has(id));
   }
 
@@ -1847,6 +1892,7 @@
     const b=$('#plan-toggle'); if(b) b.textContent='进入【添加计划】'; }
 
   /* ========= 启动 ========= */
+  patchDatePicker();
   const onTagPage = /\/problems\/tag\//.test(location.pathname);
   (function start(){
     if (enablePlanAdder && onTagPage) {
