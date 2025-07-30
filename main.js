@@ -31,6 +31,9 @@
     const showHook    = GM_getValue('showHook', false);
     const showMedal   = GM_getValue('showMedal', false);
     const enableMenu  = GM_getValue('enableUserMenu', false);
+    const enablePlanAdder = GM_getValue('enablePlanAdder', false);
+    const initialAutoExit = GM_getValue('planAdder.autoExit', false);
+    let autoExit = initialAutoExit;
     const COLOR_KEYS = ['low3','low2','low1', 'is','upp1','upp2','upp3', 'upp4', 'upp5', 'oth'];
     const COLOR_LABELS = {
         low3: '初2025级',
@@ -563,6 +566,15 @@
         animation: slideDown 0.3s ease-out;
     }
 
+    #bn-plan-options {
+        margin-left: 24px;
+        display: ${enablePlanAdder ? 'block' : 'none'};
+        padding-top: 8px;
+        border-top: 1px solid #f0f0f0;
+        margin-top: 8px;
+        animation: slideDown 0.3s ease-out;
+    }
+
     #bn-title-options, #bn-user-options {
         margin-left: 24px;
         padding-top: 8px;
@@ -787,6 +799,21 @@
 
             <div class="bn-section">
               <div class="bn-title">
+                <svg class="bn-icon bn-icon-menu" viewBox="0 0 24 24">
+                  <line x1="3" y1="12" x2="21" y2="12" />
+                  <line x1="3" y1="6" x2="21" y2="6" />
+                  <line x1="3" y1="18" x2="21" y2="18" />
+                </svg>
+                添加计划
+              </div>
+              <label><input type="checkbox" id="bn-enable-plan" ${enablePlanAdder?'checked':''}/> 启用添加计划</label>
+              <div id="bn-plan-options">
+                <label><input type="checkbox" id="bn-plan-auto" ${initialAutoExit?'checked':''}/> 完成后退出</label>
+              </div>
+            </div>
+
+            <div class="bn-section">
+              <div class="bn-title">
                 <svg class="bn-icon bn-icon-palette" viewBox="0 0 24 24">
                   <circle cx="13.5" cy="6.5" r=".5"/>
                   <circle cx="17.5" cy="10.5" r=".5"/>
@@ -848,6 +875,9 @@
     const chkHook  = document.getElementById('bn-show-hook');
     const chkMedal = document.getElementById('bn-show-medal');
     const chkMenu  = document.getElementById('bn-enable-user-menu');
+    const chkPlan  = document.getElementById('bn-enable-plan');
+    const planOpts = document.getElementById('bn-plan-options');
+    const chkPlanAuto = document.getElementById('bn-plan-auto');
     const chkUseColor = document.getElementById('bn-use-custom-color');
     const colorSidebar = document.getElementById('bn-color-sidebar');
     const saveActions = document.getElementById('bn-save-actions');
@@ -866,6 +896,8 @@
         showHook,
         showMedal,
         enableMenu,
+        enablePlanAdder,
+        autoExit: initialAutoExit,
         useCustomColors,
         palette: Object.assign({}, palette)
     };
@@ -880,6 +912,7 @@
     titleOpts.style.display = enableTitleTruncate ? 'block' : 'none';
     userOpts.style.display  = enableUserTruncate ? 'block' : 'none';
     copyOpts.style.display  = enableCopy ? 'block' : 'none';
+    planOpts.style.display  = enablePlanAdder ? 'block' : 'none';
     checkChanged();
 
     // 初始化颜色选择器
@@ -970,28 +1003,6 @@
         }
     });
 
-    pinBtn.addEventListener('click', () => {
-        pinned = !pinned;
-        GM_setValue('panelPinned', pinned);
-        pinBtn.classList.toggle('bn-pinned', pinned);
-        if (pinned) {
-            showPanel();
-        } else if (!trigger.matches(':hover') && !panel.matches(':hover')) {
-            hidePanel();
-        }
-    });
-
-    pinBtn.addEventListener('click', () => {
-        pinned = !pinned;
-        GM_setValue('panelPinned', pinned);
-        pinBtn.classList.toggle('bn-pinned', pinned);
-        if (pinned) {
-            showPanel();
-        } else if (!trigger.matches(':hover') && !panel.matches(':hover')) {
-            hidePanel();
-        }
-    });
-
     function checkChanged() {
         const ti = parseInt(titleInp.value, 10);
         const ui = parseInt(userInp.value, 10);
@@ -1013,6 +1024,8 @@
             chkHook.checked !== originalConfig.showHook ||
             chkMedal.checked !== originalConfig.showMedal ||
             chkMenu.checked !== originalConfig.enableMenu ||
+            chkPlan.checked !== originalConfig.enablePlanAdder ||
+            chkPlanAuto.checked !== originalConfig.autoExit ||
             chkUseColor.checked !== originalConfig.useCustomColors ||
             paletteChanged;
         saveActions.style.display = changed ? 'flex' : 'none';
@@ -1059,6 +1072,18 @@
     chkHook.onchange = checkChanged;
     chkMedal.onchange = checkChanged;
     chkMenu.onchange = checkChanged;
+    chkPlan.onchange = () => {
+        const on = chkPlan.checked;
+        if (on) {
+            planOpts.style.display = 'block';
+            planOpts.style.animation = 'slideDown 0.3s ease-out';
+        } else {
+            planOpts.style.animation = 'slideUp 0.3s ease-out';
+            setTimeout(() => { planOpts.style.display = 'none'; }, 300);
+        }
+        checkChanged();
+    };
+    chkPlanAuto.onchange = () => { autoExit = chkPlanAuto.checked; checkChanged(); };
 
     document.getElementById('bn-color-reset').onclick = () => {
         COLOR_KEYS.forEach(k => {
@@ -1097,6 +1122,9 @@
         GM_setValue('showHook', chkHook.checked);
         GM_setValue('showMedal', chkMedal.checked);
         GM_setValue('enableUserMenu', chkMenu.checked);
+        GM_setValue('enablePlanAdder', chkPlan.checked);
+        GM_setValue('planAdder.autoExit', chkPlanAuto.checked);
+        autoExit = chkPlanAuto.checked;
 
         const obj = {};
         COLOR_KEYS.forEach(k => {
@@ -1106,7 +1134,7 @@
         });
         GM_setValue('userPalette', JSON.stringify(obj));
         GM_setValue('useCustomColors', chkUseColor.checked);
-        location.reload();
+        setTimeout(() => location.reload(), 50);
     };
 
     document.getElementById('bn-cancel-changes').onclick = () => {
@@ -1121,11 +1149,15 @@
         chkHook.checked = originalConfig.showHook;
         chkMedal.checked = originalConfig.showMedal;
         chkMenu.checked = originalConfig.enableMenu;
+        chkPlan.checked = originalConfig.enablePlanAdder;
+        chkPlanAuto.checked = originalConfig.autoExit;
+        autoExit = originalConfig.autoExit;
         chkUseColor.checked = originalConfig.useCustomColors;
 
         titleOpts.style.display = chkTitleTr.checked ? 'block' : 'none';
         userOpts.style.display  = chkUserTr.checked ? 'block' : 'none';
         copyOpts.style.display  = chkCp.checked ? 'block' : 'none';
+        planOpts.style.display  = chkPlan.checked ? 'block' : 'none';
         if (chkUseColor.checked) {
             container.classList.add('bn-expanded');
             panel.classList.add('bn-expanded');
@@ -1510,9 +1542,10 @@
     autoExit: 'planAdder.autoExit'
   };
 
+  const enablePlanAdder = GM_getValue('enablePlanAdder', false);
   let modeOn   = !!GM_getValue(KEY.mode, false);
   let selected = new Map((GM_getValue(KEY.selected, []) || []).map(o => [o.pid, o.code]));
-  let autoExit = !!GM_getValue(KEY.autoExit, false);
+  let autoExit = GM_getValue(KEY.autoExit, false);
   let observer = null;
 
   /* ========= 小工具 ========= */
@@ -1638,7 +1671,6 @@
         <label>日期：<input type="date" id="pad-date"></label>
         <button class="ui mini button" id="pad-copy">复制编号</button>
         <button class="ui mini button" id="pad-clear">清空</button>
-        <label title="成功后退出并清空"><input type="checkbox" id="pad-auto" style="vertical-align:middle;">完成后退出</label>
         <button class="ui mini primary button" id="pad-ok">确定（<span id="pad-count">0</span>）</button>
       </div>`;
     document.body.appendChild(bar);
@@ -1651,11 +1683,13 @@
       .padder-selected{background:rgba(0,150,255,.06)!important;}
     `);
 
-    const date=$('#pad-date'); date.value=GM_getValue(KEY.date)||tomorrowISO();
-    date.onchange=()=>GM_setValue(KEY.date,date.value);
+    const date=$('#pad-date');
+    const tomorrow=tomorrowISO();
+    date.min = tomorrow;
+    date.value = GM_getValue(KEY.date, tomorrow);
+    date.onchange=()=>{ if(date.value<tomorrow) date.value=tomorrow; GM_setValue(KEY.date,date.value); };
     $('#pad-copy').onclick=()=>{ GM_setClipboard(JSON.stringify({date:date.value,codes:[...selected.values()]},null,2)); notify(`已复制 ${selected.size} 个编号`); };
     $('#pad-clear').onclick=()=>{ if(!selected.size||!confirm('确认清空？')) return; clearSelections(); };
-    const cbAuto=$('#pad-auto'); cbAuto.checked=autoExit; cbAuto.onchange=()=>{ autoExit=cbAuto.checked; GM_setValue(KEY.autoExit,autoExit); };
     $('#pad-ok').onclick=submitPlan;
 
     count();
@@ -1813,5 +1847,13 @@
     const b=$('#plan-toggle'); if(b) b.textContent='进入【添加计划】'; }
 
   /* ========= 启动 ========= */
-  (function start(){ toggleButton(); if(modeOn) enterMode(); })();
+  const onTagPage = /\/problems\/tag\//.test(location.pathname);
+  (function start(){
+    if (enablePlanAdder && onTagPage) {
+      toggleButton();
+      if(modeOn) enterMode();
+    } else {
+      modeOn = false; GM_setValue(KEY.mode,false);
+    }
+  })();
 })();
