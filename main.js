@@ -1133,7 +1133,7 @@
         });
         GM_setValue('userPalette', JSON.stringify(obj));
         GM_setValue('useCustomColors', chkUseColor.checked);
-        location.reload();
+        setTimeout(() => location.reload(), 50);
     };
 
     document.getElementById('bn-cancel-changes').onclick = () => {
