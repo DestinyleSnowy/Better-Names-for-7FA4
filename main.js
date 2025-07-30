@@ -84,13 +84,13 @@
         position: fixed;
         bottom: 20px;
         right: 20px;
-        width: 320px;
+        width: 480px;
         z-index: 10000;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
     #bn-container.bn-expanded {
-        width: 560px;
+        width: 720px;
     }
     #bn-container * {
         pointer-events: auto;
@@ -127,7 +127,7 @@
         position: absolute;
         bottom: 58px;
         right: 0;
-        width: 320px;
+        width: 480px;
         padding: 0;
         background: #fff;
         box-shadow: 0 8px 32px rgba(0,0,0,0.12);
@@ -139,8 +139,7 @@
         visibility: hidden;
         pointer-events: none;
         transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-        max-height: 80vh;
-        overflow-y: auto;
+
     }
     #bn-panel.bn-show {
         transform: scale(1) translateY(0);
@@ -149,7 +148,7 @@
         pointer-events: auto;
     }
     #bn-panel.bn-expanded {
-        width: 560px;
+        width: 720px;
     }
 
     .bn-panel-header {
@@ -261,6 +260,9 @@
     }
 
     .bn-main-content {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
         flex: 1;
         min-width: 0;
     }
@@ -1565,9 +1567,9 @@
   };
 
   function patchDatePicker(){
-    const tryPatch = () => {
-      document.querySelectorAll('button,span').forEach(btn => {
-        if(btn.textContent.trim() === '今天' && !btn.dataset.bnTomorrow){
+    const change = () => {
+      document.querySelectorAll('button,span,a,div').forEach(btn => {
+        if(btn.textContent && btn.textContent.trim() === '今天' && !btn.dataset.bnTomorrow){
           btn.dataset.bnTomorrow = '1';
           btn.textContent = '明天';
           btn.addEventListener('click', () => {
@@ -1584,9 +1586,9 @@
         }
       });
     };
-    const obs = new MutationObserver(tryPatch);
-    obs.observe(document.body, {childList:true, subtree:true});
-    tryPatch();
+    const mo = new MutationObserver(change);
+    mo.observe(document.body, {childList:true, subtree:true});
+    change();
   }
   const offsetStr = h => {
     const s=h>=0?'+':'-', a=Math.abs(h);
