@@ -84,13 +84,13 @@
         position: fixed;
         bottom: 20px;
         right: 20px;
-        width: 720px;
+        width: 480px;
         z-index: 10000;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
     #bn-container.bn-expanded {
-        width: 1200px;
+        width: 960px;
     }
     #bn-container * {
         pointer-events: auto;
@@ -127,7 +127,7 @@
         position: absolute;
         bottom: 58px;
         right: 0;
-        width: 720px;
+        width: 480px;
         padding: 0;
         background: #fff;
         box-shadow: 0 8px 32px rgba(0,0,0,0.12);
@@ -150,7 +150,7 @@
         pointer-events: auto;
     }
     #bn-panel.bn-expanded {
-        width: 1200px;
+        width: 960px;
     }
 
     .bn-panel-header {
@@ -263,7 +263,7 @@
 
     .bn-main-content {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(2, 1fr);
         gap: 12px;
         flex: 1;
         min-width: 0;
