@@ -133,7 +133,6 @@
         box-shadow: 0 8px 32px rgba(0,0,0,0.12);
         border: 1px solid #e0e0e0;
         border-radius: 12px;
-        height: calc(100vh - 80px);
         max-height: calc(100vh - 80px);
         overflow-y: auto;
         transform: scale(0.95) translateY(10px);
