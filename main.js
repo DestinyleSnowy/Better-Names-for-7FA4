@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      v5.0.0.rc.2
-// @description  Better Names v5.0.0.rc.1
+// @version      v5.0.0.rc.3
+// @description  Better Names v5.0.0.rc.3
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -97,6 +97,17 @@
         box-sizing: border-box;
     }
 
+    @media (max-width: 600px) {
+        #bn-container,
+        #bn-container.bn-expanded {
+            width: calc(100vw - 40px);
+        }
+        #bn-panel,
+        #bn-panel.bn-expanded {
+            width: 100%;
+        }
+    }
+
     #bn-trigger {
         position: absolute;
         bottom: 0;
@@ -160,59 +171,6 @@
         border-bottom: 1px solid #e9ecef;
     }
 
-    #bn-pin {
-        position: absolute;
-        top: 12px;
-        right: 12px;
-        width: 20px;
-        height: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        color: #999;
-        transition: color 0.2s, transform 0.2s;
-    }
-    #bn-pin svg {
-        width: 100%;
-        height: 100%;
-        fill: currentColor;
-    }
-    #bn-pin:hover {
-        color: #333;
-        transform: scale(1.2);
-    }
-    #bn-pin.bn-pinned {
-        color: #007bff;
-        transform: rotate(45deg);
-    }
-
-    #bn-pin {
-        position: absolute;
-        top: 12px;
-        right: 12px;
-        width: 20px;
-        height: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        color: #999;
-        transition: color 0.2s, transform 0.2s;
-    }
-    #bn-pin svg {
-        width: 100%;
-        height: 100%;
-        fill: currentColor;
-    }
-    #bn-pin:hover {
-        color: #333;
-        transform: scale(1.2);
-    }
-    #bn-pin.bn-pinned {
-        color: #007bff;
-        transform: rotate(45deg);
-    }
     #bn-pin {
         position: absolute;
         top: 12px;
@@ -856,7 +814,7 @@
           <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
           <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
         </div>
-        <div class="bn-version">v5.0.0.rc.2</div>
+        <div class="bn-version">v5.0.0.rc.3</div>
       </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
