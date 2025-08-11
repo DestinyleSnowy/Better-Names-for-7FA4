@@ -1,9 +1,8 @@
-
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      v5.0.0.rc.5
-// @description  Better Names v5.0.0.rc.5
+// @version      v5.0.0.rc.6
+// @description  Better Names v5.0.0.rc.6
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -34,6 +33,7 @@
     const enableMenu  = GM_getValue('enableUserMenu', false);
     const enablePlanAdder = GM_getValue('enablePlanAdder', false);
     const initialAutoExit = GM_getValue('planAdder.autoExit', false);
+    const enableVjLink = GM_getValue('enableVjLink', false);
     let autoExit = initialAutoExit;
     const COLOR_KEYS = ['low3','low2','low1', 'is','upp1','upp2','upp3', 'upp4', 'upp5', 'oth'];
     const COLOR_LABELS = {
@@ -743,6 +743,7 @@
               <label><input type="checkbox" id="bn-show-hook" ${showHook?'checked':''}/> 显示等级钩子</label>
               <label><input type="checkbox" id="bn-show-medal" ${showMedal?'checked':''}/> 显示 NOI 奖牌</label>
               <label><input type="checkbox" id="bn-enable-user-menu" ${enableMenu?'checked':''}/> 启用用户菜单</label>
+              <label><input type="checkbox" id="bn-enable-vj" ${enableVjLink?'checked':''}/> 外站题目链接 Vjudge 按钮</label>
             </div>
 
             <div class="bn-section">
@@ -815,7 +816,7 @@
           <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
           <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
         </div>
-        <div class="bn-version">v5.0.0.rc.5</div>
+        <div class="bn-version">v5.0.0.rc.6</div>
       </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
@@ -844,6 +845,7 @@
     const chkUseColor = document.getElementById('bn-use-custom-color');
     const colorSidebar = document.getElementById('bn-color-sidebar');
     const saveActions = document.getElementById('bn-save-actions');
+    const chkVj    = document.getElementById('bn-enable-vj');
     const colorPickers = {};
     const hexInputs = {};
 
@@ -862,7 +864,8 @@
         enablePlanAdder,
         autoExit: initialAutoExit,
         useCustomColors,
-        palette: Object.assign({}, palette)
+        palette: Object.assign({}, palette),
+        enableVjLink
     };
 
 
@@ -991,6 +994,7 @@
             chkMedal.checked !== originalConfig.showMedal ||
             chkMenu.checked !== originalConfig.enableMenu ||
             chkPlan.checked !== originalConfig.enablePlanAdder ||
+            chkVj.checked !== originalConfig.enableVjLink ||
             chkPlanAuto.checked !== originalConfig.autoExit ||
             chkUseColor.checked !== originalConfig.useCustomColors ||
             paletteChanged;
@@ -1018,6 +1022,7 @@
     chkHook.onchange = checkChanged;
     chkMedal.onchange = checkChanged;
     chkMenu.onchange = checkChanged;
+    chkVj.onchange = checkChanged;
     chkPlan.onchange = () => { toggleOption(chkPlan, planOpts); checkChanged(); };
     chkPlanAuto.onchange = () => { autoExit = chkPlanAuto.checked; checkChanged(); };
 
@@ -1058,6 +1063,7 @@
         GM_setValue('showHook', chkHook.checked);
         GM_setValue('showMedal', chkMedal.checked);
         GM_setValue('enableUserMenu', chkMenu.checked);
+        GM_setValue('enableVjLink', chkVj.checked);
         GM_setValue('enablePlanAdder', chkPlan.checked);
         GM_setValue('planAdder.autoExit', chkPlanAuto.checked);
         autoExit = chkPlanAuto.checked;
@@ -1085,6 +1091,7 @@
         chkHook.checked = originalConfig.showHook;
         chkMedal.checked = originalConfig.showMedal;
         chkMenu.checked = originalConfig.enableMenu;
+        chkVj.checked = originalConfig.enableVjLink;
         chkPlan.checked = originalConfig.enablePlanAdder;
         chkPlanAuto.checked = originalConfig.autoExit;
         autoExit = originalConfig.autoExit;
@@ -1167,6 +1174,76 @@
         };
         link.parentNode.insertBefore(btn, link);
     }
+
+    function fVjudgeLink() {
+      // 只在题面页生效（/problem/数字）
+      if (!/^\/problem\/\d+\/?$/.test(location.pathname)) return;
+      if (document.getElementById('bn-vjudge-btn')) return; // 防重复
+
+      // 查找“题目名称：xxx”这一块的文本，兼容多处 span
+      let raw = '';
+      const spans = document.querySelectorAll('div.ui.center.aligned.grid span');
+      for (const s of spans) {
+        const t = (s.textContent || '').trim();
+        if (/^题目名称[:：]/.test(t)) { raw = t.replace(/^题目名称[:：]\s*/, '').trim(); break; }
+      }
+      if (!raw) return;
+
+      const lower = raw.replace(/\s+/g, '').toLowerCase();
+
+      // 解析规则（与你给的第一段脚本一致）
+      const parser = {
+        'cf':   pid => `https://vjudge.net/problem/CodeForces-${pid.slice(2)}`,
+        'atc':  pid => {
+          // 形如 atcabc123a → AtCoder-abc123_A
+          const base = pid.slice(3, pid.length - 1);
+          const last = pid.slice(-1);
+          return `https://vjudge.net/problem/AtCoder-${base}_${last}`;
+        },
+        'luogu': pid => `https://vjudge.net/problem/洛谷-${pid.slice(5)}`,
+        'uoj':   pid => `https://vjudge.net/problem/UniversalOJ-${pid.slice(3)}`
+      };
+
+      let vjUrl = '';
+      for (const k of Object.keys(parser)) {
+        if (lower.includes(k)) {
+          try { vjUrl = parser[k](lower); } catch {}
+          break;
+        }
+      }
+      if (!vjUrl) return;
+
+      // 找到右上角按钮容器，参考 fEasierClip 的容错做法
+      let firstBtn = document.querySelector('div.ui.buttons.right.floated > a');
+      if (!firstBtn) {
+        const grids = document.querySelectorAll('div.ui.center.aligned.grid');
+        for (const g of grids) {
+          const candBox = g.querySelector('div.ui.buttons.right.floated');
+          if (candBox && candBox.firstElementChild && candBox.firstElementChild.tagName === 'A') {
+            firstBtn = candBox.firstElementChild;
+            break;
+          }
+        }
+      }
+      if (!firstBtn) return;
+
+      const vj = document.createElement('a');
+      vj.id = 'bn-vjudge-btn';
+      vj.className = 'small ui button';
+      vj.href = vjUrl;
+      vj.target = '_blank';
+      vj.rel = 'noopener';
+      vj.setAttribute('data-tooltip', `vj-${lower}`);
+      vj.textContent = 'Vjudge';
+
+      // 插在第一个按钮后面
+      if (firstBtn.nextSibling) {
+        firstBtn.parentNode.insertBefore(vj, firstBtn.nextSibling);
+      } else {
+        firstBtn.parentNode.appendChild(vj);
+      }
+    }
+
 
     function initUserMenu() {
         const menu = document.createElement('div');
@@ -1456,6 +1533,7 @@
 
     if (enableCopy) fEasierClip();
     if (enableMenu) initUserMenu();
+    if (enableVjLink) fVjudgeLink();
 })();
 
 (function () {
