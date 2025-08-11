@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      v5.0.0.rc.7
-// @description  Better Names v5.0.0.rc.7 
+// @version      v5.0.0.rc.8
+// @description  Better Names v5.0.0.rc.8
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -143,6 +143,10 @@
       --bn-panel-shadow: 0 8px 32px rgba(0,0,0,0.12);
       --bn-trigger-shadow: 0 4px 12px rgba(0,0,0,0.1);
       --bn-hover-bg:#f8f9fa;
+
+      /* 新增：让保存条不再推挤布局 */
+      --bn-savebar-h: 48px;
+      --bn-version-h: 44px;
     }
     #bn-container.bn-dark {
       --bn-bg: #1f2227;
@@ -231,7 +235,11 @@
     }
     .bn-panel-subtitle { font-size: 12px; color: var(--bn-text-muted); margin: 4px 0 0 0; }
 
-    .bn-panel-content { display: flex; transition: all .4s cubic-bezier(.4,0,.2,1); }
+    .bn-panel-content {
+      display: flex; transition: all .4s cubic-bezier(.4,0,.2,1);
+      /* 永远为保存条+版本栏预留空间，避免跳变 */
+      padding-bottom: calc(var(--bn-savebar-h) + var(--bn-version-h));
+    }
     .bn-main-content { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; flex: 1; min-width: 0; }
 
     .bn-color-sidebar {
@@ -307,8 +315,8 @@
     .bn-color-item:hover::before { left: 100%; }
     .bn-color-item:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.18); border-color: #007bff; }
     .bn-color-item label {
-      width: 84px;  
-      text-align: right;    
+      width: 84px;
+      text-align: right;
       font-size: 11px;
       font-weight: 600;
       color: var(--bn-text-muted);
@@ -332,19 +340,37 @@
     .bn-color-actions { display: flex; gap: 8px; }
     .bn-color-actions .bn-btn { flex: 1; padding: 10px 16px; font-size: 12px; }
 
-    .bn-save-actions { display: none; padding: 12px 20px; border-top: 1px solid var(--bn-border-subtle); background: var(--bn-bg); display: flex; gap: 8px; justify-content: flex-end; }
+    /* ⚠️ 保存条改为“悬浮”，通过透明度显示，避免面板跳变 */
+    .bn-save-actions {
+      position: absolute;
+      left: 0; right: 0;
+      bottom: var(--bn-version-h);
+      height: var(--bn-savebar-h);
+      padding: 0 20px;
+      border-top: 1px solid var(--bn-border-subtle);
+      background: var(--bn-bg);
+      display: flex; gap: 8px; justify-content: flex-end; align-items: center;
 
+      opacity: 0; pointer-events: none; transform: translateY(6px);
+      transition: opacity .2s ease, transform .2s ease;
+      will-change: opacity, transform;
+    }
+    .bn-save-actions.bn-visible {
+      opacity: 1; pointer-events: auto; transform: translateY(0);
+    }
+
+    /* 子菜单：默认不带动画（仅在切换时由 JS 注入动画） */
     #bn-copy-options {
       margin-left: 24px; display: ${enableCopy ? 'block' : 'none'}; padding-top: 8px; border-top: 1px solid var(--bn-border-subtle);
-      margin-top: 8px; animation: slideDown .3s ease-out;
+      margin-top: 8px;
     }
     #bn-plan-options {
       margin-left: 24px; display: ${enablePlanAdder ? 'block' : 'none'}; padding-top: 8px; border-top: 1px solid var(--bn-border-subtle);
-      margin-top: 8px; animation: slideDown .3s ease-out;
+      margin-top: 8px;
     }
     #bn-title-options, #bn-user-options {
       margin-left: 24px; padding-top: 8px; border-top: 1px solid var(--bn-border-subtle);
-      margin-top: 8px; animation: slideDown .3s ease-out;
+      margin-top: 8px;
     }
     #bn-title-options { display: ${isFinite(maxTitleUnits)?'block':'none'}; }
     #bn-user-options  { display: ${isFinite(maxUserUnits)?'block':'none'}; }
@@ -377,6 +403,10 @@
       background: linear-gradient(135deg, var(--bn-bg-grad-1) 0%, var(--bn-bg-grad-2) 100%);
       border-top: 1px solid var(--bn-border-subtle);
       font-size: 11px; color: var(--bn-text-muted); font-weight: 500;
+
+      /* 新增：固定高度，给保存条预留落点 */
+      min-height: var(--bn-version-h);
+      display: flex; align-items: center; justify-content: center;
     }
 
     @media (max-width: 600px) {
@@ -521,7 +551,7 @@
         <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
-      <div class="bn-version">v5.0.0.rc.7</div>
+      <div class="bn-version">v5.0.0.rc.8</div>
     </div>`;
   document.body.appendChild(container);
   container.style.pointerEvents = 'none';
@@ -723,7 +753,8 @@
       (document.getElementById('bn-theme-select').value !== originalConfig.themeMode) ||
       paletteChanged;
 
-    saveActions.style.display = changed ? 'flex' : 'none';
+    // 改为“透明度显隐”，避免布局跳变
+    saveActions.classList.toggle('bn-visible', changed);
   }
 
   function toggleOption(chk, el) {
@@ -1579,21 +1610,15 @@
     addIds.forEach(i=>set.add(i));
     const union = [...set];
 
-    log('planId =', planId || '(空)', 'existing=', meta.problemIds, 'union=', union);
-
-    // 2) 首选：一次性并集
     try{
       const body = buildBody({ id: planId, epoch, uid, values: union });
       await postPlan(body, uid);
       const after = await fetchPlanJSON({ uid, epoch });
       const ok = union.every(x => after.problemIds.includes(x));
       if (ok) { notify(`保存成功：加入 ${addIds.length} 题（共 ${union.length} 题）`); afterSuccess(); return; }
-      log('一次性写入后校验未通过，进入逐条补齐');
-    }catch(e){
-      log('一次性写入失败：', e.message);
-    }
+    }catch(e){}
 
-    // 3) 逐条补齐
+    // 逐条补齐
     try{
       for(const id of addIds){
         const latest = await fetchPlanJSON({ uid, epoch });
@@ -1604,9 +1629,7 @@
       const final = await fetchPlanJSON({ uid, epoch });
       const ok2 = union.every(x => final.problemIds.includes(x));
       if (ok2) { notify(`保存成功（逐条补齐）：加入 ${addIds.length} 题（共 ${union.length} 题）`); afterSuccess(); return; }
-    }catch(e){
-      log('逐条补齐失败：', e.message);
-    }
+    }catch(e){}
 
     notify('[错误代码 C1] 提交未生效');
   }
