@@ -2,8 +2,8 @@
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      v5.0.0.rc.4
-// @description  Better Names v5.0.0.rc.4
+// @version      v5.0.0.rc.5
+// @description  Better Names v5.0.0.rc.5
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -815,7 +815,7 @@
           <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
           <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
         </div>
-        <div class="bn-version">v5.0.0.rc.4</div>
+        <div class="bn-version">v5.0.0.rc.5</div>
       </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
@@ -1112,8 +1112,16 @@
         checkChanged();
     };
 
+    function firstVisibleCharOfTitle() {
+        const h1 = document.querySelector('body > div:nth-child(2) > div > div.ui.center.aligned.grid > div > h1');
+        if (!h1) return '';
+        const s = (h1.textContent || '').replace(/[\s\u200B-\u200D\uFEFF]/g, '');
+        return s ? s[0].toUpperCase() : '';
+    }
+
     function fEasierClip() {
         if (!/\/problem\//.test(location.pathname)) return;
+        if (firstVisibleCharOfTitle() === 'L') return;
         let link = document.querySelector('div.ui.buttons.right.floated > a');
         if (!link) {
             const grids = document.querySelectorAll('div.ui.center.aligned.grid');
