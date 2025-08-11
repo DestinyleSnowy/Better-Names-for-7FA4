@@ -1,8 +1,9 @@
+
 // ==UserScript==
 // @name         Better Names
 // @namespace    http://tampermonkey.net/
-// @version      v5.0.0.rc.3
-// @description  Better Names v5.0.0.rc.3
+// @version      v5.0.0.rc.4
+// @description  Better Names v5.0.0.rc.4
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -814,7 +815,7 @@
           <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
           <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
         </div>
-        <div class="bn-version">v5.0.0.rc.3</div>
+        <div class="bn-version">v5.0.0.rc.4</div>
       </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
@@ -1452,13 +1453,12 @@
 (function () {
   'use strict';
 
-  
+
   const CFG = {
-    base: 'http://in.7fa4.cn:8888',
-    base: 'http://jx.7fa4.cn:8888',
-    tzOffsetHours: 8,  
-    DEBUG: true,    
-    DELIM: '|'         
+    base: location.origin,
+    tzOffsetHours: 8,
+    DEBUG: true,
+    DELIM: '|'
   };
 
   const SEL = {
@@ -1741,12 +1741,6 @@
       exitMode();
     }
   }
-
-// 常见错误解决方案
-// A1: 勾选题目
-// B1: 先点顶部“计划”再回来
-// B2: 向我们提 issue
-// C1: 把 Network 中 POST /user_plan 的 Form Data 与 Response 向我们提 issue
 
   async function submitPlan(){
     if(!selected.size) return notify('[错误代码 A1] 请先勾选题目');
