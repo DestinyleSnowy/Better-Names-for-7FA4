@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         7fa4 Better
 // @namespace    http://tampermonkey.net/
-// @version      v5.0.0.beta (patch06) (Public Release)
-// @description  7fa4 Better v5.0.0.beta (patch06) (Public Release): Drag settings icon
+// @version      v5.0.0.beta (patch07) (Public Release)
+// @description  7fa4 Better v5.0.0.beta (patch07) (Public Release): Drag settings icon
 // @author       wwxz
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -552,7 +552,6 @@
             </div>
             <label><input type="checkbox" id="bn-enable-copy" ${enableCopy ? 'checked' : ''}/> 启用题面复制</label>
             <div id="bn-copy-options">
-              <label><input type="checkbox" id="bn-copy-notify" ${copyNotify ? 'checked' : ''}/> 显示复制提示</label>
               <label><input type="checkbox" id="bn-hide-orig" ${hideOrig ? 'checked' : ''}/> 隐藏原始按钮</label>
             </div>
           </div>
@@ -607,7 +606,7 @@
         <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
-      <div class="bn-version">Public Release | v5.0.0.beta (patch06)</div>
+      <div class="bn-version">Public Release | v5.0.0.beta (patch07)</div>
     </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
