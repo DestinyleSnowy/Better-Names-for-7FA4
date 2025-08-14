@@ -1,8 +1,8 @@
   // ==UserScript==
 // @name         7fa4 Better
 // @namespace    http://tampermonkey.net/
-// @version      v5.0.0.beta (patch02) (Public Release)
-// @description  7fa4 Better v5.0.0.beta (patch02) (Public Release)
+// @version      v5.0.0.beta (patch03) (Public Release)
+// @description  7fa4 Better v5.0.0.beta (patch03) (Public Release): Vjudge button modified.
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -551,7 +551,7 @@
         <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
-      <div class="bn-version">Public Release | v5.0.0.beta (patch02)</div>
+      <div class="bn-version">Public Release | v5.0.0.beta (patch03)</div>
     </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
@@ -1142,11 +1142,25 @@
         const vj = document.createElement('a');
         vj.id = 'bn-vjudge-btn';
         vj.className = 'small ui button';
-        vj.href = vjUrl; vj.target = '_blank'; vj.rel = 'noopener';
+        vj.href = vjUrl;
+        vj.target = '_blank';
+        vj.rel = 'noopener';
         vj.setAttribute('data-tooltip', `vj-${lower}`);
-        vj.textContent = 'Vjudge';
-
-        firstBtn.nextSibling ? firstBtn.parentNode.insertBefore(vj, firstBtn.nextSibling) : firstBtn.parentNode.appendChild(vj);
+        vj.textContent = 'Vjudge 提交';
+        // 调整按钮样式为橙色背景、白色文字
+        vj.style.backgroundColor = '#f2711c';
+        vj.style.color = '#ffffff';
+        // 将按钮插入到“投稿/外站提交”所在的左侧按钮组；若不存在，再回退到右侧按钮组
+        const leftGroup = document.querySelector('div.ui.buttons:not(.right.floated)');
+        if (leftGroup) {
+            leftGroup.appendChild(vj);
+        } else if (firstBtn && firstBtn.parentNode) {
+            // 插入到右侧按钮组最左边，使其靠近左侧
+            firstBtn.parentNode.insertBefore(vj, firstBtn);
+        } else {
+            const container = document.querySelector('div.ui.buttons.right.floated') || document.querySelector('div.ui.buttons');
+            if (container) container.appendChild(vj);
+        }
     }
 
     function initUserMenu() {
