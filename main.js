@@ -1,8 +1,8 @@
-// ==UserScript==
-// @name         Better Names
+  // ==UserScript==
+// @name         7fa4 Better
 // @namespace    http://tampermonkey.net/
-// @version      v5.0.0.beta (Public Release)
-// @description  Better Names v5.0.0.beta (Public Release)
+// @version      v5.0.0.beta (patch02) (Public Release)
+// @description  7fa4 Better v5.0.0.beta (patch02) (Public Release)
 // @author       wwx
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -439,7 +439,7 @@
       <div class="bn-panel-header">
         <div class="bn-panel-title">
           <svg class="bn-icon bn-icon-settings" viewBox="0 0 24 24"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-          Better Names 设置
+          7fa4 Better 设置
         </div>
         <div id="bn-pin" title="固定面板">
           <svg class="bn-icon bn-icon-pin" viewBox="0 0 24 24"><path d="M16 9V4h1c.55 0 1-.45 1-1V2c0-.55-.45-1-1-1H7c-.55 0-1 .45-1 1v1c0 .55.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z"/></svg>
@@ -503,7 +503,7 @@
 
           <div class="bn-section">
             <div class="bn-title">
-            <svg class="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"> <line x1="3" y1="12" x2="21" y2="12"/> <line x1="3" y1="6" x2="21" y2="6"/> <line x1="3" y1="18" x2="21" y2="18"/></svg>    
+            <svg class="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"> <line x1="3" y1="12" x2="21" y2="12"/> <line x1="3" y1="6" x2="21" y2="6"/> <line x1="3" y1="18" x2="21" y2="18"/></svg>
               添加计划
             </div>
             <label><input type="checkbox" id="bn-enable-plan" ${enablePlanAdder ? 'checked' : ''}/> 启用添加计划</label>
@@ -551,7 +551,7 @@
         <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
-      <div class="bn-version">Public Release | v5.0.0.beta</div>
+      <div class="bn-version">Public Release | v5.0.0.beta (patch02)</div>
     </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
@@ -1037,7 +1037,9 @@
         152: { name: "马平川", colorKey: 'upp5', hook: 9, medal: 'silver' },
         151: { name: "程书涵", colorKey: 'upp5', hook: 9 },
         831: { name: "王曦田", colorKey: 'upp3', hook: 6 },
-        15: { name: "黄嘉玮", colorKey: 'upp2', hook: 7 }
+        15: { name: "黄嘉玮", colorKey: 'upp2', hook: 7 },
+        2320: {name: "李秉樾", colorKey: 'low1', hook: 7},
+        1346: { name: "刘弘成", colorKey: 'low2' }
     };
 
     /* ----------------------------------------------------------------
