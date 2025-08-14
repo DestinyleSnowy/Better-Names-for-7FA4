@@ -1,8 +1,8 @@
-  // ==UserScript==
+// ==UserScript==
 // @name         7fa4 Better
 // @namespace    http://tampermonkey.net/
-// @version      v5.0.0.beta (patch04) (Public Release)
-// @description  7fa4 Better v5.0.0.beta (patch04) (Public Release): Fixed user menu.
+// @version      v5.0.0.beta (patch05) (Public Release)
+// @description  7fa4 Better v5.0.0.beta (patch05) (Public Release): Copy without leading endl
 // @author       wwxz
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -240,7 +240,22 @@
       /* 永远为保存条+版本栏预留空间，避免跳变 */
       padding-bottom: calc(var(--bn-savebar-h) + var(--bn-version-h));
     }
-    .bn-main-content { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; flex: 1; min-width: 0; }
+    .bn-main-content {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      flex: 1;
+      min-width: 0;
+      /* 只给中间网格（每个“框”所在区域）留白，侧栏不动 */
+      padding: 16px 20px 0 20px;
+    }
+
+    @media (max-width: 600px) {
+      .bn-main-content {
+        padding: 12px 12px 0 12px;
+      }
+    }
+
 
     .bn-color-sidebar {
       width: 480px; background: var(--bn-bg-subtle);
@@ -387,8 +402,11 @@
     #bn-user-menu {
       position: fixed;
       z-index: 10001;
-      /* 设置菜单为不透明的背景：优先使用主题色 --bn-bg，不存在则回退为白色 */
-      background: var(--bn-bg, #fff);
+      /* 背景颜色采用主题色或白色，并叠加由右至左渐深的浅蓝色阴影 */
+      background-color: var(--bn-bg, #fff);
+      /* 渐变从右（深）到左（浅） */
+      background-image: linear-gradient(to left, rgba(124, 191, 255, 0.15), rgba(124, 191, 255, 0));
+      background-repeat: no-repeat;
       box-shadow: var(--bn-panel-shadow);
       border-radius: 8px;
       padding: 8px 0;
@@ -396,7 +414,7 @@
       flex-direction: column;
       min-width: 160px;
       overflow: hidden;
-      /* 使用默认边框 */
+      /* 默认边框，不做额外定制 */
       border: 1px solid var(--bn-border);
     }
     #bn-user-menu a {
@@ -561,7 +579,7 @@
         <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
-      <div class="bn-version">Public Release | v5.0.0.beta (patch04)</div>
+      <div class="bn-version">Public Release | v5.0.0.beta (patch05)</div>
     </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
@@ -1083,20 +1101,63 @@
         btn.id = 'bn-copy-btn';
         btn.className = 'small ui button';
         btn.textContent = '复制题面';
+        // 放在 fEasierClip 内、fetch 之后，复制之前
+        function stripLeadingBlank(text) {
+          // 1) 统一换行为 \n，避免 \r\n 干扰
+          let s = text.replace(/\r\n/g, '\n');
+          // 2) 去掉 BOM、零宽空格/连接符等“不可见字符”
+          s = s.replace(/^[\uFEFF\u200B-\u200D\u2060]+/, '');
+          // 3) 去掉「若干空格/Tab 后跟换行」形成的“空白行块”
+          s = s.replace(/^(?:[ \t]*\n)+/, '');
+          return s;
+        }
+
         btn.onclick = async () => {
-            try {
-                const res = await fetch(location.href.replace(/\/$/, '') + '/markdown/text', { credentials: 'include' });
-                const text = await res.text();
-                if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
-                else {
-                    const ta = document.createElement('textarea');
-                    ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
-                }
-                if (copyNotify) GM_notification({ text: '复制成功！', timeout: 2000 });
-            } catch (e) {
-                GM_notification({ text: '复制失败：' + e, timeout: 3000 });
+          const originalText = btn.textContent;
+          const originalBg = btn.style.backgroundColor;
+          const originalColor = btn.style.color;
+
+          // 处理中态（样式保持原样、仅改文字并禁用点击）
+          btn.textContent = '处理中…';
+          btn.style.pointerEvents = 'none';
+
+          try {
+            const res = await fetch(location.href.replace(/\/$/, '') + '/markdown/text', { credentials: 'include' });
+            let text = await res.text();
+            text = stripLeadingBlank(text);   // ← 关键：清理开头空行/不可见字符
+
+            if (navigator.clipboard?.writeText) {
+              await navigator.clipboard.writeText(text);
+            } else {
+              const ta = document.createElement('textarea');
+              ta.value = text;
+              document.body.appendChild(ta);
+              ta.select();
+              document.execCommand('copy');
+              ta.remove();
             }
+
+            // 成功：绿底白字“复制成功”，短暂后恢复
+            btn.textContent = '复制成功';
+            btn.style.backgroundColor = '#21ba45';
+            btn.style.color = '#ffffff';
+            setTimeout(() => {
+              btn.textContent = originalText;
+              btn.style.backgroundColor = originalBg;
+              btn.style.color = originalColor;
+              btn.style.pointerEvents = '';
+            }, 1200);
+
+          } catch (e) {
+            // 失败：恢复并发通知（失败保留原逻辑）
+            btn.textContent = originalText;
+            btn.style.backgroundColor = originalBg;
+            btn.style.color = originalColor;
+            btn.style.pointerEvents = '';
+            GM_notification({ text: '复制失败：' + e, timeout: 3000 });
+          }
         };
+
         link.parentNode.insertBefore(btn, link);
     }
 
@@ -1186,7 +1247,8 @@
     `;
         document.body.appendChild(menu);
         // 修复菜单背景透明问题：为菜单容器设置不透明白色背景
-        menu.style.background = '#ffffff';
+        // 设置背景颜色，但不要覆盖背景渐变
+        menu.style.backgroundColor = '#ffffff';
         menu.style.opacity = '1';
 
         const home = menu.querySelector('#bn-menu-home');
