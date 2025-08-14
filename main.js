@@ -1,9 +1,9 @@
   // ==UserScript==
 // @name         7fa4 Better
 // @namespace    http://tampermonkey.net/
-// @version      v5.0.0.beta (patch03) (Public Release)
-// @description  7fa4 Better v5.0.0.beta (patch03) (Public Release): Vjudge button modified.
-// @author       wwx
+// @version      v5.0.0.beta (patch04) (Public Release)
+// @description  7fa4 Better v5.0.0.beta (patch04) (Public Release): Fixed user menu.
+// @author       wwxz
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
 // @grant        GM_getValue
@@ -385,9 +385,19 @@
     .bn-medal-iron { background: linear-gradient(135deg, #495057 0%, #343a40 100%); }
 
     #bn-user-menu {
-      position: fixed; z-index: 10001; background: var(--bn-bg);
-      box-shadow: var(--bn-panel-shadow); border: 1px solid var(--bn-border);
-      border-radius: 8px; padding: 8px 0; display: none; flex-direction: column; min-width: 160px; overflow: hidden;
+      position: fixed;
+      z-index: 10001;
+      /* 设置菜单为不透明的背景：优先使用主题色 --bn-bg，不存在则回退为白色 */
+      background: var(--bn-bg, #fff);
+      box-shadow: var(--bn-panel-shadow);
+      border-radius: 8px;
+      padding: 8px 0;
+      display: none;
+      flex-direction: column;
+      min-width: 160px;
+      overflow: hidden;
+      /* 使用默认边框 */
+      border: 1px solid var(--bn-border);
     }
     #bn-user-menu a {
       padding: 10px 16px; color: var(--bn-text-sub); text-decoration: none; font-size: 13px; white-space: nowrap; transition: all .2s ease; position: relative;
@@ -551,7 +561,7 @@
         <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
-      <div class="bn-version">Public Release | v5.0.0.beta (patch03)</div>
+      <div class="bn-version">Public Release | v5.0.0.beta (patch04)</div>
     </div>`;
     document.body.appendChild(container);
     container.style.pointerEvents = 'none';
@@ -1146,7 +1156,7 @@
         vj.target = '_blank';
         vj.rel = 'noopener';
         vj.setAttribute('data-tooltip', `vj-${lower}`);
-        vj.textContent = 'Vjudge 提交';
+        vj.textContent = 'Vjudge';
         // 调整按钮样式为橙色背景、白色文字
         vj.style.backgroundColor = '#f2711c';
         vj.style.color = '#ffffff';
@@ -1175,6 +1185,9 @@
       <a id="bn-menu-plan" href="#">转到计划</a>
     `;
         document.body.appendChild(menu);
+        // 修复菜单背景透明问题：为菜单容器设置不透明白色背景
+        menu.style.background = '#ffffff';
+        menu.style.opacity = '1';
 
         const home = menu.querySelector('#bn-menu-home');
         const subProblem = menu.querySelector('#bn-menu-sub-problem');
