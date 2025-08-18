@@ -3955,6 +3955,12 @@
   function patchDatePicker() {
     const install = (input) => {
       if (!input || input.dataset.bnTomorrowInstalled) return;
+      const tomorrow = tomorrowISO();
+      input.min = tomorrow;
+      if (input.value < tomorrow) input.value = tomorrow;
+      input.addEventListener('change', () => {
+        if (input.value < tomorrow) input.value = tomorrow;
+      });
       input.dataset.bnTomorrowInstalled = '1';
     };
     document.addEventListener('focusin', (e) => {
