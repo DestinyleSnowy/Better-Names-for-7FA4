@@ -4217,7 +4217,7 @@ window.getCurrentUserId = getCurrentUserId;
     const iso = $('#pad-date')?.value || tomorrowISO();
     const epoch = dateToEpoch(iso, CFG.tzOffsetHours);
     const uid = getCurrentUserId(); if (!uid) { notify('[错误代码 B1] 无法识别 user_id'); return; }
-
+   
     const addIds = [...selected.keys()].map(Number);
     if (!addIds.length) return notify('[错误代码 B2] 未解析到数字ID');
 
@@ -4616,7 +4616,6 @@ window.getCurrentUserId = getCurrentUserId;
         .then(t => ({ responseText: t }));
     };
 
-  // 是否已通过：查看自己在该题是否有 Accepted / 100 分提交
   async function hasAccepted(problemId) {
     const uid = getCurrentUserId();
     if (!uid) return false;
@@ -4756,7 +4755,6 @@ window.getCurrentUserId = getCurrentUserId;
       : (opt) => fetch(opt.url, { headers: opt.headers || {}, credentials: 'include' })
         .then(r => r.text()).then(t => ({ responseText: t }));
 
-
     async function hasAccepted(problemId) {
       const uid = getCurrentUserId();
       if (!uid) return false;
@@ -4789,8 +4787,6 @@ window.getCurrentUserId = getCurrentUserId;
 
     function qs(sel, root) { return (root || document).querySelector(sel); }
     function qsa(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
-
-
     function sameOrigin(u) { try { return new URL(u, location.origin).origin === location.origin; } catch { return true; } }
     function fetchText(u, headers) {
       if (sameOrigin(u) || u.startsWith('/')) return fetch(u, { credentials: 'include', headers: headers || {} }).then(r => r.text());
@@ -4830,7 +4826,7 @@ window.getCurrentUserId = getCurrentUserId;
       return { seen, ac };
     }
 
-    async function needWarn(problemId) {
+    async function needWarn(problemId) {     
       const uid = getCurrentUserId();
       try {
         const html = await fetchText(`/submissions?problem_id=${encodeURIComponent(problemId)}`, { 'X-Requested-With': 'XMLHttpRequest' });
@@ -4948,7 +4944,6 @@ window.getCurrentUserId = getCurrentUserId;
       return fetch(u, opt).then(function (r) { return r.text(); });
     }
 
-
     function parseItemList(html) {
       var m = html && html.match(/const\s+itemList\s*=\s*(\[[\s\S]*?\]);/);
       if (!m) return null;
@@ -4985,8 +4980,8 @@ window.getCurrentUserId = getCurrentUserId;
       return { seen: seen, anyAC: anyAC };
     }
 
-    async function hasAnyAcceptedAcrossAll(problemId) {
-      var uid = getCurrentUserId();
+    async function hasAnyAcceptedAcrossAll(problemId) {      
+      const uid = getCurrentUserId();
       if (!uid) return null; // 无法识别登录用户
 
       // 1) 首选：使用过滤后的“仅本人 + 成功(100 分)”列表，天然跨页
@@ -5025,24 +5020,39 @@ window.getCurrentUserId = getCurrentUserId;
       return null; // 仍无法判定，交给兜底
     }
 
-    // 覆写 needWarn：有 AC => 不拦；无 AC => 拦；无法判定 => 兜底看题目页
-    window.needWarn = async function (problemId) {
-      try {
-        var passed = await hasAnyAcceptedAcrossAll(problemId);
-        if (passed === true) return false;
-        if (passed === false) return true;
-      } catch (e) { /* ignore */ }
+    var WARN_CACHE_TTL = 5 * 60 * 1000; // 5 分钟缓存
+    var warnCache = new Map();
 
+    async function needWarnFallback(pid) {
       try {
-        var ph = await fetchText(BASE + '/problem/' + encodeURIComponent(problemId), { 'X-Requested-With': 'XMLHttpRequest' });
+        var ph = await fetchText(BASE + '/problem/' + encodeURIComponent(pid), { 'X-Requested-With': 'XMLHttpRequest' });
         if (/class="[^"]*check-need-button[^"]*"\s+data-href="\/submissions\?problem_id=\d+"/.test(ph)
           || /class="[^"]*check-need-button[^"]*"\s+data-href="\/problem\/\d+\/statistics/.test(ph)) {
           return true;
         }
       } catch (e) { /* ignore */ }
+      return false;
+    }
 
-      return false; // 默认放行，避免“全拦”
+    // 覆写 needWarn：有 AC => 不拦；无 AC => 拦；无法判定 => 兜底看题目页
+    window.needWarn = async function (problemId, opt) {
+      var force = opt && opt.force;
+      var now = Date.now();
+      var hit = warnCache.get(problemId);
+      if (!force && hit && now - hit.time < WARN_CACHE_TTL) return hit.value;
+
+      var warn;
+      try {
+        var passed = await hasAnyAcceptedAcrossAll(problemId);
+        if (passed === true) warn = false;
+        else if (passed === false) warn = true;
+      } catch (e) { /* ignore */ }
+      if (warn === undefined) warn = await needWarnFallback(problemId);
+      warnCache.set(problemId, { value: warn, time: now });
+      return warn;
     };
+    window.needWarn.clearCache = function () { warnCache.clear(); };
   } catch (_e) { /* ignore */ }
 })();
+
 
