@@ -1,0 +1,17 @@
+{
+  "name": "better-names-for-7fa4",
+  "version": "1.0.0",
+  "description": "本仓库提供一个适用于 7FA4 在线评测系统的 Tampermonkey 用户脚本，旨在改进界面显示并提供便捷功能。",
+  "main": "main.js",
+  "scripts": {
+    "build": "rollup -c",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "rollup": "^4.46.3"
+  }
+}
