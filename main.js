@@ -4522,41 +4522,21 @@
       const m = a && a.getAttribute('href').match(/\/user\/(\d+)/);
       return m ? m[1] : null;
     }
-    function getLoginUserId() {
-      const ud = document.querySelector('#user-dropdown');
-      if (ud && ud.dataset) return ud.dataset.user_id || ud.dataset.userId || null;
-      const a1 = document.querySelector('#user-dropdown a[href^="/user/"]');
-      const m1 = a1 && a1.getAttribute('href').match(/\/user\/(\d+)/);
-      if (m1) return m1[1];
-      const a2 = document.querySelector('a[href^="/user_plans/"]');
-      const m2 = a2 && a2.getAttribute('href').match(/\/user_plans\/(\d+)/);
-      if (m2) return m2[1];
-      return null;
-    }
-    // 事件委托，拦截点击 /submission/{id}
-    document.addEventListener('click', async (e) => {
-      const a = e.target && (e.target.closest && e.target.closest('a[href^="/submission/"]'));
-      if (!a) return;
-      // 仅左键 & 非修饰键
-      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-
-      const tr = a.closest('tr');
-      const pid = tr && extractProblemIdFromRow(tr);
-      if (!pid) return; // 找不到题号就放行
-      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
-      const warn = await (window.needWarn ? window.needWarn(pid) : needWarn(pid));
-      if (!warn) {
-        location.href = a.href;
-        return;
+      function getLoginUserId() {
+        const ud = document.querySelector('#user-dropdown');
+        if (ud && ud.dataset) return ud.dataset.user_id || ud.dataset.userId || null;
+        const a1 = document.querySelector('#user-dropdown a[href^="/user/"]');
+        const m1 = a1 && a1.getAttribute('href').match(/\/user\/(\d+)/);
+        if (m1) return m1[1];
+        const a2 = document.querySelector('a[href^="/user_plans/"]');
+        const m2 = a2 && a2.getAttribute('href').match(/\/user_plans\/(\d+)/);
+        if (m2) return m2[1];
+        return null;
       }
-      const mask = ensureModal();
-      mask.bnConfirm(() => { location.href = a.href; });
-    }, true);
-
-  } catch (err) {
-    console.warn('[7fa4-better] submissions-guard error:', err);
-  }
-})();
+      } catch (err) {
+        console.warn('[7fa4-better] submissions-guard error:', err);
+      }
+    })();
 
 
 (function () {
