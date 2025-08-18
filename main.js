@@ -14,6 +14,21 @@
 // @grant        GM_xmlhttpRequest
 // ==/UserScript==
 
+function getCurrentUserId() {
+  const ud = document.querySelector('#user-dropdown');
+  if (ud && ud.dataset && (ud.dataset.user_id || ud.dataset.userId)) {
+    return Number(ud.dataset.user_id || ud.dataset.userId);
+  }
+  const a1 = document.querySelector('#user-dropdown a[href^="/user/"]');
+  const m1 = a1 && a1.getAttribute('href').match(/\/user\/(\d+)/);
+  if (m1) return Number(m1[1]);
+  const a2 = document.querySelector('a[href^="/user_plans/"]');
+  const m2 = a2 && a2.getAttribute('href').match(/\/user_plans\/(\d+)/);
+  if (m2) return Number(m2[1]);
+  return NaN;
+}
+window.getCurrentUserId = getCurrentUserId;
+
 (function () {
   'use strict';
 
@@ -3974,11 +3989,6 @@
   const notify = m => GM_notification({ text: m, timeout: 2600 });
   const persist = () => GM_setValue(KEY.selected, [...selected].map(([pid, code]) => ({ pid, code })));
 
-  function getUserId() {
-    const a = document.querySelector('a[href^="/user_plans/"]');
-    return a ? (a.href.match(/\/user_plans\/(\d+)/) || [])[1] : null;
-  }
-
   let _codeColIdx = null; // 缓存编号列索引
   function codeColIndex() {
     if (_codeColIdx != null) return _codeColIdx;
@@ -4206,7 +4216,7 @@
 
     const iso = $('#pad-date')?.value || tomorrowISO();
     const epoch = dateToEpoch(iso, CFG.tzOffsetHours);
-    const uid = getUserId(); if (!uid) { notify('[错误代码 B1] 无法识别 user_id'); return; }
+    const uid = getCurrentUserId(); if (!uid) { notify('[错误代码 B1] 无法识别 user_id'); return; }
 
     const addIds = [...selected.keys()].map(Number);
     if (!addIds.length) return notify('[错误代码 B2] 未解析到数字ID');
@@ -4522,17 +4532,6 @@
       const m = a && a.getAttribute('href').match(/\/user\/(\d+)/);
       return m ? m[1] : null;
     }
-    function getLoginUserId() {
-      const ud = document.querySelector('#user-dropdown');
-      if (ud && ud.dataset) return ud.dataset.user_id || ud.dataset.userId || null;
-      const a1 = document.querySelector('#user-dropdown a[href^="/user/"]');
-      const m1 = a1 && a1.getAttribute('href').match(/\/user\/(\d+)/);
-      if (m1) return m1[1];
-      const a2 = document.querySelector('a[href^="/user_plans/"]');
-      const m2 = a2 && a2.getAttribute('href').match(/\/user_plans\/(\d+)/);
-      if (m2) return m2[1];
-      return null;
-    }
     // 事件委托，拦截点击 /submission/{id}
     document.addEventListener('click', async (e) => {
       const a = e.target && (e.target.closest && e.target.closest('a[href^="/submission/"]'));
@@ -4617,21 +4616,6 @@
         .then(t => ({ responseText: t }));
     };
 
-  // 取当前登录用户 ID：优先 #user-dropdown 的 data-user_id；其次 /user/123；再次 /user_plans/123
-  function getCurrentUserId() {
-    const ud = document.querySelector('#user-dropdown');
-    if (ud && ud.dataset && (ud.dataset.user_id || ud.dataset.userId)) {
-      return ud.dataset.user_id || ud.dataset.userId;
-    }
-    const a1 = document.querySelector('#user-dropdown a[href^="/user/"]');
-    const m1 = a1 && a1.getAttribute('href').match(/\/user\/(\d+)/);
-    if (m1) return m1[1];
-    const a2 = document.querySelector('a[href^="/user_plans/"]');
-    const m2 = a2 && a2.getAttribute('href').match(/\/user_plans\/(\d+)/);
-    if (m2) return m2[1];
-    return null;
-  }
-
   // 是否已通过：查看自己在该题是否有 Accepted / 100 分提交
   async function hasAccepted(problemId) {
     const uid = getCurrentUserId();
@@ -4688,20 +4672,6 @@
     return fetch(url, { headers: headers || {} }).then(r => r.text()).then(t => ({ responseText: t }));
   }
 
-  function getLoginUid() {
-    const ud = document.querySelector('#user-dropdown');
-    if (ud && ud.dataset && (ud.dataset.user_id || ud.dataset.userId)) {
-      return Number(ud.dataset.user_id || ud.dataset.userId);
-    }
-    const a1 = document.querySelector('#user-dropdown a[href^="/user/"]');
-    const m1 = a1 && a1.getAttribute('href').match(/\/user\/(\d+)/);
-    if (m1) return Number(m1[1]);
-    const a2 = document.querySelector('a[href^="/user_plans/"]');
-    const m2 = a2 && a2.getAttribute('href').match(/\/user_plans\/(\d+)/);
-    if (m2) return Number(m2[1]);
-    return NaN;
-  }
-
   function parseItemList(html) {
     const m = html && html.match(/const\s+itemList\s*=\s*(\[[\s\S]*?\]);/);
     if (!m) return null;
@@ -4739,7 +4709,7 @@
   }
 
   window.needWarn = async function (problemId) {
-    const uid = getLoginUid();
+    const uid = getCurrentUserId();
 
     // 1) submissions 列表判断（首选）
     try {
@@ -4786,20 +4756,9 @@
       : (opt) => fetch(opt.url, { headers: opt.headers || {}, credentials: 'include' })
         .then(r => r.text()).then(t => ({ responseText: t }));
 
-    function getUid() {
-      const ud = document.querySelector('#user-dropdown');
-      if (ud && ud.dataset && (ud.dataset.user_id || ud.dataset.userId)) return ud.dataset.user_id || ud.dataset.userId;
-      const a1 = document.querySelector('#user-dropdown a[href^="/user/"]');
-      const m1 = a1 && a1.getAttribute('href').match(/\/user\/(\d+)/);
-      if (m1) return m1[1];
-      const a2 = document.querySelector('a[href^="/user_plans/"]');
-      const m2 = a2 && a2.getAttribute('href').match(/\/user_plans\/(\d+)/);
-      if (m2) return m2[1];
-      return null;
-    }
 
     async function hasAccepted(problemId) {
-      const uid = getUid();
+      const uid = getCurrentUserId();
       if (!uid) return false;
       try {
         const url = `${BASE}/submissions?problem_id=${problemId}&submitter=${uid}&min_score=100&max_score=100&language=&status=`;
@@ -4831,13 +4790,6 @@
     function qs(sel, root) { return (root || document).querySelector(sel); }
     function qsa(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
 
-    function getLoginUserId() {
-      const ud = qs('#user-dropdown');
-      if (ud && ud.dataset && (ud.dataset.user_id || ud.dataset.userId)) return Number(ud.dataset.user_id || ud.dataset.userId);
-      const a = qs('#user-dropdown a[href^="/user/"]');
-      const m = a && a.getAttribute('href').match(/\/user\/(\d+)/);
-      return m ? Number(m[1]) : NaN;
-    }
 
     function sameOrigin(u) { try { return new URL(u, location.origin).origin === location.origin; } catch { return true; } }
     function fetchText(u, headers) {
@@ -4879,7 +4831,7 @@
     }
 
     async function needWarn(problemId) {
-      const uid = getLoginUserId();
+      const uid = getCurrentUserId();
       try {
         const html = await fetchText(`/submissions?problem_id=${encodeURIComponent(problemId)}`, { 'X-Requested-With': 'XMLHttpRequest' });
         if (Number.isFinite(uid)) {
@@ -4996,17 +4948,6 @@
       return fetch(u, opt).then(function (r) { return r.text(); });
     }
 
-    function getUid() {
-      var ud = document.querySelector('#user-dropdown');
-      if (ud && ud.dataset && (ud.dataset.user_id || ud.dataset.userId)) return ud.dataset.user_id || ud.dataset.userId;
-      var a1 = document.querySelector('#user-dropdown a[href^="/user/"]');
-      var m1 = a1 && a1.getAttribute('href').match(/\/user\/(\d+)/);
-      if (m1) return m1[1];
-      var a2 = document.querySelector('a[href^="/user_plans/"]');
-      var m2 = a2 && a2.getAttribute('href').match(/\/user_plans\/(\d+)/);
-      if (m2) return m2[1];
-      return null;
-    }
 
     function parseItemList(html) {
       var m = html && html.match(/const\s+itemList\s*=\s*(\[[\s\S]*?\]);/);
@@ -5045,7 +4986,7 @@
     }
 
     async function hasAnyAcceptedAcrossAll(problemId) {
-      var uid = getUid();
+      var uid = getCurrentUserId();
       if (!uid) return null; // 无法识别登录用户
 
       // 1) 首选：使用过滤后的“仅本人 + 成功(100 分)”列表，天然跨页
