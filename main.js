@@ -3826,7 +3826,7 @@ window.getCurrentUserId = getCurrentUserId;
   }
 
   /* ----------------------------------------------------------------
-   *  X) 隐藏“已通过/已跳过”的题目（仅 Q/H/E/S 开头）
+   *  X) 隐藏“已通过/已跳过”的题目
    * ---------------------------------------------------------------- */
   function __bn_shouldHideRow(tr) {
     try {
@@ -3834,10 +3834,10 @@ window.getCurrentUserId = getCurrentUserId;
       if (!tds || tds.length < 3) return false;
       const codeCell = tds[2];
       const idText = (codeCell.textContent || '').trim();
-      if (!/^[QHES]/.test(idText)) return false; // 只处理 Q/H/E/S
+      if (!/^[QHEST]/.test(idText)) return false; // 只处理 Q/H/E/S/TR/TN
       const statusTd = tds[1];
       const evalTd = tds[0];
-      const isPass = !!statusTd.querySelector('.status.accepted, .status .accepted, span.status.accepted, i.checkmark.icon');
+      const isPass = !!statusTd.querySelector('.status.accepted, .status .accepted, span.status.accepted, i.checkmark.icon, i.thumbs.up.icon, i.check.icon');
       const isSkip = !!evalTd.querySelector('i.coffee.icon');
       return isPass || isSkip;
     } catch (e) { return false; }
