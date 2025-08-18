@@ -126,6 +126,35 @@
   const basePalette = palettes[effectiveTheme] || palettes.light;
   const palette = Object.assign({}, basePalette, useCustomColors ? storedPalette : {});
 
+  async function request(url, options = {}) {
+    const { method = 'GET', headers = {}, data, retry = 2 } = options;
+    for (let i = 0; i <= retry; i++) {
+      try {
+        if (typeof GM_xmlhttpRequest === 'function') {
+          return await new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+              url,
+              method,
+              data,
+              headers,
+              withCredentials: true,
+              onload: r => resolve({ status: r.status, responseText: r.responseText }),
+              onerror: e => reject(new Error(e.error || 'network error'))
+            });
+          });
+        }
+        const resp = await fetch(url, { method, headers, body: data, credentials: 'include' });
+        const text = await resp.text();
+        return { status: resp.status, responseText: text };
+      } catch (err) {
+        if (i === retry) throw err;
+      }
+    }
+  }
+
+  window.request = request;
+  window.gmFetch = opts => request(opts.url, opts);
+
   /* ----------------------------------------------------------------
    *  1) 样式（支持暗色）
    * ---------------------------------------------------------------- */
@@ -3579,8 +3608,8 @@
       btn.style.pointerEvents = 'none';
 
       try {
-        const res = await fetch(location.href.replace(/\/$/, '') + '/markdown/text', { credentials: 'include' });
-        let text = await res.text();
+        const r = await request(location.href.replace(/\/$/, '') + '/markdown/text');
+        let text = r.responseText || '';
         text = stripLeadingBlank(text);   // ← 关键：清理开头空行/不可见字符
 
         if (navigator.clipboard?.writeText) {
@@ -3612,6 +3641,7 @@
         btn.style.color = originalColor;
         btn.style.pointerEvents = '';
         GM_notification({ text: '复制失败：' + e, timeout: 3000 });
+        console.error('copy markdown failed', e);
       }
     };
 
@@ -4137,21 +4167,11 @@
   }
 
   function gmFetch(opts) {
-    return new Promise((res, rej) => {
-      GM_xmlhttpRequest({
-        ...opts, withCredentials: true,
-        onload: r => {
-          log(opts.method || 'GET', opts.url, r.status, (r.responseText || '').slice(0, 160));
-          r.status >= 200 && r.status < 300 ? res(r) : rej(new Error(`HTTP ${r.status}: ${(r.responseText || '').slice(0, 200)}`));
-        },
-        onerror: e => rej(new Error(e.error || '网络错误'))
-      });
-    });
+    return request(opts.url, opts);
   }
 
   async function fetchPlanJSON({ uid, epoch }) {
-    const r = await gmFetch({
-      url: CFG.base + `/user_plan?user_id=${uid}&date=${epoch}&type=day&format=json`,
+    const r = await request(CFG.base + `/user_plan?user_id=${uid}&date=${epoch}&type=day&format=json`, {
       headers: {
         'X-Requested-With': 'XMLHttpRequest',
         'Accept': 'application/json',
@@ -4159,7 +4179,7 @@
       }
     });
     let j = {};
-    try { j = JSON.parse(r.responseText || '{}'); } catch { }
+    try { j = JSON.parse(r.responseText || '{}'); } catch (e) { console.error('parse plan json failed', e); }
     const up = j.user_plan || {};
     const arr = String(up.problem_ids || '')
       .split(/[|,\s]+/)
@@ -4180,8 +4200,7 @@
   }
 
   function postPlan(body, uid) {
-    return gmFetch({
-      url: CFG.base + '/user_plan',
+    return request(CFG.base + '/user_plan', {
       method: 'POST',
       data: body,
       headers: {
@@ -4284,22 +4303,7 @@
     const $ = (s, r) => (r || document).querySelector(s);
 
     // 统一 GM_xhr（脚本前面已有 gmFetch，若不可用则降级到 fetch）
-    const gmFetch = (opts) => new Promise((res, rej) => {
-      try {
-        if (typeof GM_xmlhttpRequest === 'function') {
-          GM_xmlhttpRequest({
-            ...opts,
-            withCredentials: true,
-            onload: r => res(r),
-            onerror: e => rej(new Error(e.error || '网络错误'))
-          });
-        } else {
-          fetch(opts.url, { method: opts.method || 'GET', credentials: 'include' })
-            .then(r => r.text().then(t => res({ status: r.status, responseText: t })))
-            .catch(err => rej(err));
-        }
-      } catch (err) { rej(err); }
-    });
+    const gmFetch = (opts) => request(opts.url, opts);
 
 
 
@@ -4499,15 +4503,18 @@
     }
     async function needWarn(problemId) {
       try {
-        const r = await gmFetch({
-          url: CFG.base + `/problem/${problemId}`,
-          headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        const r = await request(CFG.base + `/problem/${problemId}`, {
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          retry: 2
         });
         const html = r.responseText || '';
         // 题目页上“提交记录/统计”按钮带有 check-need-button 时，代表未通过（element1.txt）
         return /class="[^"]*check-need-button[^"]*"\s+data-href="\/submissions\?problem_id=\d+"/.test(html)
           || /class="[^"]*check-need-button[^"]*"\s+data-href="\/problem\/\d+\/statistics/.test(html);
-      } catch { return false; }
+      } catch (e) {
+        console.error('needWarn failed', e);
+        return false;
+      }
     }
 
     function extractProblemIdFromRow(row) {
@@ -4609,13 +4616,7 @@
   const BASE = (window.CFG && window.CFG.base) ? window.CFG.base : '';
 
   // 兼容 gmFetch；没有就用 fetch 简实现
-  const gmf = (typeof window.gmFetch === 'function')
-    ? window.gmFetch
-    : function (opt) {
-      return fetch(opt.url, { headers: opt.headers || {} })
-        .then(r => r.text())
-        .then(t => ({ responseText: t }));
-    };
+  const gmf = window.gmFetch;
 
   // 取当前登录用户 ID：优先 #user-dropdown 的 data-user_id；其次 /user/123；再次 /user_plans/123
   function getCurrentUserId() {
@@ -4650,7 +4651,7 @@
   window.needWarn = async function (problemId) {
     try {
       if (await hasAccepted(problemId)) return false;
-    } catch (e) { /* ignore */ }
+    } catch (e) { console.error('hasAccepted check failed', e); }
 
     try {
       const r = await gmf({ url: `${BASE}/problem/${problemId}`, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
@@ -4672,20 +4673,7 @@
     try { return new URL(url, location.origin).origin === location.origin; } catch { return false; }
   }
   function safeFetch(url, headers) {
-    if (sameOrigin(url) || url.startsWith('/')) {
-      return fetch(url, { headers: headers || {}, credentials: 'include' })
-        .then(r => r.text()).then(t => ({ responseText: t }));
-    }
-    if (typeof GM_xmlhttpRequest === 'function') {
-      return new Promise((resolve, reject) => {
-        GM_xmlhttpRequest({
-          method: 'GET', url, headers: headers || {}, withCredentials: true,
-          onload: r => resolve({ responseText: r.responseText }),
-          onerror: reject, ontimeout: reject
-        });
-      });
-    }
-    return fetch(url, { headers: headers || {} }).then(r => r.text()).then(t => ({ responseText: t }));
+    return request(url, { headers: headers || {} });
   }
 
   function getLoginUid() {
@@ -4781,10 +4769,7 @@
   try {
     if (window.__bnNeedWarnShimAdded) return; window.__bnNeedWarnShimAdded = true;
     const BASE = (window.CFG && window.CFG.base) ? window.CFG.base : location.origin;
-    const gmf = (typeof window.gmFetch === 'function')
-      ? window.gmFetch
-      : (opt) => fetch(opt.url, { headers: opt.headers || {}, credentials: 'include' })
-        .then(r => r.text()).then(t => ({ responseText: t }));
+    const gmf = window.gmFetch;
 
     function getUid() {
       const ud = document.querySelector('#user-dropdown');
@@ -4811,16 +4796,16 @@
 
     if (typeof window.needWarn !== 'function') {
       window.needWarn = async function (problemId) {
-        try { if (await hasAccepted(problemId)) return false; } catch (e) { }
+        try { if (await hasAccepted(problemId)) return false; } catch (e) { console.error('hasAccepted failed', e); }
         try {
           const r = await gmf({ url: `${BASE}/problem/${problemId}`, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
           const html = r && (r.responseText || r) || '';
           return /class="[^"]*check-need-button[^"]*"\s+data-href="\/submissions\?problem_id=\d+"/.test(html)
             || /class="[^"]*check-need-button[^"]*"\s+data-href="\/problem\/\d+\/statistics/.test(html);
-        } catch (e) { return false; }
+        } catch (e) { console.error('problem fetch failed', e); return false; }
       };
     }
-  } catch (_e) { }
+  } catch (_e) { console.error('needWarn shim setup failed', _e); }
 })();
 /* === 7fa4 Better | Submission Guard (final) === */
 (function () {
@@ -4839,10 +4824,8 @@
       return m ? Number(m[1]) : NaN;
     }
 
-    function sameOrigin(u) { try { return new URL(u, location.origin).origin === location.origin; } catch { return true; } }
     function fetchText(u, headers) {
-      if (sameOrigin(u) || u.startsWith('/')) return fetch(u, { credentials: 'include', headers: headers || {} }).then(r => r.text());
-      return fetch(u, { headers: headers || {} }).then(r => r.text());
+      return request(u, { headers: headers || {} }).then(r => r.responseText);
     }
 
     function parseItemList(html) {
@@ -4892,7 +4875,7 @@
             if (seen) return !ac;
           }
         }
-      } catch (e) {/* ignore */ }
+      } catch (e) { console.error('needWarn submissions fetch failed', e); }
       // fallback: look for check-need-button on problem page – existence means NOT passed
       try {
         const ph = await fetchText(`/problem/${encodeURIComponent(problemId)}`, { 'X-Requested-With': 'XMLHttpRequest' });
@@ -4900,7 +4883,7 @@
           || /class="[^"]*check-need-button[^"]*"\s+data-href="\/problem\/\d+\/statistics/.test(ph)) {
           return true;
         }
-      } catch (e) { }
+      } catch (e) { console.error('needWarn problem page fetch failed', e); }
       return false; // default allow
     }
     window.needWarn = needWarn; // expose
@@ -4969,14 +4952,14 @@
           location.href = a.href;
           return;
         }
-      } catch (_) { /* on error, fall through to warn */ }
+      } catch (e) { console.error('needWarn invocation failed', e); }
 
       const mask = (typeof window.ensureModal === 'function' ? ensureModal() : ensureSimpleModal());
       if (mask && typeof mask.bnConfirm === 'function') {
         mask.bnConfirm(() => { location.href = a.href; });
       }
     }, true);
-  } catch (_e) { }
+  } catch (_e) { console.error('guard setup failed', _e); }
 })();
 /* === Patch: Submission Guard — scan *all* submissions (any AC across all pages) ===
  * 说明：这一补丁不删除原逻辑，只在文件末尾**覆写** window.needWarn：
@@ -4991,9 +4974,7 @@
 
     function sameOrigin(u) { try { return new URL(u, location.origin).origin === location.origin; } catch (e) { return false; } }
     function fetchText(u, headers) {
-      var opt = { headers: headers || {} };
-      if (sameOrigin(u) || (typeof u === 'string' && u.indexOf('/') === 0)) opt.credentials = 'include';
-      return fetch(u, opt).then(function (r) { return r.text(); });
+      return request(u, { headers: headers || {} }).then(function (r) { return r.responseText; });
     }
 
     function getUid() {
@@ -5065,7 +5046,7 @@
           // 若能看到本人但没看到 Accepted，保守返回 false（见到本人但没有 AC）
           if (new RegExp('/user/' + uid).test(hOk)) return false;
         }
-      } catch (e) { /* ignore */ }
+      } catch (e) { console.error('filtered submissions check failed', e); }
 
       // 2) 次选：不加过滤，解析 itemList/table —— 仅能看到“当前页”的本人提交
       try {
@@ -5079,7 +5060,7 @@
           var r3 = userSeenAndAnyACFromTable(html, uid);
           if (r3.seen) return r3.anyAC;
         }
-      } catch (e) { /* ignore */ }
+      } catch (e) { console.error('unfiltered submissions check failed', e); }
 
       return null; // 仍无法判定，交给兜底
     }
@@ -5090,7 +5071,7 @@
         var passed = await hasAnyAcceptedAcrossAll(problemId);
         if (passed === true) return false;
         if (passed === false) return true;
-      } catch (e) { /* ignore */ }
+      } catch (e) { console.error('hasAnyAcceptedAcrossAll failed', e); }
 
       try {
         var ph = await fetchText(BASE + '/problem/' + encodeURIComponent(problemId), { 'X-Requested-With': 'XMLHttpRequest' });
@@ -5098,10 +5079,10 @@
           || /class="[^"]*check-need-button[^"]*"\s+data-href="\/problem\/\d+\/statistics/.test(ph)) {
           return true;
         }
-      } catch (e) { /* ignore */ }
+      } catch (e) { console.error('problem page check failed', e); }
 
       return false; // 默认放行，避免“全拦”
     };
-  } catch (_e) { /* ignore */ }
+  } catch (_e) { console.error('needWarn override failed', _e); }
 })();
 
