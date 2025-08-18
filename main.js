@@ -5084,24 +5084,38 @@
       return null; // 仍无法判定，交给兜底
     }
 
-    // 覆写 needWarn：有 AC => 不拦；无 AC => 拦；无法判定 => 兜底看题目页
-    window.needWarn = async function (problemId) {
-      try {
-        var passed = await hasAnyAcceptedAcrossAll(problemId);
-        if (passed === true) return false;
-        if (passed === false) return true;
-      } catch (e) { /* ignore */ }
+    var WARN_CACHE_TTL = 5 * 60 * 1000; // 5 分钟缓存
+    var warnCache = new Map();
 
+    async function needWarnFallback(pid) {
       try {
-        var ph = await fetchText(BASE + '/problem/' + encodeURIComponent(problemId), { 'X-Requested-With': 'XMLHttpRequest' });
+        var ph = await fetchText(BASE + '/problem/' + encodeURIComponent(pid), { 'X-Requested-With': 'XMLHttpRequest' });
         if (/class="[^"]*check-need-button[^"]*"\s+data-href="\/submissions\?problem_id=\d+"/.test(ph)
           || /class="[^"]*check-need-button[^"]*"\s+data-href="\/problem\/\d+\/statistics/.test(ph)) {
           return true;
         }
       } catch (e) { /* ignore */ }
+      return false;
+    }
 
-      return false; // 默认放行，避免“全拦”
+    // 覆写 needWarn：有 AC => 不拦；无 AC => 拦；无法判定 => 兜底看题目页
+    window.needWarn = async function (problemId, opt) {
+      var force = opt && opt.force;
+      var now = Date.now();
+      var hit = warnCache.get(problemId);
+      if (!force && hit && now - hit.time < WARN_CACHE_TTL) return hit.value;
+
+      var warn;
+      try {
+        var passed = await hasAnyAcceptedAcrossAll(problemId);
+        if (passed === true) warn = false;
+        else if (passed === false) warn = true;
+      } catch (e) { /* ignore */ }
+      if (warn === undefined) warn = await needWarnFallback(problemId);
+      warnCache.set(problemId, { value: warn, time: now });
+      return warn;
     };
+    window.needWarn.clearCache = function () { warnCache.clear(); };
   } catch (_e) { /* ignore */ }
 })();
 
