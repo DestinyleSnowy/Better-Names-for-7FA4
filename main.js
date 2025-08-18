@@ -4217,7 +4217,7 @@ window.getCurrentUserId = getCurrentUserId;
     const iso = $('#pad-date')?.value || tomorrowISO();
     const epoch = dateToEpoch(iso, CFG.tzOffsetHours);
     const uid = getCurrentUserId(); if (!uid) { notify('[错误代码 B1] 无法识别 user_id'); return; }
-    
+   
     const addIds = [...selected.keys()].map(Number);
     if (!addIds.length) return notify('[错误代码 B2] 未解析到数字ID');
 
@@ -4616,7 +4616,6 @@ window.getCurrentUserId = getCurrentUserId;
         .then(t => ({ responseText: t }));
     };
 
-  // 是否已通过：查看自己在该题是否有 Accepted / 100 分提交
   async function hasAccepted(problemId) {
     const uid = getCurrentUserId();
     if (!uid) return false;
@@ -4788,7 +4787,6 @@ window.getCurrentUserId = getCurrentUserId;
 
     function qs(sel, root) { return (root || document).querySelector(sel); }
     function qsa(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
-
     function sameOrigin(u) { try { return new URL(u, location.origin).origin === location.origin; } catch { return true; } }
     function fetchText(u, headers) {
       if (sameOrigin(u) || u.startsWith('/')) return fetch(u, { credentials: 'include', headers: headers || {} }).then(r => r.text());
