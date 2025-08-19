@@ -4058,7 +4058,7 @@ window.getCurrentUserId = getCurrentUserId;
     const iso = $('#pad-date')?.value || tomorrowISO();
     const epoch = dateToEpoch(iso, CFG.tzOffsetHours);
     const uid = getCurrentUserId(); if (!uid) { notify('[错误代码 B1] 无法识别 user_id'); return; }
-   
+
     const addIds = [...selected.keys()].map(Number);
     if (!addIds.length) return notify('[错误代码 B2] 未解析到数字ID');
 
@@ -4667,7 +4667,7 @@ window.getCurrentUserId = getCurrentUserId;
       return { seen, ac };
     }
 
-    async function needWarn(problemId) {     
+    async function needWarn(problemId) {
       const uid = getCurrentUserId();
       try {
         const html = await fetchText(`/submissions?problem_id=${encodeURIComponent(problemId)}`, { 'X-Requested-With': 'XMLHttpRequest' });
@@ -4821,7 +4821,7 @@ window.getCurrentUserId = getCurrentUserId;
       return { seen: seen, anyAC: anyAC };
     }
 
-    async function hasAnyAcceptedAcrossAll(problemId) {      
+    async function hasAnyAcceptedAcrossAll(problemId) {
       const uid = getCurrentUserId();
       if (!uid) return null; // 无法识别登录用户
 
@@ -4895,5 +4895,3 @@ window.getCurrentUserId = getCurrentUserId;
     window.needWarn.clearCache = function () { warnCache.clear(); };
   } catch (_e) { /* ignore */ }
 })();
-
-
