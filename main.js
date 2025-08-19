@@ -32,67 +32,30 @@ window.getCurrentUserId = getCurrentUserId;
 (function () {
   'use strict';
 
-  /* ----------------------------------------------------------------
-   *  0) 配置读取 & 常量
-   * ---------------------------------------------------------------- */
-
   const DEFAULT_MAX_UNITS = 10;
   const storedTitleUnits = GM_getValue('maxTitleUnits', DEFAULT_MAX_UNITS);
   const storedUserUnits = GM_getValue('maxUserUnits', DEFAULT_MAX_UNITS);
   const maxTitleUnits = (storedTitleUnits === 'none') ? Infinity : parseInt(storedTitleUnits, 10);
   const maxUserUnits = (storedUserUnits === 'none') ? Infinity : parseInt(storedUserUnits, 10);
-  const hideAvatar = GM_getValue('hideAvatar', false);
-  const enableCopy = GM_getValue('enableCopy', false);
-  const copyNotify = GM_getValue('copyNotify', false);
-  const hideOrig = GM_getValue('hideOrig', false);
-  const enableMenu = GM_getValue('enableUserMenu', false);
-  const enablePlanAdder = GM_getValue('enablePlanAdder', false);
-  const initialAutoExit = GM_getValue('planAdder.autoExit', false);
-  const enableVjLink = GM_getValue('enableVjLink', false);
-
-
+  const hideAvatar = GM_getValue('hideAvatar', true);
+  const enableCopy = GM_getValue('enableCopy', true);
+  const copyNotify = GM_getValue('copyNotify', true);
+  const hideOrig = GM_getValue('hideOrig', true);
+  const enableMenu = GM_getValue('enableUserMenu', true);
+  const enablePlanAdder = GM_getValue('enablePlanAdder', true);
+  const initialAutoExit = GM_getValue('planAdder.autoExit', true);
+  const enableVjLink = GM_getValue('enableVjLink', true);
   const hideDoneSkip = GM_getValue('hideDoneSkip', false);
-  // 新增：截断“计数方式” (visual|char|byte)
   const WIDTH_MODE_KEY = 'truncate.widthMode';
-  const widthMode = GM_getValue(WIDTH_MODE_KEY, 'visual'); // 默认保留你原来的“中文=2”逻辑
-
-  // 新增：主题选择（auto|light|dark），用于挑选默认调色板；面板 UI 也会跟着变暗
+  const widthMode = GM_getValue(WIDTH_MODE_KEY, 'visual');
   const THEME_KEY = 'colorTheme';
   const themeMode = GM_getValue(THEME_KEY, 'auto');
   const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   const effectiveTheme = themeMode === 'auto' ? (prefersDark ? 'dark' : 'light') : themeMode;
 
-  let autoExit = initialAutoExit;
-
-  const COLOR_KEYS = ['low3', 'low2', 'low1', 'is', 'upp1', 'upp2', 'upp3', 'upp4', 'upp5', 'upp6', 'oth', 'tch']; // 新增 tch（教师）
-  const COLOR_LABELS = {
-    low3: '初2025级',
-    low2: '初2024级',
-    low1: '初2023级',
-    is: '高2025级',
-    upp1: '高2024级',
-    upp2: '高2023级',
-    upp3: '大2025级',
-    upp4: '大2024级',
-    upp5: '大2023级',
-    upp6: '大2022级',
-    oth: '成都七中',
-    tch: '教师'
-  };
-  const GRADE_LABELS = {
-    is: '高2025级',
-    upp1: '高2024级',
-    upp2: '高2023级',
-    upp3: '大2025级',
-    upp4: '大2024级',
-    upp5: '大2023级',
-    upp6: '大2022级',
-    low3: '初2025级',
-    low2: '初2024级',
-    low1: '初2023级',
-    oth: '成都七中',
-    tch: '教师'
-  };
+  const COLOR_KEYS = ['low3', 'low2', 'low1', 'is', 'upp1', 'upp2', 'upp3', 'upp4', 'upp5', 'upp6', 'oth', 'tch'];
+  const COLOR_LABELS = { low3: '初2025级', low2: '初2024级', low1: '初2023级', is: '高2025级', upp1: '高2024级', upp2: '高2023级', upp3: '大2025级', upp4: '大2024级', upp5: '大2023级', upp6: '大2022级', oth: '成都七中', tch: '教师' };
+  const GRADE_LABELS = { is: '高2025级', upp1: '高2024级', upp2: '高2023级', upp3: '大2025级', upp4: '大2024级', upp5: '大2023级', upp6: '大2022级', low3: '初2025级', low2: '初2024级', low1: '初2023级', oth: '成都七中', tch: '教师' };
 
   function safeGetJSON(key, fallback) {
     try {
@@ -107,45 +70,13 @@ window.getCurrentUserId = getCurrentUserId;
   const useCustomColors = GM_getValue('useCustomColors', false);
 
   const palettes = {
-    light: {
-      low3: '#ff0101',
-      low2: '#ff6629',
-      low1: '#ffbb00',
-      upp1: '#62ca00',
-      upp2: '#00b972',
-      upp3: '#9900ff',
-      is: '#ca00ca',
-      oth: '#5a5a5a',
-      upp4: '#000cff',
-      upp5: '#896e00',
-      upp6: '#00ffff',
-      tch: '#333333'
-    },
-    dark: {
-      // 深色背景上更通透饱和的色
-      low3: '#ff5b5b',
-      low2: '#ff8a4d',
-      low1: '#ffd24d',
-      upp1: '#7be14a',
-      upp2: '#24d39a',
-      upp3: '#b06bff',
-      is: '#ff73ff',
-      oth: '#cfcfcf',
-      upp4: '#6b86ff',
-      upp5: '#d2b04d',
-      upp6: '#00ffff',
-      tch: '#e0e0e0'
-    }
+    light: { low3: '#ff0101', low2: '#ff6629', low1: '#ffbb00', upp1: '#62ca00', upp2: '#00b972', upp3: '#9900ff', is: '#ca00ca', oth: '#5a5a5a', upp4: '#000cff', upp5: '#896e00', upp6: '#00ffff', tch: '#333333' },
+    dark:  { low3: '#ff5b5b', low2: '#ff8a4d', low1: '#ffd24d', upp1: '#7be14a', upp2: '#24d39a', upp3: '#b06bff', is: '#ff73ff', oth: '#cfcfcf', upp4: '#6b86ff', upp5: '#d2b04d', upp6: '#00ffff', tch: '#e0e0e0' }
   };
 
   const basePalette = palettes[effectiveTheme] || palettes.light;
   const palette = Object.assign({}, basePalette, useCustomColors ? storedPalette : {});
-
-  /* ----------------------------------------------------------------
-   *  1) 样式（支持暗色）
-   * ---------------------------------------------------------------- */
   const css = `
-    /* 基础变量：根据 light / dark 切换 */
     #bn-container {
       --bn-bg: #ffffff;
       --bn-bg-subtle: #fafbfc;
@@ -162,8 +93,6 @@ window.getCurrentUserId = getCurrentUserId;
       --bn-panel-shadow: 0 8px 32px rgba(0,0,0,0.12);
       --bn-trigger-shadow: 0 4px 12px rgba(0,0,0,0.1);
       --bn-hover-bg:#f8f9fa;
-
-      /* 新增：让保存条不再推挤布局 */
       --bn-savebar-h: 48px;
       --bn-version-h: 44px;
     }
@@ -256,7 +185,6 @@ window.getCurrentUserId = getCurrentUserId;
 
     .bn-panel-content {
       display: flex; transition: all .4s cubic-bezier(.4,0,.2,1);
-      /* 永远为保存条+版本栏预留空间，避免跳变 */
       padding-bottom: calc(var(--bn-savebar-h) + var(--bn-version-h));
     }
     .bn-main-content {
@@ -265,7 +193,6 @@ window.getCurrentUserId = getCurrentUserId;
       gap: 12px;
       flex: 1;
       min-width: 0;
-      /* 只给中间网格（每个“框”所在区域）留白，侧栏不动 */
       padding: 16px 20px 0 20px;
     }
 
@@ -274,7 +201,6 @@ window.getCurrentUserId = getCurrentUserId;
         padding: 12px 12px 0 12px;
       }
     }
-
 
     .bn-color-sidebar {
       width: 480px; background: var(--bn-bg-subtle);
@@ -370,11 +296,8 @@ window.getCurrentUserId = getCurrentUserId;
       transition: all .2s ease;
     }
     .bn-color-item input[type="text"]:focus { border-color: #007bff; background: var(--bn-bg); box-shadow: 0 0 0 2px rgba(0,123,255,0.14); outline: none; }
-
     .bn-color-actions { display: flex; gap: 8px; }
     .bn-color-actions .bn-btn { flex: 1; padding: 10px 16px; font-size: 12px; }
-
-    /* ⚠️ 保存条改为“悬浮”，通过透明度显示，避免面板跳变 */
     .bn-save-actions {
       position: absolute;
       left: 0; right: 0;
@@ -393,7 +316,6 @@ window.getCurrentUserId = getCurrentUserId;
       opacity: 1; pointer-events: auto; transform: translateY(0);
     }
 
-    /* 子菜单：默认不带动画（仅在切换时由 JS 注入动画） */
     #bn-copy-options {
       margin-left: 24px; display: ${enableCopy ? 'block' : 'none'}; padding-top: 8px; border-top: 1px solid var(--bn-border-subtle);
       margin-top: 8px;
@@ -421,9 +343,7 @@ window.getCurrentUserId = getCurrentUserId;
     #bn-user-menu {
       position: fixed;
       z-index: 10001;
-      /* 背景颜色采用主题色或白色，并叠加由右至左渐深的浅蓝色阴影 */
       background-color: var(--bn-bg, #fff);
-      /* 渐变从右（深）到左（浅） */
       background-image: linear-gradient(to left, rgba(124, 191, 255, 0.15), rgba(124, 191, 255, 0));
       background-repeat: no-repeat;
       box-shadow: var(--bn-panel-shadow);
@@ -433,7 +353,6 @@ window.getCurrentUserId = getCurrentUserId;
       flex-direction: column;
       min-width: 160px;
       overflow: hidden;
-      /* 默认边框，不做额外定制 */
       border: 1px solid var(--bn-border);
     }
     #bn-user-menu a {
@@ -450,8 +369,6 @@ window.getCurrentUserId = getCurrentUserId;
       background: linear-gradient(135deg, var(--bn-bg-grad-1) 0%, var(--bn-bg-grad-2) 100%);
       border-top: 1px solid var(--bn-border-subtle);
       font-size: 11px; color: var(--bn-text-muted); font-weight: 500;
-
-      /* 新增：固定高度，给保存条预留落点 */
       min-height: var(--bn-version-h);
       display: flex; align-items: center; justify-content: center;
     }
@@ -465,33 +382,28 @@ window.getCurrentUserId = getCurrentUserId;
     }
   `;
   const style = document.createElement('style'); style.textContent = css; document.head.appendChild(style);
-  GM_addStyle(`/* === 角落定位 & 面板展开方向 === */
-#bn-container.bn-pos-br { bottom:20px; right:20px; top:auto; left:auto; }
-#bn-container.bn-pos-bl { bottom:20px; left:20px;  top:auto; right:auto; }
-#bn-container.bn-pos-tr { top:20px;    right:20px; bottom:auto; left:auto; }
-#bn-container.bn-pos-tl { top:20px;    left:20px;  bottom:auto; right:auto; }
+  GM_addStyle(`
+  #bn-container.bn-pos-br { bottom:20px; right:20px; top:auto; left:auto; }
+  #bn-container.bn-pos-bl { bottom:20px; left:20px;  top:auto; right:auto; }
+  #bn-container.bn-pos-tr { top:20px;    right:20px; bottom:auto; left:auto; }
+  #bn-container.bn-pos-tl { top:20px;    left:20px;  bottom:auto; right:auto; }
 
-#bn-container.bn-pos-br #bn-trigger { bottom:0; right:0;  top:auto;   left:auto; }
-#bn-container.bn-pos-bl #bn-trigger { bottom:0; left:0;   top:auto;   right:auto; }
-#bn-container.bn-pos-tr #bn-trigger { top:0;    right:0;  bottom:auto; left:auto; }
-#bn-container.bn-pos-tl #bn-trigger { top:0;    left:0;   bottom:auto; right:auto; }
+  #bn-container.bn-pos-br #bn-trigger { bottom:0; right:0;  top:auto;   left:auto; }
+  #bn-container.bn-pos-bl #bn-trigger { bottom:0; left:0;   top:auto;   right:auto; }
+  #bn-container.bn-pos-tr #bn-trigger { top:0;    right:0;  bottom:auto; left:auto; }
+  #bn-container.bn-pos-tl #bn-trigger { top:0;    left:0;   bottom:auto; right:auto; }
 
-#bn-container.bn-pos-br #bn-panel { bottom:58px; right:0;  top:auto;   left:auto;  transform-origin: bottom right; }
-#bn-container.bn-pos-bl #bn-panel { bottom:58px; left:0;   top:auto;   right:auto; transform-origin: bottom left; }
-#bn-container.bn-pos-tr #bn-panel { top:58px;    right:0;  bottom:auto; left:auto;  transform-origin: top right; }
-#bn-container.bn-pos-tl #bn-panel { top:58px;    left:0;   bottom:auto; right:auto; transform-origin: top left; }
+  #bn-container.bn-pos-br #bn-panel { bottom:58px; right:0;  top:auto;   left:auto;  transform-origin: bottom right; }
+  #bn-container.bn-pos-bl #bn-panel { bottom:58px; left:0;   top:auto;   right:auto; transform-origin: bottom left; }
+  #bn-container.bn-pos-tr #bn-panel { top:58px;    right:0;  bottom:auto; left:auto;  transform-origin: top right; }
+  #bn-container.bn-pos-tl #bn-panel { top:58px;    left:0;   bottom:auto; right:auto; transform-origin: top left; }
 
-#bn-container.bn-pos-tr #bn-panel,
-#bn-container.bn-pos-tl #bn-panel { transform: scale(.95) translateY(-10px); }
+  #bn-container.bn-pos-tr #bn-panel,
+  #bn-container.bn-pos-tl #bn-panel { transform: scale(.95) translateY(-10px); }
 
-#bn-container.bn-dragging #bn-panel { display: none !important; }
+  #bn-container.bn-dragging #bn-panel { display: none !important; }
+  .bn-hide-done-skip{display:none!important;}`);
 
-/* 隐藏行样式 */
-.bn-hide-done-skip{display:none!important;}`);
-
-  /* ----------------------------------------------------------------
-   *  2) 面板 DOM
-   * ---------------------------------------------------------------- */
   const colorInputsHTML = COLOR_KEYS.map(k => `
     <div class="bn-color-item">
       <label>${COLOR_LABELS[k] || k}:</label>
@@ -518,7 +430,6 @@ window.getCurrentUserId = getCurrentUserId;
       </div>
       <div class="bn-panel-content">
         <div class="bn-main-content">
-
           <div class="bn-section">
             <div class="bn-title">
               <svg class="bn-icon" viewBox="0 0 24 24"><path d="M6.13 1L6 16a2 2 0 002 2h15"/><path d="M1 6.13L16 6a2 2 0 012 2v15"/></svg>
@@ -546,7 +457,6 @@ window.getCurrentUserId = getCurrentUserId;
               </label>
             </div>
           </div>
-
           <div class="bn-section">
             <div class="bn-title">
               <svg class="bn-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -556,8 +466,7 @@ window.getCurrentUserId = getCurrentUserId;
             <label><input type="checkbox" id="bn-enable-user-menu" ${enableMenu ? 'checked' : ''}/> 启用用户菜单</label>
             <label><input type="checkbox" id="bn-enable-vj" ${enableVjLink ? 'checked' : ''}/> 外站题目链接 Vjudge 按钮</label>
                       <label><input type=\"checkbox\" id=\"bn-hide-done-skip\" ${hideDoneSkip ? 'checked' : ''}/> 隐藏已通过&已跳过题目</label>
-</div>
-
+          </div>
           <div class="bn-section">
             <div class="bn-title">
               <svg class="bn-icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
@@ -569,7 +478,6 @@ window.getCurrentUserId = getCurrentUserId;
               <label><input type="checkbox" id="bn-hide-orig" ${hideOrig ? 'checked' : ''}/> 隐藏原始按钮</label>
             </div>
           </div>
-
           <div class="bn-section">
             <div class="bn-title">
             <svg class="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"> <line x1="3" y1="12" x2="21" y2="12"/> <line x1="3" y1="6" x2="21" y2="6"/> <line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -580,7 +488,6 @@ window.getCurrentUserId = getCurrentUserId;
               <label><input type="checkbox" id="bn-plan-auto" ${initialAutoExit ? 'checked' : ''}/> 完成后退出</label>
             </div>
           </div>
-
           <div class="bn-section">
             <div class="bn-title">
               <svg class="bn-icon" viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 011.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
@@ -597,9 +504,7 @@ window.getCurrentUserId = getCurrentUserId;
               </label>
             </div>
           </div>
-
         </div>
-
         <div class="bn-color-sidebar" id="bn-color-sidebar">
           <div class="bn-color-header">
             <div class="bn-color-title">
@@ -614,7 +519,6 @@ window.getCurrentUserId = getCurrentUserId;
             </div>
           </div>
         </div>
-
       </div>
       <div class="bn-save-actions" id="bn-save-actions">
         <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
@@ -625,14 +529,10 @@ window.getCurrentUserId = getCurrentUserId;
   document.body.appendChild(container);
   container.style.pointerEvents = 'none';
 
-  /* ----------------------------------------------------------------
-   *  3) 元素引用
-   * ---------------------------------------------------------------- */
   const trigger = document.getElementById('bn-trigger');
   const panel = document.getElementById('bn-panel');
   const pinBtn = document.getElementById('bn-pin');
   let pinned = !!GM_getValue('panelPinned', false);
-  /* === 角落状态与拖拽逻辑 === */
   const CORNER_KEY = 'bn.corner';
   const SNAP_MARGIN = 20;
   let isDragging = false;
@@ -642,17 +542,14 @@ window.getCurrentUserId = getCurrentUserId;
   let __bn_raf = null;
   let __bn_dragX = 0, __bn_dragY = 0;
   let __bn_pointerId = null;
-  let __bn_prevTransition = '';
-  let __bn_prevWillChange = '';
 
-  function applyCorner(pos /* 'br'|'bl'|'tr'|'tl' */) {
+  function applyCorner(pos) {
     container.classList.remove('bn-pos-br', 'bn-pos-bl', 'bn-pos-tr', 'bn-pos-tl');
     container.classList.add('bn-pos-' + pos);
     GM_setValue(CORNER_KEY, pos);
   }
-  // 初始化角落（默认右下）
+  
   applyCorner(GM_getValue(CORNER_KEY, 'br'));
-
 
   const titleInp = document.getElementById('bn-title-input');
   const userInp = document.getElementById('bn-user-input');
@@ -704,9 +601,6 @@ window.getCurrentUserId = getCurrentUserId;
     themeMode
   };
 
-  /* ----------------------------------------------------------------
-   *  4) 固定/显示逻辑
-   * ---------------------------------------------------------------- */
   pinBtn.classList.toggle('bn-pinned', pinned);
   if (pinned) {
     panel.classList.add('bn-show');
@@ -718,7 +612,6 @@ window.getCurrentUserId = getCurrentUserId;
   copyOpts.style.display = originalConfig.enableCopy ? 'block' : 'none';
   planOpts.style.display = originalConfig.enablePlanAdder ? 'block' : 'none';
 
-  // 初始化颜色选择器
   COLOR_KEYS.forEach(k => {
     colorPickers[k] = document.getElementById(`bn-color-${k}`);
     hexInputs[k] = document.getElementById(`bn-color-${k}-hex`);
@@ -755,21 +648,17 @@ window.getCurrentUserId = getCurrentUserId;
     checkChanged();
   };
 
-  // 初始化颜色面板状态
   if (useCustomColors) {
     container.classList.add('bn-expanded');
     panel.classList.add('bn-expanded');
     colorSidebar.classList.add('bn-show');
   }
 
-  // 主题选择
   themeSelect.onchange = () => {
     const v = themeSelect.value;
     if (v === 'dark') container.classList.add('bn-dark');
     else if (v === 'light') container.classList.remove('bn-dark');
-    else { // auto
-      prefersDark ? container.classList.add('bn-dark') : container.classList.remove('bn-dark');
-    }
+    else { prefersDark ? container.classList.add('bn-dark') : container.classList.remove('bn-dark'); }
     checkChanged();
   };
 
@@ -796,7 +685,7 @@ window.getCurrentUserId = getCurrentUserId;
   };
   trigger.addEventListener('mouseleave', maybeHidePanel);
   panel.addEventListener('mouseleave', maybeHidePanel);
-  // === 可拖拽齿轮（100ms 滞后跟随）===
+
   const __bn_lagMs = 100;
   const __bn_trailWindow = 400;
   const __bn_now = () => (window.performance && performance.now) ? performance.now() : Date.now();
@@ -919,7 +808,6 @@ window.getCurrentUserId = getCurrentUserId;
     trigger.addEventListener('mousedown', __bn_onDown, { passive: false });
   }
 
-
   pinBtn.addEventListener('click', () => {
     pinned = !pinned;
     GM_setValue('panelPinned', pinned);
@@ -928,9 +816,6 @@ window.getCurrentUserId = getCurrentUserId;
     else if (!trigger.matches(':hover') && !panel.matches(':hover')) hidePanel();
   });
 
-  /* ----------------------------------------------------------------
-   *  5) 工具 & 变更检测
-   * ---------------------------------------------------------------- */
   function markOnce(el, key) {
     const k = `bn${key}`;
     if (!el || !el.dataset) return true;
@@ -964,7 +849,6 @@ window.getCurrentUserId = getCurrentUserId;
       (document.getElementById('bn-theme-select').value !== originalConfig.themeMode) ||
       paletteChanged;
 
-    // 改为“透明度显隐”，避免布局跳变
     saveActions.classList.toggle('bn-visible', changed);
   }
 
@@ -1011,7 +895,6 @@ window.getCurrentUserId = getCurrentUserId;
   };
 
   document.getElementById('bn-save-config').onclick = () => {
-    // 保存截断
     if (chkTitleTrEl.checked) {
       const v = parseInt(titleInp.value, 10);
       if (isNaN(v) || v <= 0) { alert('请输入大于 0 的正整数'); return; }
@@ -1028,7 +911,6 @@ window.getCurrentUserId = getCurrentUserId;
     }
     GM_setValue(WIDTH_MODE_KEY, widthModeSel.value);
 
-    // 显示 & 复制 & 菜单 & 计划
     GM_setValue('hideAvatar', chkAv.checked);
     GM_setValue('enableCopy', chkCp.checked);
     GM_setValue('copyNotify', chkNt.checked);
@@ -1040,10 +922,8 @@ window.getCurrentUserId = getCurrentUserId;
     GM_setValue('planAdder.autoExit', chkPlanAuto.checked);
     autoExit = chkPlanAuto.checked;
 
-    // 主题
     GM_setValue(THEME_KEY, themeSelect.value);
 
-    // 颜色
     const obj = {};
     COLOR_KEYS.forEach(k => { if (colorPickers[k]) obj[k] = colorPickers[k].value; });
     GM_setValue('userPalette', JSON.stringify(obj));
@@ -1078,7 +958,6 @@ window.getCurrentUserId = getCurrentUserId;
     copyOpts.style.display = chkCp.checked ? 'block' : 'none';
     planOpts.style.display = chkPlan.checked ? 'block' : 'none';
 
-    // 主题还原
     if (themeSelect.value === 'dark') container.classList.add('bn-dark');
     else if (themeSelect.value === 'light') container.classList.remove('bn-dark');
     else { prefersDark ? container.classList.add('bn-dark') : container.classList.remove('bn-dark'); }
@@ -1092,13 +971,9 @@ window.getCurrentUserId = getCurrentUserId;
     checkChanged();
   };
 
-  /* ----------------------------------------------------------------
-   *  6) 截断与图标
-   * ---------------------------------------------------------------- */
   function unitOfCharByMode(codePoint, mode) {
     if (mode === 'char') return 1;
     if (mode === 'visual') return codePoint > 255 ? 2 : 1;
-    // UTF-8 字节数近似（严格：<=0x7F:1, <=0x7FF:2, <=0xFFFF:3, 其它:4）
     if (codePoint <= 0x7F) return 1;
     if (codePoint <= 0x7FF) return 2;
     if (codePoint <= 0xFFFF) return 3;
@@ -1115,9 +990,7 @@ window.getCurrentUserId = getCurrentUserId;
     }
     return out;
   }
-  /* ----------------------------------------------------------------
-   *  7) 数据（用户）
-   * ---------------------------------------------------------------- */
+
   const users = {
     1: { name: "陈许旻", colorKey: "tch" },
     2: { name: "唐子杰", colorKey: "tch" },
@@ -3542,9 +3415,6 @@ window.getCurrentUserId = getCurrentUserId;
     2432: { name: "刘泽慧", colorKey: "low1" }
   };
 
-  /* ----------------------------------------------------------------
-   *  8) 页面特定逻辑
-   * ---------------------------------------------------------------- */
   function firstVisibleCharOfTitle() {
     const h1 = document.querySelector('body > div:nth-child(2) > div > div.ui.center.aligned.grid > div > h1');
     if (!h1) return '';
@@ -3555,7 +3425,7 @@ window.getCurrentUserId = getCurrentUserId;
   function fEasierClip() {
     if (!/\/problem\//.test(location.pathname)) return;
     if (firstVisibleCharOfTitle() === 'L') return;
-    if (document.getElementById('bn-copy-btn')) return; // 防重复
+    if (document.getElementById('bn-copy-btn')) return; 
 
     let link = document.querySelector('div.ui.buttons.right.floated > a');
     if (!link) {
@@ -3573,13 +3443,9 @@ window.getCurrentUserId = getCurrentUserId;
     btn.id = 'bn-copy-btn';
     btn.className = 'small ui button';
     btn.textContent = '复制题面';
-    // 放在 fEasierClip 内、fetch 之后，复制之前
     function stripLeadingBlank(text) {
-      // 1) 统一换行为 \n，避免 \r\n 干扰
       let s = text.replace(/\r\n/g, '\n');
-      // 2) 去掉 BOM、零宽空格/连接符等“不可见字符”
       s = s.replace(/^[\uFEFF\u200B-\u200D\u2060]+/, '');
-      // 3) 去掉「若干空格/Tab 后跟换行」形成的“空白行块”
       s = s.replace(/^(?:[ \t]*\n)+/, '');
       return s;
     }
@@ -3589,15 +3455,13 @@ window.getCurrentUserId = getCurrentUserId;
       const originalBg = btn.style.backgroundColor;
       const originalColor = btn.style.color;
 
-      // 处理中态（样式保持原样、仅改文字并禁用点击）
       btn.textContent = '处理中…';
       btn.style.pointerEvents = 'none';
 
       try {
         const res = await fetch(location.href.replace(/\/$/, '') + '/markdown/text', { credentials: 'include' });
         let text = await res.text();
-        text = stripLeadingBlank(text);   // ← 关键：清理开头空行/不可见字符
-
+        text = stripLeadingBlank(text); 
         if (navigator.clipboard?.writeText) {
           await navigator.clipboard.writeText(text);
         } else {
@@ -3609,7 +3473,6 @@ window.getCurrentUserId = getCurrentUserId;
           ta.remove();
         }
 
-        // 成功：绿底白字“复制成功”，短暂后恢复
         btn.textContent = '复制成功';
         btn.style.backgroundColor = '#21ba45';
         btn.style.color = '#ffffff';
@@ -3621,7 +3484,6 @@ window.getCurrentUserId = getCurrentUserId;
         }, 1200);
 
       } catch (e) {
-        // 失败：恢复并发通知（失败保留原逻辑）
         btn.textContent = originalText;
         btn.style.backgroundColor = originalBg;
         btn.style.color = originalColor;
@@ -3645,26 +3507,22 @@ window.getCurrentUserId = getCurrentUserId;
     }
     if (!raw) return;
     const lower = raw.replace(/\s+/g, '').toLowerCase();
-
-    // 站点解析更丰富：cf/atc/luogu/uoj/hdu/poj/zoj/uva/loj(lightoj)
     const parser = {
       cf: pid => `https://vjudge.net/problem/CodeForces-${pid.slice(2)}`,
       codeforces: pid => `https://vjudge.net/problem/CodeForces-${pid.replace(/^codeforces/, '')}`,
       atc: pid => {
-        // atcabc123a / atcabc123_a / 其它情况尽力匹配
         const m = pid.match(/^atc([a-z]+)(\d+)[_-]?([a-z])$/);
         if (m) return `https://vjudge.net/problem/AtCoder-${m[1]}${m[2]}_${m[3]}`;
-        // 回退：去掉前缀 atc，末尾字母
         const base = pid.slice(3, -1), last = pid.slice(-1);
         return `https://vjudge.net/problem/AtCoder-${base}_${last}`;
       },
       luogu: pid => `https://vjudge.net/problem/洛谷-${pid.slice(5)}`,
+      LG: pid => `https://vjudge.net/problem/洛谷-p${pid.slice(2)}`,
       uoj: pid => `https://vjudge.net/problem/UniversalOJ-${pid.slice(3)}`,
-      hdu: pid => `https://vjudge.net/problem/HDU-${pid.slice(3)}`,
       poj: pid => `https://vjudge.net/problem/POJ-${pid.slice(3)}`,
       zoj: pid => `https://vjudge.net/problem/ZOJ-${pid.slice(3)}`,
       uva: pid => `https://vjudge.net/problem/UVA-${pid.slice(3)}`,
-      loj: pid => `https://vjudge.net/problem/LightOJ-${pid.slice(3)}` // lightoj 简写 loj
+      loj: pid => `https://vjudge.net/problem/LightOJ-${pid.slice(3)}`
     };
 
     let vjUrl = '';
@@ -3690,15 +3548,12 @@ window.getCurrentUserId = getCurrentUserId;
     vj.rel = 'noopener';
     vj.setAttribute('data-tooltip', `vj-${lower}`);
     vj.textContent = 'Vjudge';
-    // 调整按钮样式为橙色背景、白色文字
     vj.style.backgroundColor = '#f2711c';
     vj.style.color = '#ffffff';
-    // 将按钮插入到“投稿/外站提交”所在的左侧按钮组；若不存在，再回退到右侧按钮组
     const leftGroup = document.querySelector('div.ui.buttons:not(.right.floated)');
     if (leftGroup) {
       leftGroup.appendChild(vj);
     } else if (firstBtn && firstBtn.parentNode) {
-      // 插入到右侧按钮组最左边，使其靠近左侧
       firstBtn.parentNode.insertBefore(vj, firstBtn);
     } else {
       const container = document.querySelector('div.ui.buttons.right.floated') || document.querySelector('div.ui.buttons');
@@ -3718,8 +3573,6 @@ window.getCurrentUserId = getCurrentUserId;
       <a id="bn-menu-plan" href="#">转到计划</a>
     `;
     document.body.appendChild(menu);
-    // 修复菜单背景透明问题：为菜单容器设置不透明白色背景
-    // 设置背景颜色，但不要覆盖背景渐变
     menu.style.backgroundColor = '#ffffff';
     menu.style.opacity = '1';
 
@@ -3763,12 +3616,9 @@ window.getCurrentUserId = getCurrentUserId;
     });
   }
 
-  /* ----------------------------------------------------------------
-   *  9) 用户名/标题处理（只处理一次 + 最小 DOM 改动）
-   * ---------------------------------------------------------------- */
   function processUserLink(a) {
     if (!a || !a.matches('a[href^="/user/"]')) return;
-    if (!markOnce(a, 'UserDone')) return; // 已处理过就跳过
+    if (!markOnce(a, 'UserDone')) return; 
 
     if (
       a.matches('#user-dropdown > a') ||
@@ -3787,7 +3637,6 @@ window.getCurrentUserId = getCurrentUserId;
     const img = a.querySelector('img');
     if (img && hideAvatar) img.remove();
 
-    // 清理旧挂件
     a.querySelectorAll('.bn-icon').forEach(el => el.remove());
 
     let baseText = '';
@@ -3825,16 +3674,13 @@ window.getCurrentUserId = getCurrentUserId;
     span.innerHTML = prefix + truncated;
   }
 
-  /* ----------------------------------------------------------------
-   *  X) 隐藏“已通过/已跳过”的题目
-   * ---------------------------------------------------------------- */
   function __bn_shouldHideRow(tr) {
     try {
       const tds = tr.querySelectorAll('td');
       if (!tds || tds.length < 3) return false;
       const codeCell = tds[2];
       const idText = (codeCell.textContent || '').trim();
-      if (!/^[QHEST]/.test(idText)) return false; // 只处理 Q/H/E/S/TR/TN
+      if (!/^[QHEST]/.test(idText)) return false; 
       const statusTd = tds[1];
       const evalTd = tds[0];
       const isPass = !!statusTd.querySelector('.status.accepted, .status .accepted, span.status.accepted, i.checkmark.icon, i.thumbs.up.icon, i.check.icon');
@@ -3849,14 +3695,9 @@ window.getCurrentUserId = getCurrentUserId;
       if (enabled && __bn_shouldHideRow(tr)) tr.classList.add('bn-hide-done-skip');
       else tr.classList.remove('bn-hide-done-skip');
     });
-
-    // 更新表头提示
     try { updateHideBadge(enabled); } catch (e) { }
   }
 
-
-
-  // 在「名称」表头后追加亮绿色提示
   function updateHideBadge(enabled) {
     try {
       const headRow = document.querySelector('table.ui.very.basic.center.aligned.table thead > tr');
