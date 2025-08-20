@@ -929,7 +929,10 @@ window.getCurrentUserId = getCurrentUserId;
     GM_setValue('userPalette', JSON.stringify(obj));
     GM_setValue('useCustomColors', chkUseColor.checked);
 
-    setTimeout(() => location.reload(), 50);
+    // Reload the page to apply the updated configuration
+    setTimeout(() => {
+      (typeof unsafeWindow !== 'undefined' ? unsafeWindow : window).location.reload();
+    }, 50);
   };
 
   document.getElementById('bn-cancel-changes').onclick = () => {
