@@ -44,6 +44,7 @@ window.getCurrentUserId = getCurrentUserId;
   const enableMenu = GM_getValue('enableUserMenu', true);
   const enablePlanAdder = GM_getValue('enablePlanAdder', true);
   const initialAutoExit = GM_getValue('planAdder.autoExit', true);
+  let autoExit = initialAutoExit;
   const enableVjLink = GM_getValue('enableVjLink', true);
   const hideDoneSkip = GM_getValue('hideDoneSkip', false);
   const WIDTH_MODE_KEY = 'truncate.widthMode';
