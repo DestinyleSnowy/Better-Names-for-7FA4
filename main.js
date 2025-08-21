@@ -932,8 +932,13 @@ window.getCurrentUserId = getCurrentUserId;
     // Reload the page to apply the updated configuration
     setTimeout(() => {
       const w = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
-      const loc = w.top?.location || w.location;
-      loc.reload();
+      const target = w.top || w;
+      try {
+        target.location.reload();
+      } catch (e) {
+        // Fallback: force navigation if reload is blocked
+        target.location.href = target.location.href;
+      }
     }, 50);
   };
 
