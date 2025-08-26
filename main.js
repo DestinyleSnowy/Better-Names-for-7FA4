@@ -347,15 +347,21 @@ window.getCurrentUserId = getCurrentUserId;
       background-color: var(--bn-bg, #fff);
       background-image: linear-gradient(to left, rgba(124, 191, 255, 0.15), rgba(124, 191, 255, 0));
       background-repeat: no-repeat;
-      box-shadow: var(--bn-panel-shadow);
+      box-shadow: var(--bn-panel-shadow), 0 8px 24px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.12);
       border-radius: 8px;
       padding: 8px 0;
       display: none;
+      opacity: 0;
+      transform: scale(0.98);
+      transition: opacity .12s ease-out, transform .12s ease-out;
+      will-change: opacity, transform;
       flex-direction: column;
       min-width: 160px;
       overflow: hidden;
       border: 1px solid var(--bn-border);
     }
+    #bn-user-menu.bn-show { opacity: 1; transform: scale(1); }
+
     #bn-user-menu a {
       padding: 10px 16px; color: var(--bn-text-sub); text-decoration: none; font-size: 13px; white-space: nowrap; transition: all .2s ease; position: relative;
     }
@@ -549,7 +555,7 @@ window.getCurrentUserId = getCurrentUserId;
     container.classList.add('bn-pos-' + pos);
     GM_setValue(CORNER_KEY, pos);
   }
-  
+
   applyCorner(GM_getValue(CORNER_KEY, 'br'));
 
   const titleInp = document.getElementById('bn-title-input');
@@ -3426,7 +3432,7 @@ window.getCurrentUserId = getCurrentUserId;
   function fEasierClip() {
     if (!/\/problem\//.test(location.pathname)) return;
     if (firstVisibleCharOfTitle() === 'L') return;
-    if (document.getElementById('bn-copy-btn')) return; 
+    if (document.getElementById('bn-copy-btn')) return;
 
     let link = document.querySelector('div.ui.buttons.right.floated > a');
     if (!link) {
@@ -3462,7 +3468,7 @@ window.getCurrentUserId = getCurrentUserId;
       try {
         const res = await fetch(location.href.replace(/\/$/, '') + '/markdown/text', { credentials: 'include' });
         let text = await res.text();
-        text = stripLeadingBlank(text); 
+        text = stripLeadingBlank(text);
         if (navigator.clipboard?.writeText) {
           await navigator.clipboard.writeText(text);
         } else {
@@ -3563,63 +3569,66 @@ window.getCurrentUserId = getCurrentUserId;
   }
 
   function initUserMenu() {
-    if (document.getElementById('bn-user-menu')) return;
+  if (document.getElementById('bn-user-menu')) return;
 
-    const menu = document.createElement('div');
-    menu.id = 'bn-user-menu';
-    menu.innerHTML = `
-      <a id="bn-menu-home" href="#">转到主页</a>
-      <a id="bn-menu-sub-problem" href="#" style="display:none;">转到该题提交记录</a>
-      <a id="bn-menu-sub-all" href="#">转到提交记录</a>
-      <a id="bn-menu-plan" href="#">转到计划</a>
-    `;
-    document.body.appendChild(menu);
-    menu.style.backgroundColor = '#ffffff';
-    menu.style.opacity = '1';
+  const menu = document.createElement('div');
+  menu.id = 'bn-user-menu';
+  menu.innerHTML = `
+    <a id="bn-menu-home" href="#">转到主页</a>
+    <a id="bn-menu-sub-problem" href="#" style="display:none;">转到该题提交记录</a>
+    <a id="bn-menu-sub-all" href="#">转到提交记录</a>
+    <a id="bn-menu-plan" href="#">转到计划</a>
+  `;
+  document.body.appendChild(menu);
 
-    const home = menu.querySelector('#bn-menu-home');
-    const subProblem = menu.querySelector('#bn-menu-sub-problem');
-    const subAll = menu.querySelector('#bn-menu-sub-all');
-    const plan = menu.querySelector('#bn-menu-plan');
-    const hide = () => { menu.style.display = 'none'; };
+  const home = menu.querySelector('#bn-menu-home');
+  const subProblem = menu.querySelector('#bn-menu-sub-problem');
+  const subAll = menu.querySelector('#bn-menu-sub-all');
+  const plan = menu.querySelector('#bn-menu-plan');
 
-    document.addEventListener('click', hide);
+  const hide = () => { menu.classList.remove('bn-show'); menu.classList.remove('bn-show'); menu.style.display = 'none'; };
+  document.addEventListener('click', hide);
 
-    document.addEventListener('contextmenu', e => {
-      const a = e.target.closest('a[href^="/user/"]');
-      if (a) {
-        const m = a.getAttribute('href').match(/^\/user\/(\d+)/);
-        if (m) {
-          e.preventDefault();
-          const uid = m[1];
-          home.href = `/user/${uid}`;
-          let pid = '';
-          let pm = location.search.match(/problem_id=(\d+)/);
-          if (!pm) pm = location.pathname.match(/\/problem\/(\d+)/);
-          if (pm) pid = pm[1];
-          if (pid) {
-            subProblem.style.display = 'block';
-            subProblem.href = `/submissions?contest=&problem_id=${pid}&submitter=${uid}&min_score=0&max_score=100&language=&status=`;
-            subAll.textContent = '转到所有提交记录';
-          } else {
-            subProblem.style.display = 'none';
-            subAll.textContent = '转到提交记录';
-          }
-          subAll.href = `/submissions?contest=&problem_id=&submitter=${uid}&min_score=0&max_score=100&language=&status=`;
-          plan.href = `/user_plans/${uid}`;
-          menu.style.left = e.pageX + 'px';
-          menu.style.top = e.pageY + 'px';
-          menu.style.display = 'flex';
-          return;
+  document.addEventListener('contextmenu', (e) => {
+    const a = e.target.closest('a[href^="/user/"]');
+    if (a) {
+      const m = (a.getAttribute('href') || '').match(/^\/user\/(\d+)/);
+      if (m) {
+        e.preventDefault();
+        const uid = m[1];
+        home.href = `/user/${uid}`;
+        let pid = '';
+        let pm = location.search.match(/problem_id=(\d+)/);
+        if (!pm) pm = location.pathname.match(/\/problem\/(\d+)/);
+        if (pm) pid = pm[1];
+        if (pid) {
+          subProblem.style.display = 'block';
+          subProblem.href = `/submissions?contest=&problem_id=${pid}&submitter=${uid}&min_score=0&max_score=100&language=&status=`;
+          subAll.textContent = '转到所有提交记录';
+        } else {
+          subProblem.style.display = 'none';
+          subAll.textContent = '转到提交记录';
         }
+        subAll.href = `/submissions?contest=&problem_id=&submitter=${uid}&min_score=0&max_score=100&language=&status=`;
+        plan.href = `/user_plans/${uid}`;
+        menu.style.left = e.pageX + 'px';
+        menu.style.top = e.pageY + 'px';
+        menu.style.display = 'flex';
+menu.classList.remove('bn-show');
+void menu.offsetWidth;
+requestAnimationFrame(function(){ try{ menu.classList.add('bn-show'); }catch(e){} });
+
+        requestAnimationFrame(() => menu.classList.add('bn-show'));
+        return;
       }
-      hide();
-    });
-  }
+    }
+    // Not a user link -> fall through to native menu
+  }, true);
+}
 
   function processUserLink(a) {
     if (!a || !a.matches('a[href^="/user/"]')) return;
-    if (!markOnce(a, 'UserDone')) return; 
+    if (!markOnce(a, 'UserDone')) return;
 
     if (
       a.matches('#user-dropdown > a') ||
@@ -3681,7 +3690,7 @@ window.getCurrentUserId = getCurrentUserId;
       if (!tds || tds.length < 3) return false;
       const codeCell = tds[2];
       const idText = (codeCell.textContent || '').trim();
-      if (!/^[QHEST]/.test(idText)) return false; 
+      if (!/^[QHEST]/.test(idText)) return false;
       const statusTd = tds[1];
       const evalTd = tds[0];
       const isPass = !!statusTd.querySelector('.status.accepted, .status .accepted, span.status.accepted, i.checkmark.icon, i.thumbs.up.icon, i.check.icon');
@@ -4895,4 +4904,79 @@ window.getCurrentUserId = getCurrentUserId;
     };
     window.needWarn.clearCache = function () { warnCache.clear(); };
   } catch (_e) { /* ignore */ }
+})();
+
+/* === BN PATCH: user menu animation + shadow === */
+(function(){
+  const css = `
+  #bn-user-menu {
+    opacity: 0 !important;
+    transform: translateY(2px) scale(0.98) !important;
+    transform-origin: left top !important;
+    transition: opacity 133ms cubic-bezier(.2,0,0,1), transform 133ms cubic-bezier(.2,0,0,1) !important;
+    will-change: opacity, transform;
+    /* Native-like layered shadow */
+    box-shadow:
+      0 12px 28px rgba(0,0,0,.20),
+      0 6px 16px rgba(0,0,0,.18),
+      0 2px 4px rgba(0,0,0,.12) !important;
+  }
+  #bn-user-menu.bn-show {
+    opacity: 1 !important;
+    transform: translateY(0) scale(1) !important;
+  }
+  @media (prefers-color-scheme: dark) {
+    #bn-user-menu {
+      background: #1f1f1f !important;
+      color: #eaeaea !important;
+      border-color: rgba(255,255,255,.08) !important;
+      box-shadow:
+        0 12px 28px rgba(0,0,0,.45),
+        0 6px 16px rgba(0,0,0,.35),
+        0 2px 4px rgba(0,0,0,.25) !important;
+    }
+    #bn-user-menu a { color: #eaeaea !important; }
+    #bn-user-menu a:hover { background: rgba(255,255,255,.08) !important; }
+  }`;
+  if (typeof GM_addStyle === 'function') GM_addStyle(css);
+  else { const s = document.createElement('style'); s.textContent = css; document.head.appendChild(s); }
+})();
+
+/* === BN PATCH 2: user menu pure fade-in (no size change) + shadow fade === */
+(function(){
+  const css = `
+  #bn-user-menu {
+    opacity: 0 !important;
+    box-shadow:
+      0 12px 28px rgba(0,0,0,0.00),
+      0 6px 16px rgba(0,0,0,0.00),
+      0 2px 4px rgba(0,0,0,0.00) !important;
+    transition:
+      opacity 300ms cubic-bezier(.2,0,0,1),
+      box-shadow 300ms cubic-bezier(.2,0,0,1) !important;
+    will-change: opacity, box-shadow;
+  }
+  #bn-user-menu.bn-show {
+    opacity: 1 !important;
+    box-shadow:
+      0 12px 28px rgba(0,0,0,.20),
+      0 6px 16px rgba(0,0,0,.18),
+      0 2px 4px rgba(0,0,0,.12) !important;
+  }
+  @media (prefers-color-scheme: dark) {
+    #bn-user-menu {
+      box-shadow:
+        0 12px 28px rgba(0,0,0,0.00),
+        0 6px 16px rgba(0,0,0,0.00),
+        0 2px 4px rgba(0,0,0,0.00) !important;
+    }
+    #bn-user-menu.bn-show {
+      box-shadow:
+        0 12px 28px rgba(0,0,0,.45),
+        0 6px 16px rgba(0,0,0,.35),
+        0 2px 4px rgba(0,0,0,.25) !important;
+    }
+  }`;
+  if (typeof GM_addStyle === 'function') GM_addStyle(css);
+  else { const s = document.createElement('style'); s.textContent = css; document.head.appendChild(s); }
 })();
