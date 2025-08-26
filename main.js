@@ -72,7 +72,7 @@ window.getCurrentUserId = getCurrentUserId;
 
   const palettes = {
     light: { low3: '#ff0101', low2: '#ff6629', low1: '#ffbb00', upp1: '#62ca00', upp2: '#00b972', upp3: '#9900ff', is: '#ca00ca', oth: '#5a5a5a', upp4: '#000cff', upp5: '#896e00', upp6: '#00ffff', tch: '#333333' },
-    dark:  { low3: '#ff5b5b', low2: '#ff8a4d', low1: '#ffd24d', upp1: '#7be14a', upp2: '#24d39a', upp3: '#b06bff', is: '#ff73ff', oth: '#cfcfcf', upp4: '#6b86ff', upp5: '#d2b04d', upp6: '#00ffff', tch: '#e0e0e0' }
+    dark: { low3: '#ff5b5b', low2: '#ff8a4d', low1: '#ffd24d', upp1: '#7be14a', upp2: '#24d39a', upp3: '#b06bff', is: '#ff73ff', oth: '#cfcfcf', upp4: '#6b86ff', upp5: '#d2b04d', upp6: '#00ffff', tch: '#e0e0e0' }
   };
 
   const basePalette = palettes[effectiveTheme] || palettes.light;
@@ -3569,62 +3569,62 @@ window.getCurrentUserId = getCurrentUserId;
   }
 
   function initUserMenu() {
-  if (document.getElementById('bn-user-menu')) return;
+    if (document.getElementById('bn-user-menu')) return;
 
-  const menu = document.createElement('div');
-  menu.id = 'bn-user-menu';
-  menu.innerHTML = `
+    const menu = document.createElement('div');
+    menu.id = 'bn-user-menu';
+    menu.innerHTML = `
     <a id="bn-menu-home" href="#">转到主页</a>
     <a id="bn-menu-sub-problem" href="#" style="display:none;">转到该题提交记录</a>
     <a id="bn-menu-sub-all" href="#">转到提交记录</a>
     <a id="bn-menu-plan" href="#">转到计划</a>
   `;
-  document.body.appendChild(menu);
+    document.body.appendChild(menu);
 
-  const home = menu.querySelector('#bn-menu-home');
-  const subProblem = menu.querySelector('#bn-menu-sub-problem');
-  const subAll = menu.querySelector('#bn-menu-sub-all');
-  const plan = menu.querySelector('#bn-menu-plan');
+    const home = menu.querySelector('#bn-menu-home');
+    const subProblem = menu.querySelector('#bn-menu-sub-problem');
+    const subAll = menu.querySelector('#bn-menu-sub-all');
+    const plan = menu.querySelector('#bn-menu-plan');
 
-  const hide = () => { menu.classList.remove('bn-show'); menu.classList.remove('bn-show'); menu.style.display = 'none'; };
-  document.addEventListener('click', hide);
+    const hide = () => { menu.classList.remove('bn-show'); menu.classList.remove('bn-show'); menu.style.display = 'none'; };
+    document.addEventListener('click', hide);
 
-  document.addEventListener('contextmenu', (e) => {
-    const a = e.target.closest('a[href^="/user/"]');
-    if (a) {
-      const m = (a.getAttribute('href') || '').match(/^\/user\/(\d+)/);
-      if (m) {
-        e.preventDefault();
-        const uid = m[1];
-        home.href = `/user/${uid}`;
-        let pid = '';
-        let pm = location.search.match(/problem_id=(\d+)/);
-        if (!pm) pm = location.pathname.match(/\/problem\/(\d+)/);
-        if (pm) pid = pm[1];
-        if (pid) {
-          subProblem.style.display = 'block';
-          subProblem.href = `/submissions?contest=&problem_id=${pid}&submitter=${uid}&min_score=0&max_score=100&language=&status=`;
-          subAll.textContent = '转到所有提交记录';
-        } else {
-          subProblem.style.display = 'none';
-          subAll.textContent = '转到提交记录';
+    document.addEventListener('contextmenu', (e) => {
+      const a = e.target.closest('a[href^="/user/"]');
+      if (a) {
+        const m = (a.getAttribute('href') || '').match(/^\/user\/(\d+)/);
+        if (m) {
+          e.preventDefault();
+          const uid = m[1];
+          home.href = `/user/${uid}`;
+          let pid = '';
+          let pm = location.search.match(/problem_id=(\d+)/);
+          if (!pm) pm = location.pathname.match(/\/problem\/(\d+)/);
+          if (pm) pid = pm[1];
+          if (pid) {
+            subProblem.style.display = 'block';
+            subProblem.href = `/submissions?contest=&problem_id=${pid}&submitter=${uid}&min_score=0&max_score=100&language=&status=`;
+            subAll.textContent = '转到所有提交记录';
+          } else {
+            subProblem.style.display = 'none';
+            subAll.textContent = '转到提交记录';
+          }
+          subAll.href = `/submissions?contest=&problem_id=&submitter=${uid}&min_score=0&max_score=100&language=&status=`;
+          plan.href = `/user_plans/${uid}`;
+          menu.style.left = e.pageX + 'px';
+          menu.style.top = e.pageY + 'px';
+          menu.style.display = 'flex';
+          menu.classList.remove('bn-show');
+          void menu.offsetWidth;
+          requestAnimationFrame(function () { try { menu.classList.add('bn-show'); } catch (e) { } });
+
+          requestAnimationFrame(() => menu.classList.add('bn-show'));
+          return;
         }
-        subAll.href = `/submissions?contest=&problem_id=&submitter=${uid}&min_score=0&max_score=100&language=&status=`;
-        plan.href = `/user_plans/${uid}`;
-        menu.style.left = e.pageX + 'px';
-        menu.style.top = e.pageY + 'px';
-        menu.style.display = 'flex';
-menu.classList.remove('bn-show');
-void menu.offsetWidth;
-requestAnimationFrame(function(){ try{ menu.classList.add('bn-show'); }catch(e){} });
-
-        requestAnimationFrame(() => menu.classList.add('bn-show'));
-        return;
       }
-    }
-    // Not a user link -> fall through to native menu
-  }, true);
-}
+      // Not a user link -> fall through to native menu
+    }, true);
+  }
 
   function processUserLink(a) {
     if (!a || !a.matches('a[href^="/user/"]')) return;
@@ -4907,7 +4907,7 @@ requestAnimationFrame(function(){ try{ menu.classList.add('bn-show'); }catch(e){
 })();
 
 /* === BN PATCH: user menu animation + shadow === */
-(function(){
+(function () {
   const css = `
   #bn-user-menu {
     opacity: 0 !important;
@@ -4943,7 +4943,7 @@ requestAnimationFrame(function(){ try{ menu.classList.add('bn-show'); }catch(e){
 })();
 
 /* === BN PATCH 2: user menu pure fade-in (no size change) + shadow fade === */
-(function(){
+(function () {
   const css = `
   #bn-user-menu {
     opacity: 0 !important;
