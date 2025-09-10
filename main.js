@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names for 7FA4
 // @namespace    http://tampermonkey.net/
-// @version      v5.1
-// @description  Better Names for 7FA4 v5.1: Added submission guard.
+// @version      v5.1.1
+// @description  Better Names for 7FA4 v5.1.1: Uniformed guardmask styles.
 // @author       wwxz
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -72,7 +72,7 @@ window.getCurrentUserId = getCurrentUserId;
 
   const palettes = {
     light: { low3: '#ff0101', low2: '#ff6629', low1: '#ffbb00', upp1: '#62ca00', upp2: '#00b972', upp3: '#9900ff', is: '#ca00ca', oth: '#5a5a5a', upp4: '#000cff', upp5: '#896e00', upp6: '#00ffff', tch: '#333333' },
-    dark: { low3: '#ff5b5b', low2: '#ff8a4d', low1: '#ffd24d', upp1: '#7be14a', upp2: '#24d39a', upp3: '#b06bff', is: '#ff73ff', oth: '#cfcfcf', upp4: '#6b86ff', upp5: '#d2b04d', upp6: '#00ffff', tch: '#e0e0e0' }
+    dark:  { low3: '#ff5b5b', low2: '#ff8a4d', low1: '#ffd24d', upp1: '#7be14a', upp2: '#24d39a', upp3: '#b06bff', is: '#ff73ff', oth: '#cfcfcf', upp4: '#6b86ff', upp5: '#d2b04d', upp6: '#00ffff', tch: '#e0e0e0' }
   };
 
   const basePalette = palettes[effectiveTheme] || palettes.light;
@@ -531,7 +531,7 @@ window.getCurrentUserId = getCurrentUserId;
         <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
-      <div class="bn-version">Public Release | v5.1</div>
+      <div class="bn-version">Public Release | v5.1.1</div>
     </div>`;
   document.body.appendChild(container);
   container.style.pointerEvents = 'none';
@@ -3569,62 +3569,62 @@ window.getCurrentUserId = getCurrentUserId;
   }
 
   function initUserMenu() {
-    if (document.getElementById('bn-user-menu')) return;
+  if (document.getElementById('bn-user-menu')) return;
 
-    const menu = document.createElement('div');
-    menu.id = 'bn-user-menu';
-    menu.innerHTML = `
+  const menu = document.createElement('div');
+  menu.id = 'bn-user-menu';
+  menu.innerHTML = `
     <a id="bn-menu-home" href="#">转到主页</a>
     <a id="bn-menu-sub-problem" href="#" style="display:none;">转到该题提交记录</a>
     <a id="bn-menu-sub-all" href="#">转到提交记录</a>
     <a id="bn-menu-plan" href="#">转到计划</a>
   `;
-    document.body.appendChild(menu);
+  document.body.appendChild(menu);
 
-    const home = menu.querySelector('#bn-menu-home');
-    const subProblem = menu.querySelector('#bn-menu-sub-problem');
-    const subAll = menu.querySelector('#bn-menu-sub-all');
-    const plan = menu.querySelector('#bn-menu-plan');
+  const home = menu.querySelector('#bn-menu-home');
+  const subProblem = menu.querySelector('#bn-menu-sub-problem');
+  const subAll = menu.querySelector('#bn-menu-sub-all');
+  const plan = menu.querySelector('#bn-menu-plan');
 
-    const hide = () => { menu.classList.remove('bn-show'); menu.classList.remove('bn-show'); menu.style.display = 'none'; };
-    document.addEventListener('click', hide);
+  const hide = () => { menu.classList.remove('bn-show'); menu.classList.remove('bn-show'); menu.style.display = 'none'; };
+  document.addEventListener('click', hide);
 
-    document.addEventListener('contextmenu', (e) => {
-      const a = e.target.closest('a[href^="/user/"]');
-      if (a) {
-        const m = (a.getAttribute('href') || '').match(/^\/user\/(\d+)/);
-        if (m) {
-          e.preventDefault();
-          const uid = m[1];
-          home.href = `/user/${uid}`;
-          let pid = '';
-          let pm = location.search.match(/problem_id=(\d+)/);
-          if (!pm) pm = location.pathname.match(/\/problem\/(\d+)/);
-          if (pm) pid = pm[1];
-          if (pid) {
-            subProblem.style.display = 'block';
-            subProblem.href = `/submissions?contest=&problem_id=${pid}&submitter=${uid}&min_score=0&max_score=100&language=&status=`;
-            subAll.textContent = '转到所有提交记录';
-          } else {
-            subProblem.style.display = 'none';
-            subAll.textContent = '转到提交记录';
-          }
-          subAll.href = `/submissions?contest=&problem_id=&submitter=${uid}&min_score=0&max_score=100&language=&status=`;
-          plan.href = `/user_plans/${uid}`;
-          menu.style.left = e.pageX + 'px';
-          menu.style.top = e.pageY + 'px';
-          menu.style.display = 'flex';
-          menu.classList.remove('bn-show');
-          void menu.offsetWidth;
-          requestAnimationFrame(function () { try { menu.classList.add('bn-show'); } catch (e) { } });
-
-          requestAnimationFrame(() => menu.classList.add('bn-show'));
-          return;
+  document.addEventListener('contextmenu', (e) => {
+    const a = e.target.closest('a[href^="/user/"]');
+    if (a) {
+      const m = (a.getAttribute('href') || '').match(/^\/user\/(\d+)/);
+      if (m) {
+        e.preventDefault();
+        const uid = m[1];
+        home.href = `/user/${uid}`;
+        let pid = '';
+        let pm = location.search.match(/problem_id=(\d+)/);
+        if (!pm) pm = location.pathname.match(/\/problem\/(\d+)/);
+        if (pm) pid = pm[1];
+        if (pid) {
+          subProblem.style.display = 'block';
+          subProblem.href = `/submissions?contest=&problem_id=${pid}&submitter=${uid}&min_score=0&max_score=100&language=&status=`;
+          subAll.textContent = '转到所有提交记录';
+        } else {
+          subProblem.style.display = 'none';
+          subAll.textContent = '转到提交记录';
         }
+        subAll.href = `/submissions?contest=&problem_id=&submitter=${uid}&min_score=0&max_score=100&language=&status=`;
+        plan.href = `/user_plans/${uid}`;
+        menu.style.left = e.pageX + 'px';
+        menu.style.top = e.pageY + 'px';
+        menu.style.display = 'flex';
+menu.classList.remove('bn-show');
+void menu.offsetWidth;
+requestAnimationFrame(function(){ try{ menu.classList.add('bn-show'); }catch(e){} });
+
+        requestAnimationFrame(() => menu.classList.add('bn-show'));
+        return;
       }
-      // Not a user link -> fall through to native menu
-    }, true);
-  }
+    }
+    // Not a user link -> fall through to native menu
+  }, true);
+}
 
   function processUserLink(a) {
     if (!a || !a.matches('a[href^="/user/"]')) return;
@@ -4399,7 +4399,7 @@ window.getCurrentUserId = getCurrentUserId;
         location.href = a.href;
         return;
       }
-      const mask = ensureModal();
+      const mask = (function(){ try { return ensureModal(); } catch(e) { console.warn('[7fa4-better] ensureModal failed, fallback to simple', e); try { return ensureSimpleModal(); } catch(e2) { console.warn('[7fa4-better] ensureSimpleModal also failed', e2); return null; } } })();
       mask.bnConfirm(() => { location.href = a.href; });
     }, true);
 
@@ -4705,42 +4705,197 @@ window.getCurrentUserId = getCurrentUserId;
     window.needWarn = needWarn; // expose
 
     function ensureSimpleModal() {
-      let mask = document.getElementById('bn-guard-mask');
-      if (mask) return mask;
-      mask = document.createElement('div');
-      mask.id = 'bn-guard-mask';
-      mask.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.0);display:flex;align-items:center;justify-content:center;z-index:2147483647;opacity:0;transition:opacity .25s ease';
-      const box = document.createElement('div');
-      box.id = 'bn-guard-box';
-      box.style.cssText = 'min-width:420px;max-width:720px;padding:28px 24px;border-radius:10px;background:#1f232a;color:#fff;text-align:center;box-shadow:0 16px 48px rgba(0,0,0,.35);transform:scale(.9);opacity:0;transition:transform .25s cubic-bezier(.2,.8,.2,1),opacity .25s ease;font-size:16px;line-height:1.65';
-      box.innerHTML = '<div style="font-size:46px;opacity:.85;margin-bottom:8px;">⚠️</div>' +
-        '<div style="font-size:22px;margin-bottom:6px;font-weight:700;letter-spacing:.1em;">是否继续</div>' +
-        '<div id="bn-guard-msg" style="opacity:.9;margin:6px 0 18px;">未通过题目前查看他人答案将获得较低的评判，请经过深入思考以后，确实难以解决再选择查看。</div>' +
-        '<div style="display:flex;gap:14px;justify-content:center;margin-top:8px;">' +
-        '<button id="bn-guard-ok" style="min-width:96px;padding:10px 18px;border:0;border-radius:8px;background:#ef4444;color:#fff;cursor:pointer;font-weight:700;">确认</button>' +
-        '<button id="bn-guard-cancel" style="min-width:96px;padding:10px 18px;border:1px solid #7dd3fc;border-radius:8px;background:#0b1220;color:#7dd3fc;cursor:pointer;font-weight:700;">取消</button>' +
-        '</div>';
-      mask.appendChild(box);
-      document.body.appendChild(mask);
-      requestAnimationFrame(() => {
-        mask.style.opacity = '1';
-        mask.style.background = 'rgba(0,0,0,.7)';
-        box.style.opacity = '1';
-        box.style.transform = 'scale(1)';
-      });
-      mask.bnClose = function (cb) {
-        box.style.transform = 'scale(.9)';
-        box.style.opacity = '0';
-        mask.style.opacity = '0';
-        mask.style.background = 'rgba(0,0,0,0)';
-        setTimeout(() => { mask.remove(); cb && cb(); }, 250);
+      var IN_DURATION = 420;
+      var OUT_DURATION = 420;
+      var EASE_BOX = 'cubic-bezier(.2,.8,.2,1)';
+      var SCALE_FROM = 0.88;
+
+      // 强制全屏 & 居中，避免被站内样式拉到左上
+      if (!document.getElementById('bn-center-css')) {
+        var cs = document.createElement('style');
+        cs.id = 'bn-center-css';
+        cs.textContent = [
+          '#bn-guard-mask{position:fixed!important;inset:0!important;left:0!important;top:0!important;right:0!important;bottom:0!important;display:flex!important;align-items:center!important;justify-content:center!important;z-index:2147483647!important;pointer-events:auto!important;}',
+          '#bn-guard-box{position:static!important;top:auto!important;left:auto!important;margin:0!important;}'
+        ].join('\n');
+        document.head.appendChild(cs);
+      }
+
+      // 构建 DOM（保持站内结构/类名）
+      var mask = document.getElementById('bn-guard-mask');
+      if (!mask) {
+        mask = document.createElement('div');
+        mask.id = 'bn-guard-mask';
+        document.body.appendChild(mask);
+      }
+      mask.className = 'ui dimmer modals page transition visible active';
+      mask.style.display = 'flex';
+      try { document.body.classList.add('dimmed'); } catch (e) { }
+      mask.innerHTML = '';
+
+      var modal = document.createElement('div');
+      modal.id = 'bn-guard-box';
+      modal.className = 'ui basic modal check-need-modal transition visible active';
+      modal.style.position = 'static';
+      modal.style.margin = '0';
+
+      var header = document.createElement('div');
+      header.className = 'ui icon header';
+      var icon = document.createElement('i'); icon.className = 'exclamation triangle icon';
+      header.appendChild(icon);
+      header.appendChild(document.createTextNode('是否继续'));
+
+      var content = document.createElement('div');
+      content.className = 'content';
+      content.textContent = '未通过题目前查看他人答案将获得较低的评级，请经过深入思考以后，确实难以解决再选择查看。';
+
+      var actions = document.createElement('div');
+      actions.className = 'actions';
+      var ok = document.createElement('a'); ok.className = 'ui red ok inverted button'; ok.textContent = '确认';
+      // 关键：取消按钮不要含 ok/approve/deny，避免被 Semantic UI 接管
+      var cancel = document.createElement('button'); cancel.type = 'button';
+      cancel.className = 'ui green inverted button bn-cancel';
+      cancel.textContent = '取消';
+      actions.appendChild(ok); actions.appendChild(cancel);
+
+      modal.appendChild(header); modal.appendChild(content); modal.appendChild(actions);
+      mask.appendChild(modal);
+
+      // 捕获阶段阻断站内委托（只作用于本弹窗内部），避免立即关闭导致看不到动画
+      function captureBlocker(ev) {
+        // 只在我们这个弹窗内部拦截“无关点击”，放行确认和取消
+        if (modal.contains(ev.target)) {
+          // 放行确认按钮
+          if (ev.target === ok) return;
+          // 放行取消按钮（带 .bn-cancel 的元素或其子元素）
+          if (ev.target.closest && ev.target.closest('.bn-cancel')) return;
+
+          // 其它点击才拦截，避免被站内委托（Semantic UI）抢走
+          ev.preventDefault();
+          ev.stopPropagation();
+          ev.stopImmediatePropagation();
+        }
+      }
+
+      document.addEventListener('click', captureBlocker, true);
+
+      // 工具
+      var supportsWAAPI = typeof modal.animate === 'function';
+      var animatingIn = true;
+      var closing = false;
+      actions.style.pointerEvents = 'none';
+
+      function cleanup() {
+        try { document.removeEventListener('click', captureBlocker, true); } catch (e) { }
+        try { mask.remove(); } catch (e) { }
+        try { document.body.classList.remove('dimmed'); } catch (e) { }
+        if (mask.dataset) delete mask.dataset.bnHref;
+        delete window.__bnConfirmCb;
+      }
+      function onTransitionEndOnce(el, cb, timeout) {
+        var done = false;
+        function finish() { if (done) return; done = true; try { el.removeEventListener('transitionend', handler); } catch (e) { }; cb && cb(); }
+        function handler(ev) { if (ev && ev.target !== el) return; finish(); }
+        el.addEventListener('transitionend', handler);
+        setTimeout(finish, typeof timeout === 'number' ? timeout : 600);
+      }
+      function finished(anim, timeout) {
+        return new Promise(function (resolve) {
+          var done = false; function fin() { if (done) return; done = true; resolve(); }
+          if (anim && anim.finished && typeof anim.finished.then === 'function') anim.finished.then(fin).catch(fin);
+          else setTimeout(fin, timeout || 600);
+        });
+      }
+
+      // 入场
+      function animateIn() {
+        mask.style.backgroundColor = 'rgba(0,0,0,0)';
+        modal.style.transformOrigin = 'center center';
+        if (supportsWAAPI) {
+          var maskIn = mask.animate(
+            [{ backgroundColor: 'rgba(0,0,0,0)' }, { backgroundColor: 'rgba(0,0,0,0.85)' }],
+            { duration: IN_DURATION, easing: 'ease', fill: 'forwards' }
+          );
+          var boxIn = modal.animate(
+            [{ transform: 'scale(' + SCALE_FROM + ')', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }],
+            { duration: IN_DURATION, easing: EASE_BOX, fill: 'forwards' }
+          );
+          Promise.all([finished(maskIn, IN_DURATION + 80), finished(boxIn, IN_DURATION + 80)]).then(function () {
+            animatingIn = false; actions.style.pointerEvents = '';
+          });
+        } else {
+          modal.style.transition = 'transform ' + IN_DURATION + 'ms ' + EASE_BOX + ', opacity ' + IN_DURATION + 'ms ease';
+          mask.style.transition = 'background-color ' + IN_DURATION + 'ms ease';
+          modal.style.transform = 'scale(' + SCALE_FROM + ')'; modal.style.opacity = '0';
+          void modal.offsetHeight;
+          requestAnimationFrame(function () {
+            mask.style.backgroundColor = 'rgba(0,0,0,0.85)';
+            modal.style.transform = 'scale(1)'; modal.style.opacity = '1';
+            onTransitionEndOnce(modal, function () { animatingIn = false; actions.style.pointerEvents = ''; }, IN_DURATION + 80);
+          });
+        }
+      }
+
+      // 出场（反向动画）
+      function animateOut(after) {
+        if (closing || animatingIn) return;
+        closing = true; actions.style.pointerEvents = 'none';
+        var fromBg = getComputedStyle(mask).backgroundColor || 'rgba(0,0,0,0.85)';
+        if (supportsWAAPI) {
+          var maskOut = mask.animate(
+            [{ backgroundColor: fromBg }, { backgroundColor: 'rgba(0,0,0,0)' }],
+            { duration: OUT_DURATION, easing: 'ease', fill: 'forwards' }
+          );
+          var boxOut = modal.animate(
+            [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(' + SCALE_FROM + ')', opacity: 0 }],
+            { duration: OUT_DURATION, easing: EASE_BOX, fill: 'forwards' }
+          );
+          Promise.all([finished(maskOut, OUT_DURATION + 80), finished(boxOut, OUT_DURATION + 80)]).then(function () {
+            cleanup(); if (typeof after === 'function') try { after(); } catch (e) { }
+          });
+        } else {
+          modal.style.transition = 'transform ' + OUT_DURATION + 'ms ' + EASE_BOX + ', opacity ' + OUT_DURATION + 'ms ease';
+          mask.style.transition = 'background-color ' + OUT_DURATION + 'ms ease';
+          mask.style.backgroundColor = 'rgba(0,0,0,0)';
+          modal.style.transform = 'scale(' + SCALE_FROM + ')'; modal.style.opacity = '0';
+          onTransitionEndOnce(modal, function () { cleanup(); if (typeof after === 'function') try { after(); } catch (e) { }; }, OUT_DURATION + 80);
+        }
+      }
+
+      // 点击遮罩空白 => 反向动画
+      mask.addEventListener('click', function (e) { if (e.target === mask) animateOut(); }, { once: true });
+
+      // 外部 API（保持兼容）
+      mask.bnConfirm = function (onYesOrHref) {
+        if (typeof onYesOrHref === 'function') {
+          window.__bnConfirmCb = onYesOrHref;
+          if (mask.dataset) delete mask.dataset.bnHref;
+        } else if (typeof onYesOrHref === 'string') {
+          if (mask.dataset) mask.dataset.bnHref = onYesOrHref;
+          window.__bnConfirmCb = null;
+        }
+        // 确认：立即关闭并跳转/回调
+        ok.onclick = function (ev) {
+          ev.preventDefault(); ev.stopPropagation();
+          cleanup();
+          var href = (mask.dataset && mask.dataset.bnHref) || window.__bnPendingHref || ok.getAttribute('href');
+          if (typeof window.__bnConfirmCb === 'function') { try { window.__bnConfirmCb(); } catch (e) { } }
+          else if (href) { location.assign(href); }
+        };
+        // 取消：反向动画
+        cancel.onclick = function (ev) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (ev.stopImmediatePropagation) ev.stopImmediatePropagation(); // 双保险
+          animateOut();
+        };
+
       };
-      mask.bnConfirm = function (cb) {
-        const ok = mask.querySelector('#bn-guard-ok');
-        const cancel = mask.querySelector('#bn-guard-cancel');
-        ok.onclick = () => mask.bnClose(cb);
-        cancel.onclick = () => mask.bnClose();
-      };
+
+      // 兜底
+      mask.bnAnimateOut = function () { animateOut(); };
+
+      animateIn();
       return mask;
     }
 
@@ -4770,7 +4925,7 @@ window.getCurrentUserId = getCurrentUserId;
         }
       } catch (_) { /* on error, fall through to warn */ }
 
-      const mask = (typeof window.ensureModal === 'function' ? ensureModal() : ensureSimpleModal());
+      const mask = (function(){ try { return (typeof window.ensureModal === 'function' ? ensureModal() : ensureSimpleModal()); } catch(e){ console.warn('[7fa4-better] ensureModal crashed, fallback to simple', e); try { return ensureSimpleModal(); } catch(e2){ console.warn('[7fa4-better] ensureSimpleModal also failed', e2); return null; } } })();
       if (mask && typeof mask.bnConfirm === 'function') {
         mask.bnConfirm(() => { location.href = a.href; });
       }
@@ -4907,7 +5062,7 @@ window.getCurrentUserId = getCurrentUserId;
 })();
 
 /* === BN PATCH: user menu animation + shadow === */
-(function () {
+(function(){
   const css = `
   #bn-user-menu {
     opacity: 0 !important;
@@ -4943,7 +5098,7 @@ window.getCurrentUserId = getCurrentUserId;
 })();
 
 /* === BN PATCH 2: user menu pure fade-in (no size change) + shadow fade === */
-(function () {
+(function(){
   const css = `
   #bn-user-menu {
     opacity: 0 !important;
