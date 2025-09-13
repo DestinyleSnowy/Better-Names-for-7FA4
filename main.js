@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names for 7FA4
 // @namespace    http://tampermonkey.net/
-// @version      v5.1.1
-// @description  Better Names for 7FA4 v5.1.1: Uniformed guardmask styles.
+// @version      v5.1.2
+// @description  Better Names for 7FA4 v5.1.2: Close #74.
 // @author       wwxz
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -531,7 +531,7 @@ window.getCurrentUserId = getCurrentUserId;
         <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
-      <div class="bn-version">Public Release | v5.1.1</div>
+      <div class="bn-version">Public Release | v5.1.2</div>
     </div>`;
   document.body.appendChild(container);
   container.style.pointerEvents = 'none';
@@ -3682,6 +3682,20 @@ window.getCurrentUserId = getCurrentUserId;
     const truncated = truncateByUnits(text, maxTitleUnits);
     Array.from(span.childNodes).forEach(n => { if (n.nodeType === Node.TEXT_NODE) n.remove(); });
     span.innerHTML = prefix + truncated;
+ 
+    // BN PATCH: force uniform font size on submissions page when title truncation is enabled
+    try {
+      if (Number.isFinite(maxTitleUnits)) {
+        // Some pages run textFit() and write inline font-size on the span, causing inconsistent sizes.
+        // Override it: use 14px and mark the node.
+        span.setAttribute('data-bn-title-done', '1');
+        span.style.setProperty('font-size', '14px', 'important');
+        // Also undo any transform scaling that textFit might apply (defensive)
+        span.style.removeProperty('transform');
+        span.style.removeProperty('line-height');
+      }
+    } catch (e) {}
+
   }
 
   function __bn_shouldHideRow(tr) {
