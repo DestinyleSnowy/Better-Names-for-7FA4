@@ -149,14 +149,16 @@ window.getCurrentUserId = getCurrentUserId;
     };
 
     const wrapLocationMethod = (key) => {
-      const original = loc[key];
-      if (typeof original !== 'function') return;
-      loc[key] = function (...args) {
-        if (args.length > 0) {
-          args[0] = normalize(args[0]);
-        }
-        return original.apply(loc, args);
-      };
+      try {
+        const original = loc[key];
+        if (typeof original !== 'function') return;
+        loc[key] = function (...args) {
+          if (args.length > 0) {
+            args[0] = normalize(args[0]);
+          }
+          return original.apply(loc, args);
+        };
+      } catch (_) {}
     };
 
     wrapLocationMethod('assign');
@@ -175,13 +177,15 @@ window.getCurrentUserId = getCurrentUserId;
       } catch {}
     }
 
-    const originalOpen = window.open;
-    if (typeof originalOpen === 'function') {
-      window.open = function (url, ...rest) {
-        const normalized = normalize(url);
-        return originalOpen.call(this, normalized, ...rest);
-      };
-    }
+    try {
+      const originalOpen = window.open;
+      if (typeof originalOpen === 'function') {
+        window.open = function (url, ...rest) {
+          const normalized = normalize(url);
+          return originalOpen.call(this, normalized, ...rest);
+        };
+      }
+    } catch (_) {}
   }
 
   function applyRenewToAnchor(anchor) {
