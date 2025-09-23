@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names for 7FA4
 // @namespace    http://tampermonkey.net/
-// @version      v5.1.2
-// @description  Better Names for 7FA4 v5.1.2: Close #74.
+// @version      v5.2.0
+// @description  Better Names for 7FA4 v5.2.0: Close #74.
 // @author       wwxz
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -43,6 +43,7 @@ window.getCurrentUserId = getCurrentUserId;
   const hideOrig = GM_getValue('hideOrig', true);
   const enableMenu = GM_getValue('enableUserMenu', true);
   const enablePlanAdder = GM_getValue('enablePlanAdder', true);
+  const enableAutoRenew = GM_getValue('enableAutoRenew', true);
   const initialAutoExit = GM_getValue('planAdder.autoExit', true);
   let autoExit = initialAutoExit;
   const enableVjLink = GM_getValue('enableVjLink', true);
@@ -53,6 +54,162 @@ window.getCurrentUserId = getCurrentUserId;
   const themeMode = GM_getValue(THEME_KEY, 'auto');
   const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   const effectiveTheme = themeMode === 'auto' ? (prefersDark ? 'dark' : 'light') : themeMode;
+
+  const RENEW_PATH_RE = /^\/problems\/tag\/(\d+)\/?$/;
+  const RENEW_SUFFIX_RE = /\/renew\/?$/;
+  const AUTO_RENEW_MEMORY_KEY = 'bn:autoRenew:lastRedirect';
+  const AUTO_RENEW_MEMORY_TTL = 120000;
+
+  function readAutoRenewMemory() {
+    try {
+      if (typeof sessionStorage === 'undefined') return null;
+      const raw = sessionStorage.getItem(AUTO_RENEW_MEMORY_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (!data || typeof data !== 'object') return null;
+      return data;
+    } catch {
+      return null;
+    }
+  }
+
+  function writeAutoRenewMemory(data) {
+    try {
+      if (typeof sessionStorage === 'undefined') return;
+      sessionStorage.setItem(AUTO_RENEW_MEMORY_KEY, JSON.stringify(data));
+    } catch {}
+  }
+
+  function clearAutoRenewMemory() {
+    try {
+      if (typeof sessionStorage === 'undefined') return;
+      sessionStorage.removeItem(AUTO_RENEW_MEMORY_KEY);
+    } catch {}
+  }
+
+  function markAutoRenewRedirect(tagId) {
+    writeAutoRenewMemory({
+      tagId: String(tagId),
+      host: location.host,
+      port: location.port || '',
+      timestamp: Date.now(),
+    });
+  }
+
+  function consumeAutoRenewRedirect(tagId) {
+    const memory = readAutoRenewMemory();
+    if (!memory) return false;
+    if (memory.tagId && String(memory.tagId) !== String(tagId)) return false;
+    if (memory.host && memory.host !== location.host) return false;
+    if (typeof memory.port === 'string' && memory.port !== (location.port || '')) return false;
+    if (typeof memory.timestamp === 'number' && Date.now() - memory.timestamp > AUTO_RENEW_MEMORY_TTL) {
+      clearAutoRenewMemory();
+      return false;
+    }
+    clearAutoRenewMemory();
+    return true;
+  }
+
+  function pruneAutoRenewMemory() {
+    const memory = readAutoRenewMemory();
+    if (!memory) return;
+    if (typeof memory.timestamp === 'number' && Date.now() - memory.timestamp <= AUTO_RENEW_MEMORY_TTL) return;
+    clearAutoRenewMemory();
+  }
+
+  function computeRenewUrl(rawHref, baseHref) {
+    if (!rawHref) return null;
+    try {
+      const url = new URL(rawHref, baseHref || location.href);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+      if (url.port && url.port !== '8888') return null;
+      const host = url.hostname || '';
+      if (!(host === '7fa4.cn' || host.endsWith('.7fa4.cn'))) return null;
+      if (RENEW_SUFFIX_RE.test(url.pathname)) return null;
+      const match = url.pathname.match(RENEW_PATH_RE);
+      if (!match) return null;
+      url.pathname = `/problems/tag/${match[1]}/renew`;
+      return url.toString();
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function applyRenewToAnchor(anchor) {
+    if (!anchor || typeof anchor.getAttribute !== 'function') return;
+    const hrefAttr = anchor.getAttribute('href');
+    const newHref = computeRenewUrl(hrefAttr, location.href);
+    if (newHref && anchor.href !== newHref) {
+      anchor.href = newHref;
+    }
+  }
+
+  function applyRenewWithin(root) {
+    if (!root || typeof root.querySelectorAll !== 'function') return;
+    const anchors = root.querySelectorAll('a[href]');
+    anchors.forEach(applyRenewToAnchor);
+  }
+
+  function initAutoRenew() {
+    const handleMutations = (mutations) => {
+      mutations.forEach(mutation => {
+        if (mutation.type === 'childList') {
+          mutation.addedNodes.forEach(node => {
+            if (node && node.nodeType === Node.ELEMENT_NODE) {
+              if (typeof node.matches === 'function' && node.matches('a[href]')) applyRenewToAnchor(node);
+              applyRenewWithin(node);
+            }
+          });
+        } else if (mutation.type === 'attributes' && mutation.target) {
+          const target = mutation.target;
+          if (target && typeof target.matches === 'function' && target.matches('a[href]')) {
+            applyRenewToAnchor(target);
+          }
+        }
+      });
+    };
+
+    const observer = new MutationObserver(handleMutations);
+    const start = () => {
+      applyRenewWithin(document);
+      const target = document.body;
+      if (!target) {
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(start);
+        else setTimeout(start, 50);
+        return;
+      }
+      observer.observe(target, { childList: true, subtree: true, attributes: true, attributeFilter: ['href'] });
+    };
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', start, { once: true });
+    } else {
+      start();
+    }
+
+    const ensureAnchor = (event) => {
+      const anchor = event.target?.closest?.('a[href]');
+      if (anchor) applyRenewToAnchor(anchor);
+    };
+    document.addEventListener('click', ensureAnchor, true);
+    document.addEventListener('auxclick', ensureAnchor, true);
+  }
+
+  pruneAutoRenewMemory();
+
+  if (enableAutoRenew) {
+    const redirectTarget = computeRenewUrl(location.href);
+    if (redirectTarget && redirectTarget !== location.href) {
+      const currentTagMatch = location.pathname.match(RENEW_PATH_RE);
+      if (!currentTagMatch || !consumeAutoRenewRedirect(currentTagMatch[1])) {
+        const tagMatch = currentTagMatch || redirectTarget.match(/\/problems\/tag\/(\d+)\/renew\/?$/);
+        const tagId = tagMatch ? tagMatch[1] : null;
+        if (tagId) markAutoRenewRedirect(tagId);
+        location.replace(redirectTarget);
+        return;
+      }
+    }
+  }
 
   const COLOR_KEYS = ['low3', 'low2', 'low1', 'is', 'upp1', 'upp2', 'upp3', 'upp4', 'upp5', 'upp6', 'oth', 'tch'];
   const COLOR_LABELS = { low3: '初2025级', low2: '初2024级', low1: '初2023级', is: '高2025级', upp1: '高2024级', upp2: '高2023级', upp3: '大2025级', upp4: '大2024级', upp5: '大2023级', upp6: '大2022级', oth: '成都七中', tch: '教师' };
@@ -497,6 +654,18 @@ window.getCurrentUserId = getCurrentUserId;
           </div>
           <div class="bn-section">
             <div class="bn-title">
+              <svg class="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10"/>
+                <polyline points="1 20 1 14 7 14"/>
+                <path d="M3.51 9a9 9 0 0 1 14.58-3.36L23 10"/>
+                <path d="M20.49 15a9 9 0 0 1-14.58 3.36L1 14"/>
+              </svg>
+              自动更新
+            </div>
+            <label><input type="checkbox" id="bn-enable-renew" ${enableAutoRenew ? 'checked' : ''}/> 启用自动跳转至 /renew 页面</label>
+          </div>
+          <div class="bn-section">
+            <div class="bn-title">
               <svg class="bn-icon" viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 011.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
               颜色 & 主题
             </div>
@@ -531,7 +700,7 @@ window.getCurrentUserId = getCurrentUserId;
         <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
-      <div class="bn-version">Public Release | v5.1.2</div>
+      <div class="bn-version">Public Release | v5.2.0</div>
     </div>`;
   document.body.appendChild(container);
   container.style.pointerEvents = 'none';
@@ -575,6 +744,7 @@ window.getCurrentUserId = getCurrentUserId;
 
   const chkMenu = document.getElementById('bn-enable-user-menu');
   const chkPlan = document.getElementById('bn-enable-plan');
+  const chkAutoRenew = document.getElementById('bn-enable-renew');
   const planOpts = document.getElementById('bn-plan-options');
   const chkPlanAuto = document.getElementById('bn-plan-auto');
   const chkUseColor = document.getElementById('bn-use-custom-color');
@@ -599,6 +769,7 @@ window.getCurrentUserId = getCurrentUserId;
     hideOrig,
     enableMenu,
     enablePlanAdder,
+    enableAutoRenew,
     autoExit: initialAutoExit,
     useCustomColors,
     palette: Object.assign({}, palette),
@@ -848,6 +1019,7 @@ window.getCurrentUserId = getCurrentUserId;
       (document.getElementById('bn-hide-orig').checked !== originalConfig.hideOrig) ||
       (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) ||
       (document.getElementById('bn-enable-plan').checked !== originalConfig.enablePlanAdder) ||
+      (document.getElementById('bn-enable-renew').checked !== originalConfig.enableAutoRenew) ||
       (document.getElementById('bn-enable-vj').checked !== originalConfig.enableVjLink) ||
       (document.getElementById('bn-hide-done-skip').checked !== originalConfig.hideDoneSkip) ||
       (document.getElementById('bn-plan-auto').checked !== originalConfig.autoExit) ||
@@ -885,6 +1057,7 @@ window.getCurrentUserId = getCurrentUserId;
   chkVj.onchange = checkChanged;
   chkHideDoneSkip.onchange = () => { applyHideDoneSkip(chkHideDoneSkip.checked); checkChanged(); };
   chkPlan.onchange = () => { toggleOption(chkPlan, planOpts); checkChanged(); };
+  chkAutoRenew.onchange = checkChanged;
   chkPlanAuto.onchange = () => { autoExit = chkPlanAuto.checked; checkChanged(); };
   widthModeSel.onchange = checkChanged;
 
@@ -926,6 +1099,7 @@ window.getCurrentUserId = getCurrentUserId;
     GM_setValue('enableUserMenu', chkMenu.checked);
     GM_setValue('enableVjLink', chkVj.checked);
     GM_setValue('enablePlanAdder', chkPlan.checked);
+    GM_setValue('enableAutoRenew', chkAutoRenew.checked);
     GM_setValue('planAdder.autoExit', chkPlanAuto.checked);
     autoExit = chkPlanAuto.checked;
 
@@ -955,6 +1129,7 @@ window.getCurrentUserId = getCurrentUserId;
     chkHideDoneSkip.checked = originalConfig.hideDoneSkip;
     applyHideDoneSkip(originalConfig.hideDoneSkip);
     chkPlan.checked = originalConfig.enablePlanAdder;
+    chkAutoRenew.checked = originalConfig.enableAutoRenew;
     chkPlanAuto.checked = originalConfig.autoExit;
     autoExit = originalConfig.autoExit;
     chkUseColor.checked = originalConfig.useCustomColors;
@@ -977,6 +1152,8 @@ window.getCurrentUserId = getCurrentUserId;
     });
     checkChanged();
   };
+
+  if (enableAutoRenew) initAutoRenew();
 
   function unitOfCharByMode(codePoint, mode) {
     if (mode === 'char') return 1;
