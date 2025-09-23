@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names for 7FA4
 // @namespace    http://tampermonkey.net/
-// @version      v5.2.1
-// @description  Better Names for 7FA4 v5.2.1.
+// @version      v5.2.2
+// @description  Better Names for 7FA4 v5.2.2.
 // @author       wwxz
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -464,13 +464,14 @@ window.getCurrentUserId = getCurrentUserId;
       padding: 0 20px;
       border-top: 1px solid var(--bn-border-subtle);
       background: var(--bn-bg);
-      display: flex; gap: 8px; justify-content: flex-end; align-items: center;
+      display: none; gap: 8px; justify-content: flex-end; align-items: center;
 
       opacity: 0; pointer-events: none; transform: translateY(6px);
       transition: opacity .2s ease, transform .2s ease;
       will-change: opacity, transform;
     }
     .bn-save-actions.bn-visible {
+      display: flex;
       opacity: 1; pointer-events: auto; transform: translateY(0);
     }
 
@@ -700,7 +701,7 @@ window.getCurrentUserId = getCurrentUserId;
         <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
-      <div class="bn-version">Public Release | v5.2.1</div>
+      <div class="bn-version">Public Release | v5.2.2</div>
     </div>`;
   document.body.appendChild(container);
   container.style.pointerEvents = 'none';
