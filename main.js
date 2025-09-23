@@ -379,6 +379,65 @@ window.getCurrentUserId = getCurrentUserId;
     .bn-icon { width: 16px; height: 16px; opacity: .75; flex-shrink: 0; }
     .bn-desc { font-size: 12px; color: var(--bn-text-muted); margin: 0 0 12px 0; line-height: 1.4; }
 
+    .bn-info {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: 6px;
+      cursor: help;
+      outline: none;
+    }
+    .bn-info:focus { outline: none; }
+    .bn-info-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--bn-border-subtle);
+      color: var(--bn-text-muted);
+      font-size: 11px;
+      font-weight: 600;
+      transition: background-color .2s ease, color .2s ease, box-shadow .2s ease;
+    }
+    .bn-info:hover .bn-info-icon,
+    .bn-info:focus-visible .bn-info-icon {
+      background: #007bff;
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(0,123,255,0.35);
+    }
+    .bn-info-tooltip {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 50%;
+      transform: translate(-50%, -6px);
+      background: var(--bn-bg);
+      color: var(--bn-text-sub);
+      border: 1px solid var(--bn-border-subtle);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 12px;
+      line-height: 1.5;
+      min-width: 220px;
+      max-width: 280px;
+      box-shadow: var(--bn-panel-shadow);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s ease, transform .2s ease;
+      z-index: 20;
+      text-align: left;
+      white-space: normal;
+    }
+    .bn-info:hover .bn-info-tooltip,
+    .bn-info:focus-visible .bn-info-tooltip,
+    .bn-info:focus-within .bn-info-tooltip {
+      opacity: 1;
+      transform: translate(-50%, 0);
+      pointer-events: auto;
+    }
+
     #bn-panel label {
       display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--bn-text-sub);
       cursor: pointer; padding: 4px 0; transition: all .2s ease; border-radius: 6px;
@@ -662,8 +721,12 @@ window.getCurrentUserId = getCurrentUserId;
                 <path d="M20.49 15a9 9 0 0 1-14.58 3.36L1 14"/>
               </svg>
               自动更新
+              <span class="bn-info" tabindex="0" role="button" aria-label="由于用户脚本只能在首个请求返回后才能运行，因此首个“原始”页面请求无法被阻止，当前实现已经尽快中止并改写。">
+                <span class="bn-info-icon">?</span>
+                <span class="bn-info-tooltip" role="tooltip">由于用户脚本只能在首个请求返回后才能运行，因此首个“原始”页面请求无法被阻止，当前实现已经尽快中止并改写。</span>
+              </span>
             </div>
-            <label><input type="checkbox" id="bn-enable-renew" ${enableAutoRenew ? 'checked' : ''}/> 启用题目自动更新 (Beta)</label>
+            <label><input type="checkbox" id="bn-enable-renew" ${enableAutoRenew ? 'checked' : ''}/> 启用题目自动更新</label>
           </div>
           <div class="bn-section">
             <div class="bn-title">
