@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names for 7FA4
 // @namespace    http://tampermonkey.net/
-// @version      v5.2.0
-// @description  Better Names for 7FA4 v5.2.0: Close #74.
+// @version      v5.2.1
+// @description  Better Names for 7FA4 v5.2.1.
 // @author       wwxz
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -662,7 +662,7 @@ window.getCurrentUserId = getCurrentUserId;
               </svg>
               自动更新
             </div>
-            <label><input type="checkbox" id="bn-enable-renew" ${enableAutoRenew ? 'checked' : ''}/> 启用自动跳转至 /renew 页面</label>
+            <label><input type="checkbox" id="bn-enable-renew" ${enableAutoRenew ? 'checked' : ''}/> 启用题目自动更新 (Beta)</label>
           </div>
           <div class="bn-section">
             <div class="bn-title">
@@ -700,7 +700,7 @@ window.getCurrentUserId = getCurrentUserId;
         <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
-      <div class="bn-version">Public Release | v5.2.0</div>
+      <div class="bn-version">Public Release | v5.2.1</div>
     </div>`;
   document.body.appendChild(container);
   container.style.pointerEvents = 'none';
