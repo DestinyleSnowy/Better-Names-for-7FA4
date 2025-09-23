@@ -43,7 +43,7 @@ window.getCurrentUserId = getCurrentUserId;
   const hideOrig = GM_getValue('hideOrig', true);
   const enableMenu = GM_getValue('enableUserMenu', true);
   const enablePlanAdder = GM_getValue('enablePlanAdder', true);
-  const enableAutoRenew = GM_getValue('enableAutoRenew', true);
+  const enableAutoRenew = GM_getValue('enableAutoRenew', false);
   const initialAutoExit = GM_getValue('planAdder.autoExit', true);
   let autoExit = initialAutoExit;
   const enableVjLink = GM_getValue('enableVjLink', true);
@@ -3989,7 +3989,7 @@ window.getCurrentUserId = getCurrentUserId;
     autoExit: 'planAdder.autoExit'
   };
 
-  const enablePlanAdder = GM_getValue('enablePlanAdder', false);
+  const enablePlanAdder = GM_getValue('enablePlanAdder', true);
   let modeOn = !!GM_getValue(KEY.mode, false);
   let selected = new Map(
     (GM_getValue(KEY.selected, []) || [])
