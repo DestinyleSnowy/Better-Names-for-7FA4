@@ -56,7 +56,7 @@ window.getCurrentUserId = getCurrentUserId;
   const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   const effectiveTheme = themeMode === 'auto' ? (prefersDark ? 'dark' : 'light') : themeMode;
 
-  const RENEW_PATH_RE = /^\/problems\/tag\/(\d+)\/?$/;
+  const RENEW_PATH_RE = /^\/problems\/tag\/([^\/?#]+)\/?$/;
   const RENEW_SUFFIX_RE = /\/renew\/?$/;
   const AUTO_RENEW_MEMORY_KEY = 'bn:autoRenew:lastRedirect';
   const AUTO_RENEW_MEMORY_TTL = 120000;
@@ -153,6 +153,18 @@ window.getCurrentUserId = getCurrentUserId;
       url.pathname = `/problems/tag/${match[1]}/renew`;
       return url.toString();
     } catch (err) {
+      return null;
+    }
+  }
+
+  function extractTagSlugFromUrl(href, baseHref) {
+    if (!href) return null;
+    try {
+      const url = new URL(href, baseHref || location.href);
+      const normalizedPath = url.pathname.replace(RENEW_SUFFIX_RE, '');
+      const match = normalizedPath.match(RENEW_PATH_RE);
+      return match ? match[1] : null;
+    } catch {
       return null;
     }
   }
@@ -275,10 +287,9 @@ window.getCurrentUserId = getCurrentUserId;
     wrapLocationForAutoRenew();
     const redirectTarget = computeRenewUrl(location.href);
     if (redirectTarget && redirectTarget !== location.href) {
-      const currentTagMatch = location.pathname.match(RENEW_PATH_RE);
-      if (!currentTagMatch || !consumeAutoRenewRedirect(currentTagMatch[1])) {
-        const tagMatch = currentTagMatch || redirectTarget.match(/\/problems\/tag\/(\d+)\/renew\/?$/);
-        const tagId = tagMatch ? tagMatch[1] : null;
+      const currentTagSlug = extractTagSlugFromUrl(location.href);
+      if (!currentTagSlug || !consumeAutoRenewRedirect(currentTagSlug)) {
+        const tagId = currentTagSlug || extractTagSlugFromUrl(redirectTarget);
         if (tagId) markAutoRenewRedirect(tagId, redirectTarget);
         location.replace(redirectTarget);
         return;
