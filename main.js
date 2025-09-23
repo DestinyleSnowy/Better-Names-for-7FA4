@@ -59,6 +59,7 @@ window.getCurrentUserId = getCurrentUserId;
   const RENEW_SUFFIX_RE = /\/renew\/?$/;
   const AUTO_RENEW_MEMORY_KEY = 'bn:autoRenew:lastRedirect';
   const AUTO_RENEW_MEMORY_TTL = 120000;
+  const AUTO_RENEW_LOCATION_FLAG = '__bn:autoRenew:locationWrapped';
 
   function readAutoRenewMemory() {
     try {
@@ -135,6 +136,54 @@ window.getCurrentUserId = getCurrentUserId;
     }
   }
 
+  function wrapLocationForAutoRenew() {
+    if (typeof window !== 'object' || !window.location) return;
+    if (window[AUTO_RENEW_LOCATION_FLAG]) return;
+    window[AUTO_RENEW_LOCATION_FLAG] = true;
+
+    const loc = window.location;
+    const normalize = (value) => {
+      if (value == null) return value;
+      const renewed = computeRenewUrl(value, loc.href);
+      return renewed || value;
+    };
+
+    const wrapLocationMethod = (key) => {
+      const original = loc[key];
+      if (typeof original !== 'function') return;
+      loc[key] = function (...args) {
+        if (args.length > 0) {
+          args[0] = normalize(args[0]);
+        }
+        return original.apply(loc, args);
+      };
+    };
+
+    wrapLocationMethod('assign');
+    wrapLocationMethod('replace');
+
+    const locProto = Object.getPrototypeOf(loc) || (typeof Location !== 'undefined' ? Location.prototype : null);
+    const hrefDescriptor = locProto && Object.getOwnPropertyDescriptor(locProto, 'href');
+    if (hrefDescriptor && hrefDescriptor.configurable !== false && typeof hrefDescriptor.set === 'function' && typeof hrefDescriptor.get === 'function') {
+      try {
+        Object.defineProperty(loc, 'href', {
+          configurable: true,
+          enumerable: hrefDescriptor.enumerable,
+          get() { return hrefDescriptor.get.call(loc); },
+          set(value) { return hrefDescriptor.set.call(loc, normalize(value)); },
+        });
+      } catch {}
+    }
+
+    const originalOpen = window.open;
+    if (typeof originalOpen === 'function') {
+      window.open = function (url, ...rest) {
+        const normalized = normalize(url);
+        return originalOpen.call(this, normalized, ...rest);
+      };
+    }
+  }
+
   function applyRenewToAnchor(anchor) {
     if (!anchor || typeof anchor.getAttribute !== 'function') return;
     const hrefAttr = anchor.getAttribute('href');
@@ -198,6 +247,7 @@ window.getCurrentUserId = getCurrentUserId;
   pruneAutoRenewMemory();
 
   if (enableAutoRenew) {
+    wrapLocationForAutoRenew();
     const redirectTarget = computeRenewUrl(location.href);
     if (redirectTarget && redirectTarget !== location.href) {
       const currentTagMatch = location.pathname.match(RENEW_PATH_RE);
@@ -205,6 +255,17 @@ window.getCurrentUserId = getCurrentUserId;
         const tagMatch = currentTagMatch || redirectTarget.match(/\/problems\/tag\/(\d+)\/renew\/?$/);
         const tagId = tagMatch ? tagMatch[1] : null;
         if (tagId) markAutoRenewRedirect(tagId);
+        try {
+          if (typeof window.stop === 'function') {
+            window.stop();
+          }
+        } catch {}
+        try {
+          const rootEl = document.documentElement;
+          if (rootEl && rootEl.style) {
+            rootEl.style.visibility = 'hidden';
+          }
+        } catch {}
         location.replace(redirectTarget);
         return;
       }
