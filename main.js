@@ -57,6 +57,65 @@ window.getCurrentUserId = getCurrentUserId;
 
   const RENEW_PATH_RE = /^\/problems\/tag\/(\d+)\/?$/;
   const RENEW_SUFFIX_RE = /\/renew\/?$/;
+  const AUTO_RENEW_MEMORY_KEY = 'bn:autoRenew:lastRedirect';
+  const AUTO_RENEW_MEMORY_TTL = 120000;
+
+  function readAutoRenewMemory() {
+    try {
+      if (typeof sessionStorage === 'undefined') return null;
+      const raw = sessionStorage.getItem(AUTO_RENEW_MEMORY_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (!data || typeof data !== 'object') return null;
+      return data;
+    } catch {
+      return null;
+    }
+  }
+
+  function writeAutoRenewMemory(data) {
+    try {
+      if (typeof sessionStorage === 'undefined') return;
+      sessionStorage.setItem(AUTO_RENEW_MEMORY_KEY, JSON.stringify(data));
+    } catch {}
+  }
+
+  function clearAutoRenewMemory() {
+    try {
+      if (typeof sessionStorage === 'undefined') return;
+      sessionStorage.removeItem(AUTO_RENEW_MEMORY_KEY);
+    } catch {}
+  }
+
+  function markAutoRenewRedirect(tagId) {
+    writeAutoRenewMemory({
+      tagId: String(tagId),
+      host: location.host,
+      port: location.port || '',
+      timestamp: Date.now(),
+    });
+  }
+
+  function consumeAutoRenewRedirect(tagId) {
+    const memory = readAutoRenewMemory();
+    if (!memory) return false;
+    if (memory.tagId && String(memory.tagId) !== String(tagId)) return false;
+    if (memory.host && memory.host !== location.host) return false;
+    if (typeof memory.port === 'string' && memory.port !== (location.port || '')) return false;
+    if (typeof memory.timestamp === 'number' && Date.now() - memory.timestamp > AUTO_RENEW_MEMORY_TTL) {
+      clearAutoRenewMemory();
+      return false;
+    }
+    clearAutoRenewMemory();
+    return true;
+  }
+
+  function pruneAutoRenewMemory() {
+    const memory = readAutoRenewMemory();
+    if (!memory) return;
+    if (typeof memory.timestamp === 'number' && Date.now() - memory.timestamp <= AUTO_RENEW_MEMORY_TTL) return;
+    clearAutoRenewMemory();
+  }
 
   function computeRenewUrl(rawHref, baseHref) {
     if (!rawHref) return null;
@@ -136,11 +195,19 @@ window.getCurrentUserId = getCurrentUserId;
     document.addEventListener('auxclick', ensureAnchor, true);
   }
 
+  pruneAutoRenewMemory();
+
   if (enableAutoRenew) {
     const redirectTarget = computeRenewUrl(location.href);
     if (redirectTarget && redirectTarget !== location.href) {
-      location.replace(redirectTarget);
-      return;
+      const currentTagMatch = location.pathname.match(RENEW_PATH_RE);
+      if (!currentTagMatch || !consumeAutoRenewRedirect(currentTagMatch[1])) {
+        const tagMatch = currentTagMatch || redirectTarget.match(/\/problems\/tag\/(\d+)\/renew\/?$/);
+        const tagId = tagMatch ? tagMatch[1] : null;
+        if (tagId) markAutoRenewRedirect(tagId);
+        location.replace(redirectTarget);
+        return;
+      }
     }
   }
 
