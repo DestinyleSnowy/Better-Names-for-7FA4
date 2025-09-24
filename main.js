@@ -386,9 +386,7 @@ window.getCurrentUserId = getCurrentUserId;
       justify-content: center;
       margin-left: 6px;
       cursor: help;
-      outline: none;
     }
-    .bn-info:focus { outline: none; }
     .bn-info-icon {
       display: inline-flex;
       align-items: center;
@@ -403,7 +401,8 @@ window.getCurrentUserId = getCurrentUserId;
       transition: background-color .2s ease, color .2s ease, box-shadow .2s ease;
     }
     .bn-info.bn-info-active .bn-info-icon,
-    .bn-info:focus-visible .bn-info-icon {
+    .bn-info .bn-info-icon:hover,
+    .bn-info .bn-info-icon:focus-visible {
       background: #007bff;
       color: #fff;
       box-shadow: 0 2px 6px rgba(0,123,255,0.35);
@@ -431,7 +430,8 @@ window.getCurrentUserId = getCurrentUserId;
       white-space: normal;
     }
     .bn-info.bn-info-active .bn-info-tooltip,
-    .bn-info:focus-visible .bn-info-tooltip,
+    .bn-info .bn-info-icon:hover + .bn-info-tooltip,
+    .bn-info .bn-info-icon:focus-visible + .bn-info-tooltip,
     .bn-info:focus-within .bn-info-tooltip {
       opacity: 1;
       transform: translate(-50%, 0);
@@ -721,8 +721,8 @@ window.getCurrentUserId = getCurrentUserId;
                 <path d="M20.49 15a9 9 0 0 1-14.58 3.36L1 14"/>
               </svg>
               自动更新
-              <span class="bn-info" tabindex="0" role="button" aria-label="由于用户脚本只能在首个请求返回后才能运行，因此首个“原始”页面请求无法被阻止，当前实现已经尽快中止并改写。">
-                <span class="bn-info-icon">?</span>
+              <span class="bn-info">
+                <span class="bn-info-icon" tabindex="0" role="button" aria-label="由于用户脚本只能在首个请求返回后才能运行，因此首个“原始”页面请求无法被阻止，当前实现已经尽快中止并改写。">?</span>
                 <span class="bn-info-tooltip" role="tooltip">由于用户脚本只能在首个请求返回后才能运行，因此首个“原始”页面请求无法被阻止，当前实现已经尽快中止并改写。</span>
               </span>
             </div>
@@ -819,10 +819,18 @@ window.getCurrentUserId = getCurrentUserId;
   const chkVj = document.getElementById('bn-enable-vj');
   const chkHideDoneSkip = document.getElementById('bn-hide-done-skip');
 
-  const infoTips = panel.querySelectorAll('.bn-info');
-  infoTips.forEach(info => {
+  const infoPairs = [];
+  panel.querySelectorAll('.bn-info').forEach((info, index) => {
     const icon = info.querySelector('.bn-info-icon');
+    const tooltip = info.querySelector('.bn-info-tooltip');
     if (!icon) return;
+
+    if (tooltip) {
+      if (!tooltip.id) {
+        tooltip.id = `bn-info-tooltip-${index}`;
+      }
+      icon.setAttribute('aria-describedby', tooltip.id);
+    }
 
     const activateInfo = () => {
       info.classList.add('bn-info-active');
@@ -834,13 +842,25 @@ window.getCurrentUserId = getCurrentUserId;
 
     icon.addEventListener('pointerenter', activateInfo);
     icon.addEventListener('pointerleave', deactivateInfo);
-
-    info.addEventListener('focusin', activateInfo);
-    info.addEventListener('focusout', (event) => {
-      if (event.relatedTarget && info.contains(event.relatedTarget)) return;
+    icon.addEventListener('focus', activateInfo);
+    icon.addEventListener('blur', () => {
       info.classList.remove('bn-info-active');
     });
+
+    infoPairs.push({ info, icon });
   });
+
+  if (infoPairs.length) {
+    document.addEventListener('pointerdown', (event) => {
+      infoPairs.forEach(({ info, icon }) => {
+        if (info.contains(event.target)) return;
+        if (document.activeElement === icon) {
+          icon.blur();
+        }
+        info.classList.remove('bn-info-active');
+      });
+    });
+  }
 
   const colorPickers = {};
   const hexInputs = {};
