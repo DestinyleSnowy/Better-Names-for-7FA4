@@ -227,9 +227,65 @@ window.getCurrentUserId = getCurrentUserId;
   const storedPalette = safeGetJSON('userPalette', {});
   const useCustomColors = GM_getValue('useCustomColors', false);
 
+  function parseHexColor(hex) {
+    if (typeof hex !== 'string') return null;
+    const trimmed = hex.trim();
+    if (!trimmed) return null;
+    const raw = trimmed.startsWith('#') ? trimmed.slice(1) : trimmed;
+    if (!(raw.length === 6 || raw.length === 8)) return null;
+    const hasAlpha = raw.length === 8;
+    const channels = [];
+    for (let i = 0; i < 6; i += 2) {
+      const value = Number.parseInt(raw.slice(i, i + 2), 16);
+      if (Number.isNaN(value)) return null;
+      channels.push(value);
+    }
+    let alpha = null;
+    if (hasAlpha) {
+      const parsedAlpha = Number.parseInt(raw.slice(6, 8), 16);
+      if (Number.isNaN(parsedAlpha)) return null;
+      alpha = parsedAlpha;
+    }
+    return { r: channels[0], g: channels[1], b: channels[2], alpha, hasAlpha };
+  }
+
+  function formatHexColor(color) {
+    if (!color) return null;
+    const clamp = (v) => Math.min(255, Math.max(0, Math.round(v)));
+    const toHex = (v) => clamp(v).toString(16).padStart(2, '0');
+    const base = `#${toHex(color.r)}${toHex(color.g)}${toHex(color.b)}`;
+    if (color.hasAlpha) return base + toHex(color.alpha ?? 255);
+    return base;
+  }
+
+  function mixColorTowardWhite(hex, ratio) {
+    const parsed = parseHexColor(hex);
+    if (!parsed) return hex;
+    const weight = Math.min(1, Math.max(0, Number.isFinite(ratio) ? ratio : 0));
+    const mix = (component) => component * (1 - weight) + 255 * weight;
+    return formatHexColor({
+      r: mix(parsed.r),
+      g: mix(parsed.g),
+      b: mix(parsed.b),
+      alpha: parsed.alpha,
+      hasAlpha: parsed.hasAlpha,
+    }) || hex;
+  }
+
+  function deriveDarkPaletteFromLight(lightPalette, ratio) {
+    const derived = {};
+    COLOR_KEYS.forEach(key => {
+      const base = lightPalette[key];
+      derived[key] = typeof base === 'string' ? mixColorTowardWhite(base, ratio) : base;
+    });
+    return derived;
+  }
+
+  const LIGHT_THEME_PALETTE = { x4: '#5a5a5a', x5: '#92800bff', x6: '#88ff00', c1: '#ff0000', c2: '#ff6629', c3: '#ffbb00', g1: '#ca00ca', g2: '#62ca00', g3: '#13c2c2', d1: '#9900ff', d2: '#000cff', d3: '#597ef7', d4: '#896e00', by: '#8c8c8c', jl: '#ff85c0', uk: '#5e6e5e' };
+  const DARK_THEME_WHITE_MIX_RATIO = 0.45;
   const palettes = {
-    light: { x4: '#5a5a5a', x5: '#92800bff', x6: '#88ff00', c1: '#ff0000', c2: '#ff6629', c3: '#ffbb00', g1: '#ca00ca', g2: '#62ca00', g3: '#13c2c2', d1: '#9900ff', d2: '#000cff', d3: '#597ef7', d4: '#896e00', by: '#8c8c8c', jl: '#ff85c0', uk: '#5e6e5e' },
-    dark: { x4: '#ffe58f', x5: '#ffd666', x6: '#ffbb96', c1: '#ff7875', c2: '#ff9c6e', c3: '#ffc069', g1: '#95de64', g2: '#5cdbd3', g3: '#36cfc9', d1: '#b37feb', d2: '#9254de', d3: '#85a5ff', d4: '#597ef7', by: '#d9d9d9', jl: '#ffadd2', uk: '#8c8c8c' }
+    light: LIGHT_THEME_PALETTE,
+    dark: deriveDarkPaletteFromLight(LIGHT_THEME_PALETTE, DARK_THEME_WHITE_MIX_RATIO)
   };
 
   const basePalette = palettes[effectiveTheme] || palettes.light;
