@@ -385,7 +385,6 @@ window.getCurrentUserId = getCurrentUserId;
       align-items: center;
       justify-content: center;
       margin-left: 6px;
-      cursor: help;
     }
     .bn-info-icon {
       display: inline-flex;
@@ -399,6 +398,7 @@ window.getCurrentUserId = getCurrentUserId;
       font-size: 11px;
       font-weight: 600;
       transition: background-color .2s ease, color .2s ease, box-shadow .2s ease;
+      cursor: pointer;
     }
     .bn-info.bn-info-active .bn-info-icon,
     .bn-info .bn-info-icon:hover,
@@ -435,7 +435,6 @@ window.getCurrentUserId = getCurrentUserId;
     .bn-info:focus-within .bn-info-tooltip {
       opacity: 1;
       transform: translate(-50%, 0);
-      pointer-events: auto;
     }
 
     #bn-panel label {
