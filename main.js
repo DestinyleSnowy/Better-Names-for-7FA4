@@ -55,6 +55,11 @@ window.getCurrentUserId = getCurrentUserId;
   const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   const effectiveTheme = themeMode === 'auto' ? (prefersDark ? 'dark' : 'light') : themeMode;
 
+  const REPO_URLS = {
+    github: 'https://github.com/DestinyleSnowy/Better-Names-for-7FA4',
+    gitlabUi: 'https://gitlab.com/-/ide/project/github.com/DestinyleSnowy/Better-Names-for-7FA4',
+  };
+
   const RENEW_PATH_RE = /^\/problems\/tag\/(\d+)\/?$/;
   const RENEW_SUFFIX_RE = /\/renew\/?$/;
   const AUTO_RENEW_MEMORY_KEY = 'bn:autoRenew:lastRedirect';
@@ -589,12 +594,36 @@ window.getCurrentUserId = getCurrentUserId;
     #bn-user-menu a:hover::before { transform: scaleY(1); }
 
     .bn-version {
-      text-align: center; padding: 12px 20px;
+      position: relative;
+      text-align: center; padding: 12px 20px; padding-right: 140px;
       background: linear-gradient(135deg, var(--bn-bg-grad-1) 0%, var(--bn-bg-grad-2) 100%);
       border-top: 1px solid var(--bn-border-subtle);
       font-size: 11px; color: var(--bn-text-muted); font-weight: 500;
       min-height: var(--bn-version-h);
       display: flex; align-items: center; justify-content: center;
+    }
+
+    .bn-version-links {
+      position: absolute; right: 20px; top: 0; bottom: 0;
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    .bn-version-link {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-weight: 600; color: var(--bn-text-muted);
+      text-decoration: none; padding: 4px 8px; border-radius: 6px;
+      transition: color .2s ease, background-color .2s ease;
+    }
+
+    .bn-version-link:hover,
+    .bn-version-link:focus-visible {
+      color: var(--bn-text);
+      background: var(--bn-hover-bg);
+      outline: none;
+    }
+
+    .bn-version-link svg {
+      width: 14px; height: 14px;
     }
 
     @media (max-width: 600px) {
@@ -603,6 +632,9 @@ window.getCurrentUserId = getCurrentUserId;
       #bn-panel { width: 300px; }
       #bn-panel.bn-expanded { width: calc(100vw - 32px); max-width: 520px; }
       .bn-color-sidebar { width: 200px; }
+      .bn-version { padding-right: 120px; }
+      .bn-version-links { right: 16px; gap: 6px; }
+      .bn-version-link { padding: 4px 6px; }
     }
   `;
   const style = document.createElement('style'); style.textContent = css; document.head.appendChild(style);
@@ -764,7 +796,19 @@ window.getCurrentUserId = getCurrentUserId;
         <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
-      <div class="bn-version">Public Release | v5.3.0</div>
+      <div class="bn-version">
+        <div class="bn-version-text">Public Release | v5.3.0</div>
+        <div class="bn-version-links">
+          <a class="bn-version-link" href="${REPO_URLS.github}" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8Z"/></svg>
+            <span>GitHub</span>
+          </a>
+          <a class="bn-version-link" href="${REPO_URLS.gitlabUi}" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M15.66 9.27l-1.2-3.7a.58.58 0 00-.55-.4.58.58 0 00-.56.4l-1.18 3.63H3.83L2.65 5.57a.58.58 0 00-.55-.4.58.58 0 00-.56.4l-1.2 3.7a1.16 1.16 0 00.43 1.3l6.44 4.8c.21.16.47.23.73.23.26 0 .52-.07.73-.23l6.44-4.8c.45-.34.64-.93.44-1.3zM3.72 7.98l1.32 3.25-3.02-2.25.92-3zm6.03 6.45c-.23.17-.52.26-.81.26a1.3 1.3 0 01-.8-.26L7.3 13.72l.7-1.8h1.94l.7 1.8-1.89 1.43zm-2.53-3.14l.78-2.02h1.02l.78 2.02H7.22zm4.95-.06l1.32-3.25 1.78 5.25-3.1-2.3z"/></svg>
+            <span>GitLab UI</span>
+          </a>
+        </div>
+      </div>
     </div>`;
   document.body.appendChild(container);
   container.style.pointerEvents = 'none';
