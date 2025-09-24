@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names for 7FA4
 // @namespace    http://tampermonkey.net/
-// @version      v5.2.2
-// @description  Better Names for 7FA4 v5.2.2.
+// @version      v5.2.3
+// @description  Better Names for 7FA4 v5.2.3.
 // @author       wwxz
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -764,7 +764,7 @@ window.getCurrentUserId = getCurrentUserId;
         <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
-      <div class="bn-version">Public Release | v5.2.2</div>
+      <div class="bn-version">Public Release | v5.2.3</div>
     </div>`;
   document.body.appendChild(container);
   container.style.pointerEvents = 'none';
