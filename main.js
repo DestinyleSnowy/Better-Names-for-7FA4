@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names for 7FA4
 // @namespace    http://tampermonkey.net/
-// @version      v5.2.3
-// @description  Better Names for 7FA4 v5.2.3.
+// @version      v5.3.0
+// @description  Better Names for 7FA4 v5.3.0.
 // @author       wwxz
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -228,8 +228,8 @@ window.getCurrentUserId = getCurrentUserId;
   const useCustomColors = GM_getValue('useCustomColors', false);
 
   const palettes = {
-    light: { x4: '#5a5a5a', x5: '#92800bff', x6: '#88ff00', c1: '#ff0000', c2: '#ff6629', c3: '#ffbb00', g1: '#ca00ca', g2: '#62ca00', g3: '#13c2c2', d1: '#9900ff', d2: '#000cff', d3: '#597ef7', d4: '#896e00', by: '#8c8c8c', jl: '#ff85c0', uk: '#5e6e5e' },
-    dark: { x4: '#ffe58f', x5: '#ffd666', x6: '#ffbb96', c1: '#ff7875', c2: '#ff9c6e', c3: '#ffc069', g1: '#95de64', g2: '#5cdbd3', g3: '#36cfc9', d1: '#b37feb', d2: '#9254de', d3: '#85a5ff', d4: '#597ef7', by: '#d9d9d9', jl: '#ffadd2', uk: '#8c8c8c' }
+    light: { x4: '#5a5a5a', x5: '#92800b', x6: '#77dd02', c1: '#ff0000', c2: '#ff6629', c3: '#ffbb00', g1: '#ca00ca', g2: '#62ca00', g3: '#13c2c2', d1: '#9900ff', d2: '#000cff', d3: '#597ef7', d4: '#896e00', by: '#8c8c8c', jl: '#ff85c0', uk: '#5e6e5e' },
+    dark: { x4: '#777676', x5: '#c7af11', x6: '#88ff00', c1: '#fc6363', c2: '#fd895b', c3: '#ffc069', g1: '#ce4dce', g2: '#93cc5e', g3: '#36cfc9', d1: '#b37feb', d2: '#666efcff', d3: '#85a5ff', d4: '#b3a15cff', by: '#d9d9d9', jl: '#ffadd2', uk: '#8c8c8c' }
   };
 
   const basePalette = palettes[effectiveTheme] || palettes.light;
@@ -764,7 +764,7 @@ window.getCurrentUserId = getCurrentUserId;
         <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
-      <div class="bn-version">Public Release | v5.2.3</div>
+      <div class="bn-version">Public Release | v5.3.0</div>
     </div>`;
   document.body.appendChild(container);
   container.style.pointerEvents = 'none';
