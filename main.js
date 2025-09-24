@@ -57,7 +57,7 @@ window.getCurrentUserId = getCurrentUserId;
 
   const REPO_URLS = {
     github: 'https://github.com/DestinyleSnowy/Better-Names-for-7FA4',
-    gitlabUi: 'https://gitlab.com/-/ide/project/github.com/DestinyleSnowy/Better-Names-for-7FA4',
+    gitlab: 'http://jx.7fa4.cn:9080/yx/drive/-/tree/main/Better%20Names%20for%207FA4',
   };
 
   const RENEW_PATH_RE = /^\/problems\/tag\/(\d+)\/?$/;
@@ -803,9 +803,9 @@ window.getCurrentUserId = getCurrentUserId;
             <svg viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8Z"/></svg>
             <span>GitHub</span>
           </a>
-          <a class="bn-version-link" href="${REPO_URLS.gitlabUi}" target="_blank" rel="noopener noreferrer">
+          <a class="bn-version-link" href="${REPO_URLS.gitlab}" target="_blank" rel="noopener noreferrer">
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M15.66 9.27l-1.2-3.7a.58.58 0 00-.55-.4.58.58 0 00-.56.4l-1.18 3.63H3.83L2.65 5.57a.58.58 0 00-.55-.4.58.58 0 00-.56.4l-1.2 3.7a1.16 1.16 0 00.43 1.3l6.44 4.8c.21.16.47.23.73.23.26 0 .52-.07.73-.23l6.44-4.8c.45-.34.64-.93.44-1.3zM3.72 7.98l1.32 3.25-3.02-2.25.92-3zm6.03 6.45c-.23.17-.52.26-.81.26a1.3 1.3 0 01-.8-.26L7.3 13.72l.7-1.8h1.94l.7 1.8-1.89 1.43zm-2.53-3.14l.78-2.02h1.02l.78 2.02H7.22zm4.95-.06l1.32-3.25 1.78 5.25-3.1-2.3z"/></svg>
-            <span>GitLab UI</span>
+            <span>GitLab</span>
           </a>
         </div>
       </div>
