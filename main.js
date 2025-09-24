@@ -402,7 +402,7 @@ window.getCurrentUserId = getCurrentUserId;
       font-weight: 600;
       transition: background-color .2s ease, color .2s ease, box-shadow .2s ease;
     }
-    .bn-info:hover .bn-info-icon,
+    .bn-info.bn-info-active .bn-info-icon,
     .bn-info:focus-visible .bn-info-icon {
       background: #007bff;
       color: #fff;
@@ -430,7 +430,7 @@ window.getCurrentUserId = getCurrentUserId;
       text-align: left;
       white-space: normal;
     }
-    .bn-info:hover .bn-info-tooltip,
+    .bn-info.bn-info-active .bn-info-tooltip,
     .bn-info:focus-visible .bn-info-tooltip,
     .bn-info:focus-within .bn-info-tooltip {
       opacity: 1;
@@ -818,6 +818,29 @@ window.getCurrentUserId = getCurrentUserId;
   const saveActions = document.getElementById('bn-save-actions');
   const chkVj = document.getElementById('bn-enable-vj');
   const chkHideDoneSkip = document.getElementById('bn-hide-done-skip');
+
+  const infoTips = panel.querySelectorAll('.bn-info');
+  infoTips.forEach(info => {
+    const icon = info.querySelector('.bn-info-icon');
+    if (!icon) return;
+
+    const activateInfo = () => {
+      info.classList.add('bn-info-active');
+    };
+    const deactivateInfo = () => {
+      if (info.contains(document.activeElement)) return;
+      info.classList.remove('bn-info-active');
+    };
+
+    icon.addEventListener('pointerenter', activateInfo);
+    icon.addEventListener('pointerleave', deactivateInfo);
+
+    info.addEventListener('focusin', activateInfo);
+    info.addEventListener('focusout', (event) => {
+      if (event.relatedTarget && info.contains(event.relatedTarget)) return;
+      info.classList.remove('bn-info-active');
+    });
+  });
 
   const colorPickers = {};
   const hexInputs = {};
