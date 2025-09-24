@@ -228,7 +228,7 @@ window.getCurrentUserId = getCurrentUserId;
   const useCustomColors = GM_getValue('useCustomColors', false);
 
   const palettes = {
-    light: { x4: '#ffd666', x5: '#fadb14', x6: '#faad14', c1: '#ff4d4f', c2: '#ff7a45', c3: '#ffa940', g1: '#73d13d', g2: '#36cfc9', g3: '#13c2c2', d1: '#9254de', d2: '#722ed1', d3: '#597ef7', d4: '#2f54eb', by: '#8c8c8c', jl: '#ff85c0', uk: '#5c5c5c' },
+    light: { x4: '#5a5a5a', x5: '#92800bff', x6: '#88ff00', c1: '#ff0000', c2: '#ff6629', c3: '#ffbb00', g1: '#ca00ca', g2: '#62ca00', g3: '#13c2c2', d1: '#9900ff', d2: '#000cff', d3: '#597ef7', d4: '#896e00', by: '#8c8c8c', jl: '#ff85c0', uk: '#5e6e5e' },
     dark: { x4: '#ffe58f', x5: '#ffd666', x6: '#ffbb96', c1: '#ff7875', c2: '#ff9c6e', c3: '#ffc069', g1: '#95de64', g2: '#5cdbd3', g3: '#36cfc9', d1: '#b37feb', d2: '#9254de', d3: '#85a5ff', d4: '#597ef7', by: '#d9d9d9', jl: '#ffadd2', uk: '#8c8c8c' }
   };
 
