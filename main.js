@@ -283,6 +283,7 @@ window.getCurrentUserId = getCurrentUserId;
     }
     #bn-container.bn-expanded { width: 1120px; }
     #bn-container * { pointer-events: auto; box-sizing: border-box; }
+    #bn-container .bn-info-tooltip { pointer-events: none; }
 
     @media (max-width: 600px) {
       #bn-container, #bn-container.bn-expanded { width: calc(100vw - 40px); }
