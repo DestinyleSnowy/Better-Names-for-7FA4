@@ -38,9 +38,9 @@ GRADE_TO_COLORKEY = {
     "初一": "c1", "初二": "c2", "初三": "c3",
     "高一": "g1", "高二": "g2", "高三": "g3",
     "大一": "d1", "大二": "d2", "大三": "d3", "大四": "d4",
-    "毕业": "by",
+    "毕业": "by", "教练": "jl", "教师": "jl", "其他": "uk", "成都七中": "uk",
 }
-ALT_TEXT = {"大  一": "大一", "大  二": "大二", "大  三": "大三", "大  四": "大四"}
+ALT_TEXT = {"大  一": "大一", "大  二": "大二", "大  三": "大三", "大  四": "大四", "教  练": "教练", "其  他": "其他"}
 
 def build_user_plan_url(uid: int) -> str:
     # 这个接口示例：/user_plan?user_id=650&date=1757928000&type=day&format=td
@@ -178,7 +178,7 @@ async def crawl_colorkeys() -> Dict[int, str]:
 def to_users_object(names: Dict[int, str], cols: Dict[int, str]) -> Dict[int, Dict[str, str]]:
     users: Dict[int, Dict[str, str]] = {}
     for uid in range(UID_START, UID_END + 1):
-        users[uid] = {"name": names.get(uid, ""), "colorKey": cols.get(uid, "unknown")}
+        users[uid] = {"name": names.get(uid, ""), "colorKey": cols.get(uid, "uk")}
     return users
 
 def write_outputs(users: Dict[int, Dict[str, str]]) -> None:
