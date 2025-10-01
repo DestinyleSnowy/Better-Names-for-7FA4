@@ -2680,7 +2680,7 @@ window.getCurrentUserId = getCurrentUserId;
     1337: { name: "黄旭", colorKey: "x6" },
     1338: { name: "刘嘉睿", colorKey: "c1" },
     1339: { name: "王海烨", colorKey: "g2" },
-    1340: { name: "", colorKey: "by" },
+    1340: { name: "榜", colorKey: "uk" },
     1341: { name: "牟益", colorKey: "c1" },
     1342: { name: "程王浩", colorKey: "c1" },
     1343: { name: "金敬淳", colorKey: "c1" },
