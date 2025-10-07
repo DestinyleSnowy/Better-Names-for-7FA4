@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names for 7FA4
 // @namespace    http://tampermonkey.net/
-// @version      v5.3.1
-// @description  Better Names for 7FA4 v5.3.1.
+// @version      v5.4.0
+// @description  Better Names for 7FA4 v5.4.0.
 // @author       wwxz
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
