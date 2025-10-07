@@ -10,8 +10,8 @@ from bs4 import BeautifulSoup
 
 BASE = "http://jx.7fa4.cn:8888"
 
-UID_START, UID_END = 1, 2645
-RANKLIST_PAGES = range(1, 52)  # 1..51
+UID_START, UID_END = 1, 2850
+RANKLIST_PAGES = range(1, 56)  # 1..51
 
 # 并发、超时、重试
 CONCURRENCY = 20
