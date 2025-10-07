@@ -39,7 +39,6 @@ window.getCurrentUserId = getCurrentUserId;
   const maxUserUnits = (storedUserUnits === 'none') ? Infinity : parseInt(storedUserUnits, 10);
   const hideAvatar = GM_getValue('hideAvatar', true);
   const enableCopy = GM_getValue('enableCopy', true);
-  const copyNotify = GM_getValue('copyNotify', true);
   const hideOrig = GM_getValue('hideOrig', true);
   const enableMenu = GM_getValue('enableUserMenu', true);
   const enablePlanAdder = GM_getValue('enablePlanAdder', true);
@@ -745,17 +744,16 @@ window.getCurrentUserId = getCurrentUserId;
             <label><input type="checkbox" id="bn-hide-avatar" ${hideAvatar ? 'checked' : ''}/> 隐藏用户头像</label>
             <label><input type="checkbox" id="bn-enable-user-menu" ${enableMenu ? 'checked' : ''}/> 启用用户菜单</label>
             <label><input type="checkbox" id="bn-enable-vj" ${enableVjLink ? 'checked' : ''}/> 外站题目链接 Vjudge 按钮</label>
-                      <label><input type=\"checkbox\" id=\"bn-hide-done-skip\" ${hideDoneSkip ? 'checked' : ''}/> 隐藏已通过&已跳过题目</label>
+            <label><input type="checkbox" id="bn-enable-copy" ${enableCopy ? 'checked' : ''}/> 启用题面快捷复制</label>
+            <div id="bn-copy-options">
+              <label><input type="checkbox" id="bn-hide-orig" ${hideOrig ? 'checked' : ''}/> 隐藏题目源码按钮</label>
+            </div>
+            <label><input type="checkbox" id="bn-hide-done-skip" ${hideDoneSkip ? 'checked' : ''}/> 隐藏已通过&已跳过题目</label>
           </div>
           <div class="bn-section">
             <div class="bn-title">
-              <svg class="bn-icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-              复制功能
-            </div>
-            <label><input type="checkbox" id="bn-enable-copy" ${enableCopy ? 'checked' : ''}/> 启用题面复制</label>
-            <div id="bn-copy-options">
-              <label><input type="checkbox" id="bn-copy-notify" ${copyNotify ? 'checked' : ''}/> 显示复制提示</label>
-              <label><input type="checkbox" id="bn-hide-orig" ${hideOrig ? 'checked' : ''}/> 隐藏原始按钮</label>
+              <svg class="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              二三帮守护
             </div>
           </div>
           <div class="bn-section">
@@ -860,7 +858,6 @@ window.getCurrentUserId = getCurrentUserId;
 
   const chkAv = document.getElementById('bn-hide-avatar');
   const chkCp = document.getElementById('bn-enable-copy');
-  const chkNt = document.getElementById('bn-copy-notify');
   const chkHo = document.getElementById('bn-hide-orig');
   const copyOpts = document.getElementById('bn-copy-options');
 
@@ -930,7 +927,6 @@ window.getCurrentUserId = getCurrentUserId;
     maxUserUnits,
     hideAvatar,
     enableCopy,
-    copyNotify,
     hideOrig,
     enableMenu,
     enablePlanAdder,
@@ -1180,7 +1176,6 @@ window.getCurrentUserId = getCurrentUserId;
       (document.getElementById('bn-enable-user-truncate').checked && ui !== originalConfig.maxUserUnits) ||
       (document.getElementById('bn-hide-avatar').checked !== originalConfig.hideAvatar) ||
       (document.getElementById('bn-enable-copy').checked !== originalConfig.enableCopy) ||
-      (document.getElementById('bn-copy-notify').checked !== originalConfig.copyNotify) ||
       (document.getElementById('bn-hide-orig').checked !== originalConfig.hideOrig) ||
       (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) ||
       (document.getElementById('bn-enable-plan').checked !== originalConfig.enablePlanAdder) ||
@@ -1216,7 +1211,6 @@ window.getCurrentUserId = getCurrentUserId;
 
   chkAv.onchange = checkChanged;
   chkCp.onchange = () => { toggleOption(chkCp, copyOpts); checkChanged(); };
-  chkNt.onchange = checkChanged;
   chkHo.onchange = checkChanged;
   chkMenu.onchange = checkChanged;
   chkVj.onchange = checkChanged;
@@ -1258,7 +1252,6 @@ window.getCurrentUserId = getCurrentUserId;
 
     GM_setValue('hideAvatar', chkAv.checked);
     GM_setValue('enableCopy', chkCp.checked);
-    GM_setValue('copyNotify', chkNt.checked);
     GM_setValue('hideOrig', chkHo.checked);
     GM_setValue('hideDoneSkip', chkHideDoneSkip.checked);
     GM_setValue('enableUserMenu', chkMenu.checked);
@@ -1287,7 +1280,6 @@ window.getCurrentUserId = getCurrentUserId;
 
     chkAv.checked = originalConfig.hideAvatar;
     chkCp.checked = originalConfig.enableCopy;
-    chkNt.checked = originalConfig.copyNotify;
     chkHo.checked = originalConfig.hideOrig;
     chkMenu.checked = originalConfig.enableMenu;
     chkVj.checked = originalConfig.enableVjLink;
