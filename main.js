@@ -566,11 +566,11 @@ window.getCurrentUserId = getCurrentUserId;
     }
 
     #bn-copy-options {
-      margin-left: 24px; display: ${enableCopy ? 'block' : 'none'}; padding-top: 8px; border-top: 1px solid var(--bn-border-subtle);
+      margin-left: 24px; display: ${enableCopy ? 'block' : 'none'}; padding-top: 8px;
       margin-top: 8px;
     }
     #bn-plan-options {
-      margin-left: 24px; display: ${enablePlanAdder ? 'block' : 'none'}; padding-top: 8px; border-top: 1px solid var(--bn-border-subtle);
+      margin-left: 24px; display: ${enablePlanAdder ? 'block' : 'none'}; padding-top: 8px;
       margin-top: 8px;
     }
     #bn-title-options, #bn-user-options {
