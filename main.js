@@ -564,10 +564,6 @@ window.getCurrentUserId = getCurrentUserId;
       opacity: 1; pointer-events: auto; transform: translateY(0);
     }
 
-    #bn-copy-options {
-      margin-left: 24px; display: ${enableCopy ? 'block' : 'none'}; padding-top: 8px;
-      margin-top: 8px;
-    }
     #bn-plan-options {
       margin-left: 24px; display: ${enablePlanAdder ? 'block' : 'none'}; padding-top: 8px;
       margin-top: 8px;
@@ -745,9 +741,7 @@ window.getCurrentUserId = getCurrentUserId;
             <label><input type="checkbox" id="bn-enable-user-menu" ${enableMenu ? 'checked' : ''}/> 启用用户菜单</label>
             <label><input type="checkbox" id="bn-enable-vj" ${enableVjLink ? 'checked' : ''}/> 外站题目链接 Vjudge 按钮</label>
             <label><input type="checkbox" id="bn-enable-copy" ${enableCopy ? 'checked' : ''}/> 启用题面快捷复制</label>
-            <div id="bn-copy-options">
-              <label><input type="checkbox" id="bn-hide-orig" ${hideOrig ? 'checked' : ''}/> 隐藏题目源码按钮</label>
-            </div>
+            <label><input type="checkbox" id="bn-hide-orig" ${hideOrig ? 'checked' : ''}/> 隐藏题目源码按钮</label>
             <label><input type="checkbox" id="bn-hide-done-skip" ${hideDoneSkip ? 'checked' : ''}/> 隐藏已通过&已跳过题目</label>
           </div>
           <div class="bn-section">
@@ -859,7 +853,6 @@ window.getCurrentUserId = getCurrentUserId;
   const chkAv = document.getElementById('bn-hide-avatar');
   const chkCp = document.getElementById('bn-enable-copy');
   const chkHo = document.getElementById('bn-hide-orig');
-  const copyOpts = document.getElementById('bn-copy-options');
 
   const chkMenu = document.getElementById('bn-enable-user-menu');
   const chkPlan = document.getElementById('bn-enable-plan');
@@ -948,7 +941,6 @@ window.getCurrentUserId = getCurrentUserId;
 
   titleOpts.style.display = originalConfig.titleTruncate ? 'block' : 'none';
   userOpts.style.display = originalConfig.userTruncate ? 'block' : 'none';
-  copyOpts.style.display = originalConfig.enableCopy ? 'block' : 'none';
   planOpts.style.display = originalConfig.enablePlanAdder ? 'block' : 'none';
 
   COLOR_KEYS.forEach(k => {
@@ -1210,7 +1202,7 @@ window.getCurrentUserId = getCurrentUserId;
   userInp.oninput = checkChanged;
 
   chkAv.onchange = checkChanged;
-  chkCp.onchange = () => { toggleOption(chkCp, copyOpts); checkChanged(); };
+  chkCp.onchange = () => { checkChanged(); };
   chkHo.onchange = checkChanged;
   chkMenu.onchange = checkChanged;
   chkVj.onchange = checkChanged;
@@ -1294,7 +1286,6 @@ window.getCurrentUserId = getCurrentUserId;
 
     titleOpts.style.display = chkTitleTrEl.checked ? 'block' : 'none';
     userOpts.style.display = chkUserTrEl.checked ? 'block' : 'none';
-    copyOpts.style.display = chkCp.checked ? 'block' : 'none';
     planOpts.style.display = chkPlan.checked ? 'block' : 'none';
 
     if (themeSelect.value === 'dark') container.classList.add('bn-dark');
