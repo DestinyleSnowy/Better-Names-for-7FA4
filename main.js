@@ -56,7 +56,7 @@ window.getCurrentUserId = getCurrentUserId;
 
   const REPO_URLS = {
     github: 'https://github.com/DestinyleSnowy/Better-Names-for-7FA4',
-    gitlab: 'http://jx.7fa4.cn:9080/yx/drive/-/tree/main/Better%20Names%20for%207FA4',
+    gitlab: 'http://jx.7fa4.cn:9080/yx/better-names-for-7fa4',
   };
 
   const RENEW_PATH_RE = /^\/problems\/tag\/(\d+)\/?$/;
