@@ -10,8 +10,8 @@ from bs4 import BeautifulSoup
 
 BASE = "http://jx.7fa4.cn:8888"
 
-UID_START, UID_END = 1, 2904
-RANKLIST_PAGES = range(1, 57)  # 1..51
+UID_START, UID_END = 1, 3088
+RANKLIST_PAGES = range(1, 61)  # 1..60
 
 # 并发、超时、重试
 CONCURRENCY = 20
@@ -197,7 +197,7 @@ async def main():
     names = await crawl_names()
     print(f"姓名抓取完成：{len(names)} 条。")
 
-    print("开始抓取年级/颜色（/ranklist?page=1..56）...")
+    print("开始抓取年级/颜色（/ranklist?page=1..60）...")
     colorkeys = await crawl_colorkeys()
     print(f"年级抓取完成：{len(colorkeys)} 条。")
 
