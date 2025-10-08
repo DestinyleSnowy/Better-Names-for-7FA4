@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names for 7FA4
 // @namespace    http://tampermonkey.net/
-// @version      v5.4.0
-// @description  Better Names for 7FA4 v5.4.0.
+// @version      v5.4.1
+// @description  Better Names for 7FA4 v5.4.1.
 // @author       wwxz
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -814,7 +814,7 @@ window.getCurrentUserId = getCurrentUserId;
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
       <div class="bn-version">
-        <div class="bn-version-text">v5.4.0</div>
+        <div class="bn-version-text">v5.4.1</div>
       </div>
     </div>`;
   document.body.appendChild(container);
@@ -4496,69 +4496,98 @@ window.getCurrentUserId = getCurrentUserId;
   }
 
   function fVjudgeLink() {
-    if (!enableVjLink) return;
-    if (!/^\/problem\/\d+\/?$/.test(location.pathname)) return;
-    if (document.getElementById('bn-vjudge-btn')) return;
-
-    let raw = '';
-    for (const s of document.querySelectorAll('div.ui.center.aligned.grid span')) {
-      const t = (s.textContent || '').trim();
-      if (/^题目名称[:：]/.test(t)) { raw = t.replace(/^题目名称[:：]\s*/, '').trim(); break; }
-    }
-    if (!raw) return;
-    const lower = raw.replace(/\s+/g, '').toLowerCase();
-    const parser = {
-      cf: pid => `https://vjudge.net/problem/CodeForces-${pid.slice(2)}`,
-      codeforces: pid => `https://vjudge.net/problem/CodeForces-${pid.replace(/^codeforces/, '')}`,
-      atc: pid => {
-        const m = pid.match(/^atc([a-z]+)(\d+)[_-]?([a-z])$/);
-        if (m) return `https://vjudge.net/problem/AtCoder-${m[1]}${m[2]}_${m[3]}`;
-        const base = pid.slice(3, -1), last = pid.slice(-1);
-        return `https://vjudge.net/problem/AtCoder-${base}_${last}`;
-      },
-      luogu: pid => `https://vjudge.net/problem/洛谷-${pid.slice(5)}`,
-      LG: pid => `https://vjudge.net/problem/洛谷-p${pid.slice(2)}`,
-      uoj: pid => `https://vjudge.net/problem/UniversalOJ-${pid.slice(3)}`,
-      poj: pid => `https://vjudge.net/problem/POJ-${pid.slice(3)}`,
-      zoj: pid => `https://vjudge.net/problem/ZOJ-${pid.slice(3)}`,
-      uva: pid => `https://vjudge.net/problem/UVA-${pid.slice(3)}`,
-      loj: pid => `https://vjudge.net/problem/LightOJ-${pid.slice(3)}`
-    };
-
-    let vjUrl = '';
-    for (const k of Object.keys(parser)) {
-      if (lower.includes(k)) { try { vjUrl = parser[k](lower); } catch { } break; }
-    }
-    if (!vjUrl) return;
-
-    let firstBtn = document.querySelector('div.ui.buttons.right.floated > a');
-    if (!firstBtn) {
-      for (const g of document.querySelectorAll('div.ui.center.aligned.grid')) {
-        const candBox = g.querySelector('div.ui.buttons.right.floated');
-        if (candBox?.firstElementChild?.tagName === 'A') { firstBtn = candBox.firstElementChild; break; }
+      if (!enableVjLink) return;
+      if (!/^\/problem\/\d+\/?$/.test(location.pathname)) return;
+      if (document.getElementById('bn-vjudge-btn')) return;
+  
+      let raw = '';
+      for (const s of document.querySelectorAll('div.ui.center.aligned.grid span')) {
+        const t = (s.textContent || '').trim();
+        if (/^题目名称[:：]/.test(t)) { raw = t.replace(/^题目名称[:：]\s*/, '').trim(); break; }
       }
-    }
-    if (!firstBtn) return;
+      if (!raw) return;
+      const parser = {
+        cfgym: pid=> `https://vjudge.net/problem/Gym-${pid}`,
+        cf: pid => `https://vjudge.net/problem/CodeForces-${pid}`,
+        codeforces: pid => `https://vjudge.net/problem/CodeForces-${pid}`,
+        atc: pid => {
+          const m = pid.match(/^atc([a-z]+)(\d+)[_-]?([a-z])$/);
+          if (m) return `https://vjudge.net/problem/AtCoder-${m[0]}${m[1]}_${m[2]}`;
+          const base = pid.slice(0, -1), last = pid.slice(-1);
+          return `https://vjudge.net/problem/AtCoder-${base}_${last}`;
+        },
+        luogu: pid => `https://vjudge.net/problem/洛谷-${pid}`,
+        LG: pid => `https://vjudge.net/problem/洛谷-p${pid}`,
+        uoj: pid => `https://vjudge.net/problem/UniversalOJ-${pid}`,
+        qoj: pid => `https://vjudge.net/problem/QOJ-${pid}`,
+        poj: pid => `https://vjudge.net/problem/POJ-${pid}`,
+        zoj: pid => `https://vjudge.net/problem/ZOJ-${pid}`,
+        uva: pid => `https://vjudge.net/problem/UVA-${pid}`,
+        loj: pid => `https://vjudge.net/problem/LightOJ-${pid}`,
+        vj: pid => `https://vjudge.net/problem/${pid}`
+      };
+      function extractOJAndProblem(buttonElement) {
+        const tooltip = buttonElement.getAttribute('data-tooltip');
+        if (!tooltip) {
+            return null;
+        }
 
-    const vj = document.createElement('a');
-    vj.id = 'bn-vjudge-btn';
-    vj.className = 'small ui button';
-    vj.href = vjUrl;
-    vj.target = '_blank';
-    vj.rel = 'noopener';
-    vj.setAttribute('data-tooltip', `vj-${lower}`);
-    vj.textContent = 'Vjudge';
-    vj.style.backgroundColor = '#f2711c';
-    vj.style.color = '#ffffff';
-    const leftGroup = document.querySelector('div.ui.buttons:not(.right.floated)');
-    if (leftGroup) {
-      leftGroup.appendChild(vj);
-    } else if (firstBtn && firstBtn.parentNode) {
-      firstBtn.parentNode.insertBefore(vj, firstBtn);
-    } else {
-      const container = document.querySelector('div.ui.buttons.right.floated') || document.querySelector('div.ui.buttons');
-      if (container) container.appendChild(vj);
-    }
+        const separator = tooltip.includes('：') ? '：' : ':';
+        const parts = tooltip.split(separator);
+        if (parts.length != 2) {
+            return null;
+        }
+
+        const oj = parts[0].trim();
+        const problemNumber = parts[1].trim();
+
+        return { oj, problemNumber };
+      }
+      
+      const button = document.querySelector('a.small.ui.green.button[data-tooltip]');
+      if(!button)
+          return;
+      const result = extractOJAndProblem(button);
+      if(!result)
+          return;
+      const lower=result.problemNumber.toLowerCase()
+      let vjUrl = '';
+      for (const k of Object.keys(parser)) {
+        if (result.oj.includes(k)) { try { vjUrl = parser[k](lower); } catch { } break; }
+      }
+      if (!vjUrl) return;
+  
+      let firstBtn = document.querySelector('div.ui.buttons.right.floated > a');
+      if (!firstBtn) {
+        for (const g of document.querySelectorAll('div.ui.center.aligned.grid')) {
+          const candBox = g.querySelector('div.ui.buttons.right.floated');
+          if (candBox?.firstElementChild?.tagName === 'A') { firstBtn = candBox.firstElementChild; break; }
+        }
+      }
+      if (!firstBtn) return;
+  
+      const vj = document.createElement('a');
+      vj.id = 'bn-vjudge-btn';
+      vj.className = 'small ui button';
+      vj.href = vjUrl;
+      vj.target = '_blank';
+      vj.rel = 'noopener';
+      if(result.oj!='vj')
+        vj.setAttribute('data-tooltip', `vj-${result.oj}-${lower}`);
+      else
+        vj.setAttribute('data-tooltip', `${result.oj}-${lower}`);
+      vj.textContent = 'Vjudge';
+      vj.style.backgroundColor = '#f2711c';
+      vj.style.color = '#ffffff';
+      const leftGroup = document.querySelector('div.ui.buttons:not(.right.floated)');
+      if (leftGroup) {
+        leftGroup.appendChild(vj);
+      } else if (firstBtn && firstBtn.parentNode) {
+        firstBtn.parentNode.insertBefore(vj, firstBtn);
+      } else {
+        const container = document.querySelector('div.ui.buttons.right.floated') || document.querySelector('div.ui.buttons');
+        if (container) container.appendChild(vj);
+      }
   }
 
   function initUserMenu() {
