@@ -1,4 +1,3 @@
-
 // Lightweight GM_* shim for MV3 content scripts.
 // Storage: use localStorage (sync) for immediate availability; mirror to chrome.storage asynchronously.
 (function() {
