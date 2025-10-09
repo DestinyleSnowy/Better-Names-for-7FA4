@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Better Names for 7FA4",
+  "version": "6.0.0 Developer",
+  "description": "强大的 7FA4 用户名与颜色映射插件",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": ["storage", "notifications", "clipboardWrite"],
+  "host_permissions": ["http://*.7fa4.cn:8888/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "Better Names for 7FA4" },
+  "content_scripts": [
+    {
+      "matches": ["http://*.7fa4.cn:8888/*"],
+      "exclude_matches": ["http://*.7fa4.cn:9080/*"],
+      "js": ["content/gm-shim.js", "content/main.js"],
+      "run_at": "document_end"
+    }
+  ]
+}
