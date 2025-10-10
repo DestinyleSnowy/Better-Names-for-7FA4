@@ -25,6 +25,10 @@
       ],
       "js": [
         "content/gm-shim.js",
+        "content/utils.js",
+        "content/auto-renew.js",
+        "content/panel.js",
+        "content/patches.js",
         "content/main.js"
       ],
       "run_at": "document_end"
