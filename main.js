@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Better Names for 7FA4
 // @namespace    http://tampermonkey.net/
-// @version      v5.4.1
-// @description  Better Names for 7FA4 v5.4.1.
+// @version      v5.4.2
+// @description  Better Names for 7FA4 v5.4.2.
 // @author       wwxz
 // @match        http://*.7fa4.cn:8888/*
 // @exclude      http://*.7fa4.cn:9080/*
@@ -814,7 +814,7 @@ window.getCurrentUserId = getCurrentUserId;
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
       <div class="bn-version">
-        <div class="bn-version-text">v5.4.1</div>
+        <div class="bn-version-text">v5.4.2</div>
       </div>
     </div>`;
   document.body.appendChild(container);
@@ -4841,7 +4841,7 @@ window.getCurrentUserId = getCurrentUserId;
       .filter(o => o.code && !/^L/i.test(o.code))
       .map(o => [o.pid, o.code])
   );
-  let autoExit = GM_getValue(KEY.autoExit, false);
+  let autoExit = GM_getValue(KEY.autoExit, true);
   let observer = null;
 
   const $ = (s, r = document) => r.querySelector(s);
