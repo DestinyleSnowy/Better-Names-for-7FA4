@@ -802,7 +802,7 @@ window.getCurrentUserId = getCurrentUserId;
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
       <div class="bn-version">
-        <div class="bn-version-text">6.0.0 SP5 Developer</div>
+        <div class="bn-version-text">6.0.0 SP6 Developer</div>
       </div>
     </div>`;
   document.body.appendChild(container);
