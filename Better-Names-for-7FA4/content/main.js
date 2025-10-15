@@ -3111,17 +3111,13 @@ window.getCurrentUserId = getCurrentUserId;
 })();
 
 /* =================================================================
- *  榜单页：自动加载分页 + 学校筛选
+ *  榜单页：学校筛选
  * ================================================================= */
 (function () {
   'use strict';
 
   const PATH_RE = /^\/progress\/quiz/;
   if (!PATH_RE.test(location.pathname)) return;
-
-  let pageParam = null;
-  try { pageParam = new URL(location.href).searchParams.get('page'); } catch (_) { /* ignore */ }
-  if (pageParam && Number(pageParam) !== 1) return;
 
   const TABLE_SELECTORS = [
     '.progress-table table',
@@ -3155,10 +3151,6 @@ window.getCurrentUserId = getCurrentUserId;
     .bn-filter-actions { margin-top: .75em; display: flex; gap: .5em; flex-wrap: wrap; }
     .bn-filter-actions .ui.button { flex-shrink: 0; }
     .bn-filter-hide { display: none !important; }
-    .bn-pagination-hidden { display: none !important; }
-    .bn-ranking-loader { display: flex; align-items: center; gap: .75em; margin-bottom: 1em; }
-    .bn-ranking-loader .bn-ranking-loader-text { font-size: .95em; }
-    .bn-ranking-loader.error { background: #fff6f6 !important; color: #9f3a38 !important; }
     @media (max-width: 640px) {
       .bn-school-select { flex-direction: column; align-items: flex-start; }
       .bn-filter-actions { flex-direction: column; align-items: stretch; }
@@ -3207,149 +3199,6 @@ window.getCurrentUserId = getCurrentUserId;
     });
   }
 
-  function parsePageNumber(element) {
-    if (!element) return NaN;
-    const data = element.dataset || {};
-    const candidates = [data.page, data.value, data.pageNumber, getText(element), element.getAttribute('data-page'), element.getAttribute('data-value')];
-    for (const raw of candidates) {
-      const num = Number(raw);
-      if (Number.isInteger(num) && num > 0) return num;
-    }
-    const href = element.getAttribute && element.getAttribute('href');
-    if (href) {
-      const match = href.match(/[?&]page=(\d+)/i);
-      if (match) {
-        const num = Number(match[1]);
-        if (Number.isInteger(num) && num > 0) return num;
-      }
-    }
-    return NaN;
-  }
-
-  function extractTotalPages(root) {
-    let max = 1;
-    const containers = root.querySelectorAll('.pagination, .ui.pagination.menu, .pager, [data-pagination]');
-    containers.forEach(container => {
-      container.querySelectorAll('a, button, .item').forEach(el => {
-        const num = parsePageNumber(el);
-        if (Number.isInteger(num) && num > max) max = num;
-      });
-    });
-    if (max === 1) {
-      root.querySelectorAll('a[href*="page="]').forEach(el => {
-        const num = parsePageNumber(el);
-        if (Number.isInteger(num) && num > max) max = num;
-      });
-    }
-    const meta = root.querySelector('[data-total-pages]');
-    if (meta) {
-      const val = Number(meta.dataset?.totalPages || meta.getAttribute('data-total-pages'));
-      if (Number.isInteger(val) && val > max) max = val;
-    }
-    return max;
-  }
-
-  function hidePagination(table) {
-    injectCSS();
-    const candidates = new Set();
-    const scopes = [table.parentElement, table.parentElement?.parentElement, document.body];
-    scopes.forEach(scope => {
-      if (!scope) return;
-      scope.querySelectorAll('.pagination, .ui.pagination.menu, .pager, [data-pagination]').forEach(el => {
-        if (el.querySelector('a[href*="page="]')) candidates.add(el);
-      });
-    });
-    candidates.forEach(el => {
-      if (el && typeof el.classList !== 'undefined') el.classList.add('bn-pagination-hidden');
-    });
-  }
-
-  function createLoader(table, totalPages) {
-    if (!table || totalPages <= 1) return null;
-    injectCSS();
-    const parent = table.parentElement;
-    if (!parent) return null;
-    const holder = document.createElement('div');
-    holder.className = 'ui segment bn-ranking-loader';
-    const spinner = document.createElement('div');
-    spinner.className = 'ui active inline loader';
-    const text = document.createElement('span');
-    text.className = 'bn-ranking-loader-text';
-    text.textContent = '正在加载全部榜单...';
-    holder.append(spinner, text);
-    parent.insertBefore(holder, table);
-    return {
-      setProgress(page, total) {
-        text.textContent = `正在加载全部榜单... (${page}/${total})`;
-      },
-      finish() {
-        holder.remove();
-      },
-      error(message) {
-        holder.classList.add('error');
-        spinner.classList.remove('active');
-        spinner.classList.add('disabled');
-        text.textContent = message;
-      }
-    };
-  }
-
-  function fetchPage(url) {
-    return new Promise((resolve, reject) => {
-      try {
-        if (typeof GM_xmlhttpRequest === 'function') {
-          GM_xmlhttpRequest({
-            method: 'GET',
-            url,
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            withCredentials: true,
-            onload: res => {
-              if (res.status >= 200 && res.status < 300) resolve(res.responseText || '');
-              else reject(new Error(`HTTP ${res.status}`));
-            },
-            onerror: err => reject(new Error(err?.error || '网络错误'))
-          });
-        } else {
-          fetch(url, { credentials: 'include' })
-            .then(resp => {
-              if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-              return resp.text();
-            })
-            .then(text => resolve(text || ''))
-            .catch(error => reject(error));
-        }
-      } catch (err) {
-        reject(err);
-      }
-    });
-  }
-
-  function getHeaderSignature(table) {
-    if (!table || !table.tHead || !table.tHead.rows.length) return null;
-    const row = table.tHead.rows[0];
-    return Array.from(row.cells || []).map(cell => getText(cell));
-  }
-
-  function findMatchingTable(doc, signature) {
-    const tables = Array.from(doc.querySelectorAll('table'));
-    if (!tables.length) return null;
-    if (signature && signature.length) {
-      const exact = tables.find(tbl => {
-        if (!tbl.tHead || !tbl.tHead.rows.length) return false;
-        const head = Array.from(tbl.tHead.rows[0].cells || []).map(cell => getText(cell));
-        if (head.length !== signature.length) return false;
-        return head.every((text, idx) => text === signature[idx]);
-      });
-      if (exact) return exact;
-      const sameWidth = tables.find(tbl => {
-        const bodyRow = tbl.tBodies && tbl.tBodies[0] && tbl.tBodies[0].rows[0];
-        return bodyRow && bodyRow.cells.length === signature.length;
-      });
-      if (sameWidth) return sameWidth;
-    }
-    return tables[0];
-  }
-
   function annotateRow(row, index) {
     if (!row || typeof index !== 'number' || index < 0) return '';
     const cell = row.cells && row.cells[index];
@@ -3358,11 +3207,16 @@ window.getCurrentUserId = getCurrentUserId;
     return value;
   }
 
+  function isHeaderRow(row) {
+    if (!row || !row.cells || !row.cells.length) return false;
+    return Array.from(row.cells).every(cell => (cell.tagName || '').toUpperCase() === 'TH');
+  }
+
   function collectRows(table) {
     const rows = [];
     if (!table || !table.tBodies) return rows;
     Array.from(table.tBodies).forEach(tbody => {
-      rows.push(...Array.from(tbody.rows || []));
+      rows.push(...Array.from(tbody.rows || []).filter(row => !isHeaderRow(row)));
     });
     return rows;
   }
@@ -3390,31 +3244,6 @@ window.getCurrentUserId = getCurrentUserId;
     if (!arr.length) return arr;
     if (collator) return arr.sort((a, b) => collator.compare(a, b));
     return arr.sort((a, b) => a.localeCompare(b));
-  }
-
-  async function loadAdditionalPages({ table, totalPages, loader, signature, schoolIndex }) {
-    if (!table || totalPages <= 1) return;
-    const tbody = table.tBodies[0] || table.createTBody();
-    const base = new URL(location.href);
-    base.searchParams.set('page', '1');
-    const parser = new DOMParser();
-    for (let page = 2; page <= totalPages; page += 1) {
-      const pageUrl = new URL(base.toString());
-      pageUrl.searchParams.set('page', String(page));
-      const html = await fetchPage(pageUrl.toString());
-      const doc = parser.parseFromString(html, 'text/html');
-      const remoteTable = findMatchingTable(doc, signature);
-      if (!remoteTable) continue;
-      const remoteBody = remoteTable.tBodies && remoteTable.tBodies[0] ? remoteTable.tBodies[0] : remoteTable;
-      const newRows = Array.from(remoteBody.rows || []);
-      newRows.forEach(row => {
-        row.classList.remove('bn-filter-hide');
-        row.classList.remove('bn-pagination-hidden');
-        annotateRow(row, schoolIndex);
-        tbody.appendChild(row);
-      });
-      if (loader) loader.setProgress(page, totalPages);
-    }
   }
 
   function applyFilter(table, state) {
@@ -3613,27 +3442,10 @@ window.getCurrentUserId = getCurrentUserId;
     injectCSS();
     const table = await waitForTable();
     if (!table) return;
-    const signature = getHeaderSignature(table);
     const schoolIndex = detectSchoolColumn(table);
     const rows = collectRows(table);
     rows.forEach(row => annotateRow(row, schoolIndex));
-
-    const totalPages = extractTotalPages(document);
-    const loader = createLoader(table, totalPages);
-    if (loader && totalPages > 1) loader.setProgress(1, totalPages);
-    try {
-      await loadAdditionalPages({ table, totalPages, loader, signature, schoolIndex });
-      if (loader) loader.finish();
-    } catch (err) {
-      console.error('[BN] Failed to load all ranking pages', err);
-      if (loader) loader.error(`加载失败：${err?.message || err}`);
-    }
-
-    hidePagination(table);
-
-    const finalRows = collectRows(table);
-    finalRows.forEach(row => annotateRow(row, schoolIndex));
-    const schools = schoolIndex >= 0 ? uniqueSorted(finalRows.map(row => row.dataset?.bnSchool || '')) : [];
+    const schools = schoolIndex >= 0 ? uniqueSorted(rows.map(row => row.dataset?.bnSchool || '')) : [];
 
     const savedSelectionRaw = GM_getValue(RANKING_FILTER_SELECTED_KEY, []);
     const savedSelection = Array.isArray(savedSelectionRaw)
