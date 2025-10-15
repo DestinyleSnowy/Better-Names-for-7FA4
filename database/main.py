@@ -5,6 +5,7 @@ import json
 import os
 import re
 import time
+from pathlib import Path
 from typing import Dict, Optional
 from bs4 import BeautifulSoup
 
@@ -12,6 +13,7 @@ BASE = "http://jx.7fa4.cn:8888"
 
 UID_START, UID_END = 1, 3088
 RANKLIST_PAGES = range(1, 61)  # 1..60
+DATA_DIR = Path(__file__).resolve().parents[1] / 'Better-Names-for-7FA4' / 'data'
 
 # 并发、超时、重试
 CONCURRENCY = 20
@@ -41,6 +43,7 @@ GRADE_TO_COLORKEY = {
     "毕业": "by", "教练": "jl", "教师": "jl", "其他": "uk",
 }
 ALT_TEXT = {"大  一": "大一", "大  二": "大二", "大  三": "大三", "大  四": "大四", "教  练": "教练", "其  他": "其他"}
+SPECIAL_JL_NAMES = {"陈许旻", "程宇轩", "钟胡天翔", "陈恒宇", "徐淑君", "徐苒茨", "王多灵", "李雪梅"}
 
 def build_user_plan_url(uid: int) -> str:
     # 这个接口示例：/user_plan?user_id=650&date=1757928000&type=day&format=td
@@ -181,16 +184,21 @@ def to_users_object(names: Dict[int, str], cols: Dict[int, str]) -> Dict[int, Di
         users[uid] = {"name": names.get(uid, ""), "colorKey": cols.get(uid, "uk")}
     return users
 
+def apply_special_colorkeys(users: Dict[int, Dict[str, str]]) -> None:
+    for info in users.values():
+        if info.get("name") in SPECIAL_JL_NAMES and info.get("name"):
+            info["colorKey"] = "jl"
+
 def write_outputs(users: Dict[int, Dict[str, str]]) -> None:
-    with open("users.json", "w", encoding="utf-8") as f:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = DATA_DIR / "users.json"
+    with out_path.open("w", encoding="utf-8") as f:
         json.dump(users, f, ensure_ascii=False, indent=2)
-    with open("users.js", "w", encoding="utf-8") as f:
-        f.write("const users = {\n")
-        for uid in range(UID_START, UID_END + 1):
-            name = users[uid]["name"].replace("\\", "\\\\").replace('"', '\\"')
-            f.write(f'  {uid}: {{ name: "{name}", colorKey: "{users[uid]["colorKey"]}" }},\n')
-        f.write("};\nexport default users;\n")
-    print("✅ 已生成 users.json 与 users.js")
+    try:
+        rel = out_path.relative_to(Path.cwd())
+    except ValueError:
+        rel = out_path
+    print(f"✅ 已生成 {rel}")
 
 async def main():
     print("开始抓取姓名（XHR：/user_plan）...")
@@ -202,6 +210,7 @@ async def main():
     print(f"年级抓取完成：{len(colorkeys)} 条。")
 
     users = to_users_object(names, colorkeys)
+    apply_special_colorkeys(users)
     write_outputs(users)
 
 if __name__ == "__main__":
