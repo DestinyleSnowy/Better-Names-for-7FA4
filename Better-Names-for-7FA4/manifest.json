@@ -9,8 +9,7 @@
     "clipboardWrite"
   ],
   "host_permissions": [
-    "http://*.7fa4.cn:8888/*",
-    "<all_urls>"
+    "http://*.7fa4.cn:8888/*"
   ],
   "background": {
     "service_worker": "background.js"

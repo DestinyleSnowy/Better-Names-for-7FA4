@@ -1,18 +1,5 @@
-// ==UserScript==
-// @name         Better Names for 7FA4
-// @namespace    http://tampermonkey.net/
-// @version      v5.4.2
-// @description  Better Names for 7FA4 v5.4.2.
-// @author       wwxz
-// @match        http://*.7fa4.cn:8888/*
-// @exclude      http://*.7fa4.cn:9080/*
-// @grant        GM_getValue
-// @grant        GM_setValue
-// @grant        GM_notification
-// @grant        GM_addStyle
-// @grant        GM_setClipboard
-// @grant        GM_xmlhttpRequest
-// ==/UserScript==
+// Better Names for 7FA4
+// 6.0.0 SP4 Developer
 
 function getCurrentUserId() {
   const ud = document.querySelector('#user-dropdown');
@@ -29,8 +16,9 @@ function getCurrentUserId() {
 }
 window.getCurrentUserId = getCurrentUserId;
 
-(function () {
+(async function () {
   'use strict';
+  if (typeof window.__GM_ready === 'function') await window.__GM_ready();
 
   const DEFAULT_MAX_UNITS = 10;
   const storedTitleUnits = GM_getValue('maxTitleUnits', DEFAULT_MAX_UNITS);
@@ -814,7 +802,7 @@ window.getCurrentUserId = getCurrentUserId;
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
       <div class="bn-version">
-        <div class="bn-version-text">v5.4.2</div>
+        <div class="bn-version-text">6.0.0 SP5 Developer</div>
       </div>
     </div>`;
   document.body.appendChild(container);
@@ -4499,7 +4487,7 @@ window.getCurrentUserId = getCurrentUserId;
       if (!enableVjLink) return;
       if (!/^\/problem\/\d+\/?$/.test(location.pathname)) return;
       if (document.getElementById('bn-vjudge-btn')) return;
-  
+
       let raw = '';
       for (const s of document.querySelectorAll('div.ui.center.aligned.grid span')) {
         const t = (s.textContent || '').trim();
@@ -4543,7 +4531,7 @@ window.getCurrentUserId = getCurrentUserId;
 
         return { oj, problemNumber };
       }
-      
+
       const button = document.querySelector('a.small.ui.green.button[data-tooltip]');
       if(!button)
           return;
@@ -4556,7 +4544,7 @@ window.getCurrentUserId = getCurrentUserId;
         if (result.oj.includes(k)) { try { vjUrl = parser[k](lower); } catch { } break; }
       }
       if (!vjUrl) return;
-  
+
       let firstBtn = document.querySelector('div.ui.buttons.right.floated > a');
       if (!firstBtn) {
         for (const g of document.querySelectorAll('div.ui.center.aligned.grid')) {
@@ -4565,7 +4553,7 @@ window.getCurrentUserId = getCurrentUserId;
         }
       }
       if (!firstBtn) return;
-  
+
       const vj = document.createElement('a');
       vj.id = 'bn-vjudge-btn';
       vj.className = 'small ui button';
@@ -4704,7 +4692,7 @@ window.getCurrentUserId = getCurrentUserId;
     const truncated = truncateByUnits(text, maxTitleUnits);
     Array.from(span.childNodes).forEach(n => { if (n.nodeType === Node.TEXT_NODE) n.remove(); });
     span.innerHTML = prefix + truncated;
- 
+
     // BN PATCH: force uniform font size on submissions page when title truncation is enabled
     try {
       if (Number.isFinite(maxTitleUnits)) {

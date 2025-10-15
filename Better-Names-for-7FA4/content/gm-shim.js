@@ -1,10 +1,7 @@
-// Lightweight GM_* shim for MV3 content scripts.
-// Storage: use localStorage (sync) for immediate availability; mirror to chrome.storage asynchronously.
 (function() {
   'use strict';
 
   const hasChromeStorage = !!(typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local);
-  // Best-effort mirror
   function mirrorToChromeStorage(key, value) {
     try {
       if (!hasChromeStorage) return;
@@ -39,7 +36,6 @@
     } catch (e) {}
   }
 
-  // Initial backfill from chrome.storage -> localStorage (non-blocking)
   readFromChromeStorage(null, (all) => {
     if (!all) return;
     try {
@@ -53,7 +49,6 @@
     } catch (e) {}
   });
 
-  // GM_addStyle
   function GM_addStyle(css) {
     try {
       const s = document.createElement('style');
@@ -63,7 +58,6 @@
     } catch (e) { return null; }
   }
 
-  // GM_setClipboard
   async function GM_setClipboard(text) {
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -71,7 +65,6 @@
         return;
       }
     } catch (e) {}
-    // fallback
     try {
       const ta = document.createElement('textarea');
       ta.value = String(text);
@@ -82,10 +75,8 @@
     } catch (e) {}
   }
 
-  // GM_notification
   function GM_notification(details) {
     try {
-      // Accept both string and object
       if (typeof details === 'string') details = { text: details };
       const payload = {
         title: details.title || 'Notification',
@@ -108,11 +99,9 @@
     } catch (e) {}
   }
 
-  // GM_xmlhttpRequest via background service worker for cross-origin
   function GM_xmlhttpRequest(details) {
     const requestId = Math.random().toString(36).slice(2);
     if (!(chrome && chrome.runtime && chrome.runtime.sendMessage)) {
-      // Fallback to fetch in-page (CORS-bound)
       const url = details.url;
       const method = (details.method || 'GET').toUpperCase();
       const headers = details.headers || {};
@@ -142,7 +131,6 @@
     });
   }
 
-  // Expose legacy API names
   window.GM_addStyle = GM_addStyle;
   window.GM_setClipboard = GM_setClipboard;
   window.GM_notification = GM_notification;
@@ -150,7 +138,6 @@
   window.GM_getValue = function(key, defVal) { return gmLocalGet(key, defVal); };
   window.GM_setValue = function(key, val) { return gmLocalSet(key, val); };
 
-  // Also expose GM namespace style (subset)
   window.GM = window.GM || {};
   window.GM.addStyle = GM_addStyle;
   window.GM.setClipboard = GM_setClipboard;
