@@ -1,5 +1,5 @@
 // Better Names for 7FA4
-// 6.0.0 SP7 Developer
+// 6.0.0 SP8 Developer
 
 function getCurrentUserId() {
   const ud = document.querySelector('#user-dropdown');
@@ -810,7 +810,7 @@ window.getCurrentUserId = getCurrentUserId;
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
       <div class="bn-version">
-        <div class="bn-version-text">6.0.0 SP7 Developer</div>
+        <div class="bn-version-text">6.0.0 SP8 Developer</div>
       </div>
     </div>`;
   document.body.appendChild(container);
@@ -3088,6 +3088,528 @@ window.getCurrentUserId = getCurrentUserId;
   }`;
   if (typeof GM_addStyle === 'function') GM_addStyle(css);
   else { const s = document.createElement('style'); s.textContent = css; document.head.appendChild(s); }
+})();
+
+/* =================================================================
+ *  榜单页：自动加载分页 + 学校筛选
+ * ================================================================= */
+(function () {
+  'use strict';
+
+  const PATH_RE = /^\/progress\/quiz/;
+  if (!PATH_RE.test(location.pathname)) return;
+
+  let pageParam = null;
+  try { pageParam = new URL(location.href).searchParams.get('page'); } catch (_) { /* ignore */ }
+  if (pageParam && Number(pageParam) !== 1) return;
+
+  const TABLE_SELECTORS = [
+    '.progress-table table',
+    '.progress-container table',
+    '.contest-table table',
+    'table.ui.table',
+    'table.table'
+  ];
+
+  const collator = (typeof Intl !== 'undefined' && typeof Intl.Collator === 'function')
+    ? new Intl.Collator(['zh-Hans-CN', 'zh-CN', 'zh', 'zh-Hans'], { sensitivity: 'base', usage: 'sort' })
+    : null;
+
+  let cssInjected = false;
+
+  function injectCSS() {
+    if (cssInjected) return;
+    const css = `
+    .bn-ranking-filter.ui.segment { margin-bottom: 1.5em; }
+    .bn-ranking-filter .bn-filter-header { display: flex; align-items: center; justify-content: space-between; gap: .75em; flex-wrap: wrap; }
+    .bn-ranking-filter .bn-filter-toggle { display: inline-flex; align-items: center; gap: .5em; font-weight: 600; cursor: pointer; user-select: none; }
+    .bn-ranking-filter .bn-filter-toggle input { width: 16px; height: 16px; margin: 0; }
+    .bn-ranking-filter .bn-filter-summary { margin-top: .5em; font-size: .9em; color: rgba(0,0,0,.6); }
+    .bn-ranking-filter .bn-filter-summary.bn-active { color: #2185d0; font-weight: 600; }
+    .bn-ranking-filter .bn-filter-count { margin-top: .25em; font-size: .85em; color: rgba(0,0,0,.5); }
+    .bn-school-select { display: none; margin-top: .75em; gap: .35em 1.25em; flex-wrap: wrap; }
+    .bn-school-select.bn-open { display: flex; }
+    .bn-school-select label { display: inline-flex; align-items: center; gap: .4em; padding: .2em .4em; border-radius: .3em; cursor: pointer; }
+    .bn-school-select label:hover { background: rgba(33,133,208,.08); }
+    .bn-school-select input[type="checkbox"] { width: 16px; height: 16px; margin: 0; }
+    .bn-filter-actions { margin-top: .75em; display: flex; gap: .5em; flex-wrap: wrap; }
+    .bn-filter-actions .ui.button { flex-shrink: 0; }
+    .bn-filter-hide { display: none !important; }
+    .bn-pagination-hidden { display: none !important; }
+    .bn-ranking-loader { display: flex; align-items: center; gap: .75em; margin-bottom: 1em; }
+    .bn-ranking-loader .bn-ranking-loader-text { font-size: .95em; }
+    .bn-ranking-loader.error { background: #fff6f6 !important; color: #9f3a38 !important; }
+    @media (max-width: 640px) {
+      .bn-school-select { flex-direction: column; align-items: flex-start; }
+      .bn-filter-actions { flex-direction: column; align-items: stretch; }
+    }`;
+    if (typeof GM_addStyle === 'function') GM_addStyle(css);
+    else {
+      const style = document.createElement('style');
+      style.textContent = css;
+      document.head.appendChild(style);
+    }
+    cssInjected = true;
+  }
+
+  function getText(node) {
+    return (node && node.textContent ? node.textContent : '').replace(/\s+/g, ' ').trim();
+  }
+
+  function findTable(root = document) {
+    for (const selector of TABLE_SELECTORS) {
+      const table = root.querySelector(selector);
+      if (table && table.tBodies && table.tBodies.length) return table;
+    }
+    const tables = root.querySelectorAll('table');
+    for (const table of tables) {
+      if (table && table.tBodies && table.tBodies.length) return table;
+    }
+    return null;
+  }
+
+  function waitForTable(timeout = 12000) {
+    const existing = findTable();
+    if (existing) return Promise.resolve(existing);
+    return new Promise(resolve => {
+      const observer = new MutationObserver(() => {
+        const table = findTable();
+        if (table) {
+          observer.disconnect();
+          resolve(table);
+        }
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      setTimeout(() => {
+        observer.disconnect();
+        resolve(findTable());
+      }, timeout);
+    });
+  }
+
+  function parsePageNumber(element) {
+    if (!element) return NaN;
+    const data = element.dataset || {};
+    const candidates = [data.page, data.value, data.pageNumber, getText(element), element.getAttribute('data-page'), element.getAttribute('data-value')];
+    for (const raw of candidates) {
+      const num = Number(raw);
+      if (Number.isInteger(num) && num > 0) return num;
+    }
+    const href = element.getAttribute && element.getAttribute('href');
+    if (href) {
+      const match = href.match(/[?&]page=(\d+)/i);
+      if (match) {
+        const num = Number(match[1]);
+        if (Number.isInteger(num) && num > 0) return num;
+      }
+    }
+    return NaN;
+  }
+
+  function extractTotalPages(root) {
+    let max = 1;
+    const containers = root.querySelectorAll('.pagination, .ui.pagination.menu, .pager, [data-pagination]');
+    containers.forEach(container => {
+      container.querySelectorAll('a, button, .item').forEach(el => {
+        const num = parsePageNumber(el);
+        if (Number.isInteger(num) && num > max) max = num;
+      });
+    });
+    if (max === 1) {
+      root.querySelectorAll('a[href*="page="]').forEach(el => {
+        const num = parsePageNumber(el);
+        if (Number.isInteger(num) && num > max) max = num;
+      });
+    }
+    const meta = root.querySelector('[data-total-pages]');
+    if (meta) {
+      const val = Number(meta.dataset?.totalPages || meta.getAttribute('data-total-pages'));
+      if (Number.isInteger(val) && val > max) max = val;
+    }
+    return max;
+  }
+
+  function hidePagination(table) {
+    injectCSS();
+    const candidates = new Set();
+    const scopes = [table.parentElement, table.parentElement?.parentElement, document.body];
+    scopes.forEach(scope => {
+      if (!scope) return;
+      scope.querySelectorAll('.pagination, .ui.pagination.menu, .pager, [data-pagination]').forEach(el => {
+        if (el.querySelector('a[href*="page="]')) candidates.add(el);
+      });
+    });
+    candidates.forEach(el => {
+      if (el && typeof el.classList !== 'undefined') el.classList.add('bn-pagination-hidden');
+    });
+  }
+
+  function createLoader(table, totalPages) {
+    if (!table || totalPages <= 1) return null;
+    injectCSS();
+    const parent = table.parentElement;
+    if (!parent) return null;
+    const holder = document.createElement('div');
+    holder.className = 'ui segment bn-ranking-loader';
+    const spinner = document.createElement('div');
+    spinner.className = 'ui active inline loader';
+    const text = document.createElement('span');
+    text.className = 'bn-ranking-loader-text';
+    text.textContent = '正在加载全部榜单...';
+    holder.append(spinner, text);
+    parent.insertBefore(holder, table);
+    return {
+      setProgress(page, total) {
+        text.textContent = `正在加载全部榜单... (${page}/${total})`;
+      },
+      finish() {
+        holder.remove();
+      },
+      error(message) {
+        holder.classList.add('error');
+        spinner.classList.remove('active');
+        spinner.classList.add('disabled');
+        text.textContent = message;
+      }
+    };
+  }
+
+  function fetchPage(url) {
+    return new Promise((resolve, reject) => {
+      try {
+        if (typeof GM_xmlhttpRequest === 'function') {
+          GM_xmlhttpRequest({
+            method: 'GET',
+            url,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            withCredentials: true,
+            onload: res => {
+              if (res.status >= 200 && res.status < 300) resolve(res.responseText || '');
+              else reject(new Error(`HTTP ${res.status}`));
+            },
+            onerror: err => reject(new Error(err?.error || '网络错误'))
+          });
+        } else {
+          fetch(url, { credentials: 'include' })
+            .then(resp => {
+              if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+              return resp.text();
+            })
+            .then(text => resolve(text || ''))
+            .catch(error => reject(error));
+        }
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  function getHeaderSignature(table) {
+    if (!table || !table.tHead || !table.tHead.rows.length) return null;
+    const row = table.tHead.rows[0];
+    return Array.from(row.cells || []).map(cell => getText(cell));
+  }
+
+  function findMatchingTable(doc, signature) {
+    const tables = Array.from(doc.querySelectorAll('table'));
+    if (!tables.length) return null;
+    if (signature && signature.length) {
+      const exact = tables.find(tbl => {
+        if (!tbl.tHead || !tbl.tHead.rows.length) return false;
+        const head = Array.from(tbl.tHead.rows[0].cells || []).map(cell => getText(cell));
+        if (head.length !== signature.length) return false;
+        return head.every((text, idx) => text === signature[idx]);
+      });
+      if (exact) return exact;
+      const sameWidth = tables.find(tbl => {
+        const bodyRow = tbl.tBodies && tbl.tBodies[0] && tbl.tBodies[0].rows[0];
+        return bodyRow && bodyRow.cells.length === signature.length;
+      });
+      if (sameWidth) return sameWidth;
+    }
+    return tables[0];
+  }
+
+  function annotateRow(row, index) {
+    if (!row || typeof index !== 'number' || index < 0) return '';
+    const cell = row.cells && row.cells[index];
+    const value = cell ? getText(cell) : '';
+    if (value !== undefined) row.dataset.bnSchool = value;
+    return value;
+  }
+
+  function collectRows(table) {
+    const rows = [];
+    if (!table || !table.tBodies) return rows;
+    Array.from(table.tBodies).forEach(tbody => {
+      rows.push(...Array.from(tbody.rows || []));
+    });
+    return rows;
+  }
+
+  function detectSchoolColumn(table) {
+    if (!table) return -1;
+    const headers = table.querySelectorAll('thead th, th');
+    for (let i = 0; i < headers.length; i += 1) {
+      const text = getText(headers[i]);
+      if (/学校|院校|单位|School/i.test(text)) return i;
+    }
+    const firstRow = table.tBodies && table.tBodies[0] && table.tBodies[0].rows[0];
+    if (firstRow) {
+      const cells = Array.from(firstRow.cells || []);
+      for (let i = 0; i < cells.length; i += 1) {
+        const text = getText(cells[i]);
+        if (/大学|学院|学校|中学/.test(text)) return i;
+      }
+    }
+    return -1;
+  }
+
+  function uniqueSorted(values) {
+    const arr = Array.from(new Set(values.filter(Boolean)));
+    if (!arr.length) return arr;
+    if (collator) return arr.sort((a, b) => collator.compare(a, b));
+    return arr.sort((a, b) => a.localeCompare(b));
+  }
+
+  async function loadAdditionalPages({ table, totalPages, loader, signature, schoolIndex }) {
+    if (!table || totalPages <= 1) return;
+    const tbody = table.tBodies[0] || table.createTBody();
+    const base = new URL(location.href);
+    base.searchParams.set('page', '1');
+    const parser = new DOMParser();
+    for (let page = 2; page <= totalPages; page += 1) {
+      const pageUrl = new URL(base.toString());
+      pageUrl.searchParams.set('page', String(page));
+      const html = await fetchPage(pageUrl.toString());
+      const doc = parser.parseFromString(html, 'text/html');
+      const remoteTable = findMatchingTable(doc, signature);
+      if (!remoteTable) continue;
+      const remoteBody = remoteTable.tBodies && remoteTable.tBodies[0] ? remoteTable.tBodies[0] : remoteTable;
+      const newRows = Array.from(remoteBody.rows || []);
+      newRows.forEach(row => {
+        row.classList.remove('bn-filter-hide');
+        row.classList.remove('bn-pagination-hidden');
+        annotateRow(row, schoolIndex);
+        tbody.appendChild(row);
+      });
+      if (loader) loader.setProgress(page, totalPages);
+    }
+  }
+
+  function applyFilter(table, state) {
+    const rows = collectRows(table);
+    const total = rows.length;
+    if (!total) return { visible: 0, total: 0, summary: '暂无数据', active: false };
+    if (!state.enabled) {
+      rows.forEach(row => row.classList.remove('bn-filter-hide'));
+      return { visible: total, total, summary: '未启用筛选', active: false };
+    }
+    if (!state.selected.size) {
+      rows.forEach(row => row.classList.remove('bn-filter-hide'));
+      return { visible: total, total, summary: '未选择学校，显示全部', active: false };
+    }
+    const selected = state.selected;
+    let visible = 0;
+    rows.forEach(row => {
+      const key = row.dataset?.bnSchool || '';
+      if (selected.has(key)) {
+        row.classList.remove('bn-filter-hide');
+        visible += 1;
+      } else {
+        row.classList.add('bn-filter-hide');
+      }
+    });
+    return {
+      visible,
+      total,
+      summary: `已选学校：${Array.from(selected).join('、')}`,
+      active: true
+    };
+  }
+
+  function csvEscape(value) {
+    const text = (value || '').replace(/\r?\n|\r/g, ' ').trim();
+    if (/[",\n]/.test(text)) return '"' + text.replace(/"/g, '""') + '"';
+    return text;
+  }
+
+  function buildCsvFileName() {
+    const now = new Date();
+    const iso = now.toISOString().slice(0, 10).replace(/-/g, '');
+    return `ranking-${iso}.csv`;
+  }
+
+  function exportVisibleRows(table) {
+    const rows = collectRows(table);
+    if (!rows.length) return false;
+    const headerRows = [];
+    if (table.tHead && table.tHead.rows.length) {
+      const head = table.tHead.rows[0];
+      headerRows.push(Array.from(head.cells || []).map(cell => csvEscape(getText(cell))));
+    }
+    const bodyRows = rows
+      .filter(row => !row.classList.contains('bn-filter-hide'))
+      .map(row => Array.from(row.cells || []).map(cell => csvEscape(getText(cell))));
+    if (!bodyRows.length) return false;
+    const lines = [...headerRows, ...bodyRows].map(cols => cols.join(','));
+    const content = '\ufeff' + lines.join('\r\n');
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = buildCsvFileName();
+    document.body.appendChild(anchor);
+    anchor.click();
+    setTimeout(() => {
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(url);
+    }, 0);
+    return true;
+  }
+
+  function attachDownloadButton(container, table) {
+    let button = document.querySelector('#bn-ranking-download');
+    if (!button) {
+      button = document.createElement('button');
+      button.type = 'button';
+      button.id = 'bn-ranking-download';
+      button.className = 'ui button primary';
+      button.textContent = '下载表格';
+      container.appendChild(button);
+    } else if (!container.contains(button)) {
+      container.appendChild(button);
+    }
+    if (!button.dataset.bnDownloadBound) {
+      button.addEventListener('click', event => {
+        event.preventDefault();
+        exportVisibleRows(table);
+      });
+      button.dataset.bnDownloadBound = '1';
+    }
+    return button;
+  }
+
+  function setupFilterUI(table, state, schools) {
+    injectCSS();
+    const parent = table.parentElement || table;
+    const panel = document.createElement('div');
+    panel.className = 'ui segment bn-ranking-filter';
+
+    const header = document.createElement('div');
+    header.className = 'bn-filter-header';
+    const toggleLabel = document.createElement('label');
+    toggleLabel.className = 'bn-filter-toggle';
+    const toggleInput = document.createElement('input');
+    toggleInput.type = 'checkbox';
+    toggleInput.id = 'bn-ranking-filter-toggle';
+    const toggleText = document.createElement('span');
+    toggleText.textContent = '启用榜单筛选';
+    toggleLabel.append(toggleInput, toggleText);
+    header.appendChild(toggleLabel);
+    panel.appendChild(header);
+
+    const summary = document.createElement('div');
+    summary.className = 'bn-filter-summary';
+    summary.textContent = '未启用筛选';
+    panel.appendChild(summary);
+
+    const count = document.createElement('div');
+    count.className = 'bn-filter-count';
+    panel.appendChild(count);
+
+    const list = document.createElement('div');
+    list.id = 'bn-school-select';
+    list.className = 'bn-school-select';
+    if (schools.length) {
+      schools.forEach(name => {
+        const label = document.createElement('label');
+        label.className = 'bn-filter-option';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = name;
+        checkbox.dataset.school = name;
+        label.append(checkbox, document.createTextNode(name));
+        list.appendChild(label);
+      });
+    } else {
+      toggleInput.disabled = true;
+      summary.textContent = '未找到学校信息，暂无法筛选';
+    }
+    panel.appendChild(list);
+
+    const actions = document.createElement('div');
+    actions.className = 'bn-filter-actions';
+    panel.appendChild(actions);
+    attachDownloadButton(actions, table);
+
+    if (parent && parent.insertBefore) parent.insertBefore(panel, table);
+    else document.body.insertBefore(panel, document.body.firstChild);
+
+    function refresh() {
+      const result = applyFilter(table, state);
+      if (!schools.length) {
+        summary.textContent = '未找到学校信息，暂无法筛选';
+        summary.classList.remove('bn-active');
+        count.textContent = result.total ? `当前显示 ${result.visible} / ${result.total}` : '';
+        return;
+      }
+      summary.textContent = result.summary;
+      summary.classList.toggle('bn-active', !!result.active);
+      count.textContent = result.total ? `当前显示 ${result.visible} / ${result.total}` : '';
+    }
+
+    toggleInput.addEventListener('change', () => {
+      state.enabled = toggleInput.checked && !!schools.length;
+      list.classList.toggle('bn-open', state.enabled);
+      panel.classList.toggle('bn-filter-enabled', state.enabled);
+      refresh();
+    });
+
+    list.addEventListener('change', event => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement) || target.type !== 'checkbox') return;
+      if (target.checked) state.selected.add(target.value);
+      else state.selected.delete(target.value);
+      refresh();
+    });
+
+    refresh();
+  }
+
+  async function init() {
+    injectCSS();
+    const table = await waitForTable();
+    if (!table) return;
+    const signature = getHeaderSignature(table);
+    const schoolIndex = detectSchoolColumn(table);
+    const rows = collectRows(table);
+    rows.forEach(row => annotateRow(row, schoolIndex));
+
+    const totalPages = extractTotalPages(document);
+    const loader = createLoader(table, totalPages);
+    if (loader && totalPages > 1) loader.setProgress(1, totalPages);
+    try {
+      await loadAdditionalPages({ table, totalPages, loader, signature, schoolIndex });
+      if (loader) loader.finish();
+    } catch (err) {
+      console.error('[BN] Failed to load all ranking pages', err);
+      if (loader) loader.error(`加载失败：${err?.message || err}`);
+    }
+
+    hidePagination(table);
+
+    const state = {
+      enabled: false,
+      selected: new Set(),
+      schoolIndex
+    };
+    collectRows(table).forEach(row => annotateRow(row, schoolIndex));
+    const schools = schoolIndex >= 0 ? uniqueSorted(collectRows(table).map(row => row.dataset?.bnSchool || '')) : [];
+    setupFilterUI(table, state, schools);
+  }
+
+  init().catch(err => console.error('[BN] Ranking enhancement failed', err));
 })();
 
 /* === BN PATCH 2: user menu pure fade-in (no size change) + shadow fade === */
