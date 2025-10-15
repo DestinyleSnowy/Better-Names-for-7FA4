@@ -6,7 +6,9 @@
   "permissions": [
     "storage",
     "notifications",
-    "clipboardWrite"
+    "clipboardWrite",
+    "activeTab",
+    "scripting"
   ],
   "host_permissions": [
     "http://*.7fa4.cn:8888/*"
@@ -43,5 +45,8 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "submitter/popup.html"
   }
 }
