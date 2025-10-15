@@ -32,6 +32,7 @@ window.getCurrentUserId = getCurrentUserId;
   const enablePlanAdder = GM_getValue('enablePlanAdder', true);
   const enableAutoRenew = GM_getValue('enableAutoRenew', false);
   const enableSubmitter = GM_getValue('enableSubmitter', true);
+  const enableRankingFilterSetting = GM_getValue('rankingFilter.enabled', false);
   const initialAutoExit = GM_getValue('planAdder.autoExit', true);
   let autoExit = initialAutoExit;
   const enableVjLink = GM_getValue('enableVjLink', true);
@@ -764,16 +765,7 @@ window.getCurrentUserId = getCurrentUserId;
             </div>
             <label><input type="checkbox" id="bn-enable-renew" ${enableAutoRenew ? 'checked' : ''}/> 启用题目自动更新</label>
           </div>
-          <div class="bn-section">
-            <div class="bn-title">
-              <svg class="bn-icon" viewBox="0 0 24 24">
-                <path d="M2 21l21-9L2 3v7l15 2-15 2z"/>
-              </svg>
-              Submitter
-            </div>
-            <label><input type="checkbox" id="bn-enable-submitter" ${enableSubmitter ? 'checked' : ''}/> 启用 Submitter</label>
-          </div>
-          <div class="bn-section">
+          <div class="bn-section bn-section-color-theme">
             <div class="bn-title">
               <svg class="bn-icon" viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 011.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
               颜色 & 主题
@@ -788,6 +780,28 @@ window.getCurrentUserId = getCurrentUserId;
                 </select>
               </label>
             </div>
+          </div>
+          <div class="bn-section">
+            <div class="bn-title">
+              <svg class="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 11H5"/>
+                <path d="M21 7H3"/>
+                <path d="M17 15H7"/>
+                <path d="M15 19H9"/>
+              </svg>
+              榜单筛选
+            </div>
+            <label><input type="checkbox" id="bn-enable-ranking-filter" ${enableRankingFilterSetting ? 'checked' : ''}/> 启用榜单筛选</label>
+            <div class="bn-desc">合并榜单分页并在页面中按学校筛选参与者，仅在支持的榜单页生效。</div>
+          </div>
+          <div class="bn-section">
+            <div class="bn-title">
+              <svg class="bn-icon" viewBox="0 0 24 24">
+                <path d="M2 21l21-9L2 3v7l15 2-15 2z"/>
+              </svg>
+              Submitter
+            </div>
+            <label><input type="checkbox" id="bn-enable-submitter" ${enableSubmitter ? 'checked' : ''}/> 启用 Submitter</label>
           </div>
         </div>
         <div class="bn-color-sidebar" id="bn-color-sidebar">
@@ -854,6 +868,7 @@ window.getCurrentUserId = getCurrentUserId;
   const chkMenu = document.getElementById('bn-enable-user-menu');
   const chkPlan = document.getElementById('bn-enable-plan');
   const chkAutoRenew = document.getElementById('bn-enable-renew');
+  const chkRankingFilter = document.getElementById('bn-enable-ranking-filter');
   const chkSubmitter = document.getElementById('bn-enable-submitter');
   const planOpts = document.getElementById('bn-plan-options');
   const chkPlanAuto = document.getElementById('bn-plan-auto');
@@ -922,6 +937,7 @@ window.getCurrentUserId = getCurrentUserId;
     enableMenu,
     enablePlanAdder,
     enableAutoRenew,
+    enableRankingFilter: enableRankingFilterSetting,
     enableSubmitter,
     autoExit: initialAutoExit,
     useCustomColors,
@@ -1171,6 +1187,7 @@ window.getCurrentUserId = getCurrentUserId;
       (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) ||
       (document.getElementById('bn-enable-plan').checked !== originalConfig.enablePlanAdder) ||
       (document.getElementById('bn-enable-renew').checked !== originalConfig.enableAutoRenew) ||
+      (document.getElementById('bn-enable-ranking-filter').checked !== originalConfig.enableRankingFilter) ||
       (document.getElementById('bn-enable-submitter').checked !== originalConfig.enableSubmitter) ||
       (document.getElementById('bn-enable-vj').checked !== originalConfig.enableVjLink) ||
       (document.getElementById('bn-hide-done-skip').checked !== originalConfig.hideDoneSkip) ||
@@ -1216,6 +1233,7 @@ window.getCurrentUserId = getCurrentUserId;
   chkHideDoneSkip.onchange = () => { applyHideDoneSkip(chkHideDoneSkip.checked); checkChanged(); };
   chkPlan.onchange = () => { toggleOption(chkPlan, planOpts); checkChanged(); };
   chkAutoRenew.onchange = checkChanged;
+  chkRankingFilter.onchange = checkChanged;
   chkSubmitter.onchange = checkChanged;
   chkPlanAuto.onchange = () => { autoExit = chkPlanAuto.checked; checkChanged(); };
   widthModeSel.onchange = checkChanged;
@@ -1259,6 +1277,7 @@ window.getCurrentUserId = getCurrentUserId;
     GM_setValue('enablePlanAdder', chkPlan.checked);
     GM_setValue('enableAutoRenew', chkAutoRenew.checked);
     GM_setValue('enableSubmitter', chkSubmitter.checked);
+    GM_setValue('rankingFilter.enabled', chkRankingFilter.checked);
     GM_setValue('planAdder.autoExit', chkPlanAuto.checked);
     autoExit = chkPlanAuto.checked;
 
@@ -1290,6 +1309,7 @@ window.getCurrentUserId = getCurrentUserId;
     applyHideDoneSkip(originalConfig.hideDoneSkip);
     chkPlan.checked = originalConfig.enablePlanAdder;
     chkAutoRenew.checked = originalConfig.enableAutoRenew;
+    chkRankingFilter.checked = originalConfig.enableRankingFilter;
     chkSubmitter.checked = originalConfig.enableSubmitter;
     chkPlanAuto.checked = originalConfig.autoExit;
     autoExit = originalConfig.autoExit;
@@ -3116,19 +3136,19 @@ window.getCurrentUserId = getCurrentUserId;
     : null;
 
   let cssInjected = false;
+  const RANKING_FILTER_ENABLED_KEY = 'rankingFilter.enabled';
+  const RANKING_FILTER_SELECTED_KEY = 'rankingFilter.selected';
 
   function injectCSS() {
     if (cssInjected) return;
     const css = `
     .bn-ranking-filter.ui.segment { margin-bottom: 1.5em; }
     .bn-ranking-filter .bn-filter-header { display: flex; align-items: center; justify-content: space-between; gap: .75em; flex-wrap: wrap; }
-    .bn-ranking-filter .bn-filter-toggle { display: inline-flex; align-items: center; gap: .5em; font-weight: 600; cursor: pointer; user-select: none; }
-    .bn-ranking-filter .bn-filter-toggle input { width: 16px; height: 16px; margin: 0; }
+    .bn-ranking-filter .bn-filter-title { font-weight: 600; font-size: 1.05em; }
     .bn-ranking-filter .bn-filter-summary { margin-top: .5em; font-size: .9em; color: rgba(0,0,0,.6); }
     .bn-ranking-filter .bn-filter-summary.bn-active { color: #2185d0; font-weight: 600; }
     .bn-ranking-filter .bn-filter-count { margin-top: .25em; font-size: .85em; color: rgba(0,0,0,.5); }
-    .bn-school-select { display: none; margin-top: .75em; gap: .35em 1.25em; flex-wrap: wrap; }
-    .bn-school-select.bn-open { display: flex; }
+    .bn-school-select { display: flex; margin-top: .75em; gap: .35em 1.25em; flex-wrap: wrap; }
     .bn-school-select label { display: inline-flex; align-items: center; gap: .4em; padding: .2em .4em; border-radius: .3em; cursor: pointer; }
     .bn-school-select label:hover { background: rgba(33,133,208,.08); }
     .bn-school-select input[type="checkbox"] { width: 16px; height: 16px; margin: 0; }
@@ -3495,23 +3515,19 @@ window.getCurrentUserId = getCurrentUserId;
     const parent = table.parentElement || table;
     const panel = document.createElement('div');
     panel.className = 'ui segment bn-ranking-filter';
+    panel.style.display = state.enabled && schools.length ? '' : 'none';
 
     const header = document.createElement('div');
     header.className = 'bn-filter-header';
-    const toggleLabel = document.createElement('label');
-    toggleLabel.className = 'bn-filter-toggle';
-    const toggleInput = document.createElement('input');
-    toggleInput.type = 'checkbox';
-    toggleInput.id = 'bn-ranking-filter-toggle';
-    const toggleText = document.createElement('span');
-    toggleText.textContent = '启用榜单筛选';
-    toggleLabel.append(toggleInput, toggleText);
-    header.appendChild(toggleLabel);
+    const title = document.createElement('div');
+    title.className = 'bn-filter-title';
+    title.textContent = '榜单筛选';
+    header.appendChild(title);
     panel.appendChild(header);
 
     const summary = document.createElement('div');
     summary.className = 'bn-filter-summary';
-    summary.textContent = '未启用筛选';
+    summary.textContent = state.enabled ? '筛选已启用' : '未启用筛选';
     panel.appendChild(summary);
 
     const count = document.createElement('div');
@@ -3521,6 +3537,7 @@ window.getCurrentUserId = getCurrentUserId;
     const list = document.createElement('div');
     list.id = 'bn-school-select';
     list.className = 'bn-school-select';
+    const checkboxRefs = [];
     if (schools.length) {
       schools.forEach(name => {
         const label = document.createElement('label');
@@ -3529,11 +3546,12 @@ window.getCurrentUserId = getCurrentUserId;
         checkbox.type = 'checkbox';
         checkbox.value = name;
         checkbox.dataset.school = name;
+        if (state.selected.has(name)) checkbox.checked = true;
         label.append(checkbox, document.createTextNode(name));
         list.appendChild(label);
+        checkboxRefs.push(checkbox);
       });
     } else {
-      toggleInput.disabled = true;
       summary.textContent = '未找到学校信息，暂无法筛选';
     }
     panel.appendChild(list);
@@ -3546,7 +3564,20 @@ window.getCurrentUserId = getCurrentUserId;
     if (parent && parent.insertBefore) parent.insertBefore(panel, table);
     else document.body.insertBefore(panel, document.body.firstChild);
 
+    function syncCheckboxStates() {
+      checkboxRefs.forEach(checkbox => {
+        checkbox.checked = state.selected.has(checkbox.value);
+        checkbox.disabled = !state.enabled;
+      });
+    }
+
+    function syncVisibility() {
+      const visible = state.enabled && schools.length > 0;
+      panel.style.display = visible ? '' : 'none';
+    }
+
     function refresh() {
+      syncCheckboxStates();
       const result = applyFilter(table, state);
       if (!schools.length) {
         summary.textContent = '未找到学校信息，暂无法筛选';
@@ -3559,22 +3590,23 @@ window.getCurrentUserId = getCurrentUserId;
       count.textContent = result.total ? `当前显示 ${result.visible} / ${result.total}` : '';
     }
 
-    toggleInput.addEventListener('change', () => {
-      state.enabled = toggleInput.checked && !!schools.length;
-      list.classList.toggle('bn-open', state.enabled);
-      panel.classList.toggle('bn-filter-enabled', state.enabled);
-      refresh();
-    });
-
     list.addEventListener('change', event => {
       const target = event.target;
       if (!(target instanceof HTMLInputElement) || target.type !== 'checkbox') return;
+      if (!state.enabled) {
+        target.checked = state.selected.has(target.value);
+        return;
+      }
       if (target.checked) state.selected.add(target.value);
       else state.selected.delete(target.value);
+      GM_setValue(RANKING_FILTER_SELECTED_KEY, Array.from(state.selected));
       refresh();
     });
 
     refresh();
+    syncVisibility();
+
+    return { panel, refresh, syncVisibility, syncCheckboxStates };
   }
 
   async function init() {
@@ -3599,13 +3631,28 @@ window.getCurrentUserId = getCurrentUserId;
 
     hidePagination(table);
 
+    const finalRows = collectRows(table);
+    finalRows.forEach(row => annotateRow(row, schoolIndex));
+    const schools = schoolIndex >= 0 ? uniqueSorted(finalRows.map(row => row.dataset?.bnSchool || '')) : [];
+
+    const savedSelectionRaw = GM_getValue(RANKING_FILTER_SELECTED_KEY, []);
+    const savedSelection = Array.isArray(savedSelectionRaw)
+      ? savedSelectionRaw.map(name => (typeof name === 'string' ? name.trim() : '')).filter(Boolean)
+      : [];
+    const dedupedSelection = Array.from(new Set(savedSelection));
+    const validSelected = dedupedSelection.filter(name => schools.includes(name));
+    if (validSelected.length !== dedupedSelection.length) {
+      GM_setValue(RANKING_FILTER_SELECTED_KEY, validSelected);
+    }
+
+    const requestedEnabled = !!GM_getValue(RANKING_FILTER_ENABLED_KEY, false);
     const state = {
-      enabled: false,
-      selected: new Set(),
+      enabled: requestedEnabled && schools.length > 0,
+      requested: requestedEnabled,
+      selected: new Set(validSelected),
       schoolIndex
     };
-    collectRows(table).forEach(row => annotateRow(row, schoolIndex));
-    const schools = schoolIndex >= 0 ? uniqueSorted(collectRows(table).map(row => row.dataset?.bnSchool || '')) : [];
+
     setupFilterUI(table, state, schools);
   }
 
