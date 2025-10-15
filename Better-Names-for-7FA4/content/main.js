@@ -31,6 +31,7 @@ window.getCurrentUserId = getCurrentUserId;
   const enableMenu = GM_getValue('enableUserMenu', true);
   const enablePlanAdder = GM_getValue('enablePlanAdder', true);
   const enableAutoRenew = GM_getValue('enableAutoRenew', false);
+  const enableSubmitter = GM_getValue('enableSubmitter', true);
   const initialAutoExit = GM_getValue('planAdder.autoExit', true);
   let autoExit = initialAutoExit;
   const enableVjLink = GM_getValue('enableVjLink', true);
@@ -765,6 +766,15 @@ window.getCurrentUserId = getCurrentUserId;
           </div>
           <div class="bn-section">
             <div class="bn-title">
+              <svg class="bn-icon" viewBox="0 0 24 24">
+                <path d="M2 21l21-9L2 3v7l15 2-15 2z"/>
+              </svg>
+              Submitter
+            </div>
+            <label><input type="checkbox" id="bn-enable-submitter" ${enableSubmitter ? 'checked' : ''}/> 启用 Submitter</label>
+          </div>
+          <div class="bn-section">
+            <div class="bn-title">
               <svg class="bn-icon" viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 011.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
               颜色 & 主题
             </div>
@@ -844,6 +854,7 @@ window.getCurrentUserId = getCurrentUserId;
   const chkMenu = document.getElementById('bn-enable-user-menu');
   const chkPlan = document.getElementById('bn-enable-plan');
   const chkAutoRenew = document.getElementById('bn-enable-renew');
+  const chkSubmitter = document.getElementById('bn-enable-submitter');
   const planOpts = document.getElementById('bn-plan-options');
   const chkPlanAuto = document.getElementById('bn-plan-auto');
   const chkUseColor = document.getElementById('bn-use-custom-color');
@@ -911,6 +922,7 @@ window.getCurrentUserId = getCurrentUserId;
     enableMenu,
     enablePlanAdder,
     enableAutoRenew,
+    enableSubmitter,
     autoExit: initialAutoExit,
     useCustomColors,
     palette: Object.assign({}, palette),
@@ -1159,6 +1171,7 @@ window.getCurrentUserId = getCurrentUserId;
       (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) ||
       (document.getElementById('bn-enable-plan').checked !== originalConfig.enablePlanAdder) ||
       (document.getElementById('bn-enable-renew').checked !== originalConfig.enableAutoRenew) ||
+      (document.getElementById('bn-enable-submitter').checked !== originalConfig.enableSubmitter) ||
       (document.getElementById('bn-enable-vj').checked !== originalConfig.enableVjLink) ||
       (document.getElementById('bn-hide-done-skip').checked !== originalConfig.hideDoneSkip) ||
       (document.getElementById('bn-plan-auto').checked !== originalConfig.autoExit) ||
@@ -1180,6 +1193,13 @@ window.getCurrentUserId = getCurrentUserId;
     }
   }
 
+  function syncSubmitterState(enabled) {
+    if (typeof chrome === 'undefined' || !chrome.runtime || typeof chrome.runtime.sendMessage !== 'function') return;
+    try {
+      chrome.runtime.sendMessage({ type: 'bn_toggle_submitter', enabled });
+    } catch (e) {}
+  }
+
   const chkTitleTrEl = document.getElementById('bn-enable-title-truncate');
   const chkUserTrEl = document.getElementById('bn-enable-user-truncate');
 
@@ -1196,6 +1216,7 @@ window.getCurrentUserId = getCurrentUserId;
   chkHideDoneSkip.onchange = () => { applyHideDoneSkip(chkHideDoneSkip.checked); checkChanged(); };
   chkPlan.onchange = () => { toggleOption(chkPlan, planOpts); checkChanged(); };
   chkAutoRenew.onchange = checkChanged;
+  chkSubmitter.onchange = checkChanged;
   chkPlanAuto.onchange = () => { autoExit = chkPlanAuto.checked; checkChanged(); };
   widthModeSel.onchange = checkChanged;
 
@@ -1237,6 +1258,7 @@ window.getCurrentUserId = getCurrentUserId;
     GM_setValue('enableVjLink', chkVj.checked);
     GM_setValue('enablePlanAdder', chkPlan.checked);
     GM_setValue('enableAutoRenew', chkAutoRenew.checked);
+    GM_setValue('enableSubmitter', chkSubmitter.checked);
     GM_setValue('planAdder.autoExit', chkPlanAuto.checked);
     autoExit = chkPlanAuto.checked;
 
@@ -1246,6 +1268,8 @@ window.getCurrentUserId = getCurrentUserId;
     COLOR_KEYS.forEach(k => { if (colorPickers[k]) obj[k] = colorPickers[k].value; });
     GM_setValue('userPalette', JSON.stringify(obj));
     GM_setValue('useCustomColors', chkUseColor.checked);
+
+    syncSubmitterState(chkSubmitter.checked);
 
     setTimeout(() => location.reload(), 50);
   };
@@ -1266,6 +1290,7 @@ window.getCurrentUserId = getCurrentUserId;
     applyHideDoneSkip(originalConfig.hideDoneSkip);
     chkPlan.checked = originalConfig.enablePlanAdder;
     chkAutoRenew.checked = originalConfig.enableAutoRenew;
+    chkSubmitter.checked = originalConfig.enableSubmitter;
     chkPlanAuto.checked = originalConfig.autoExit;
     autoExit = originalConfig.autoExit;
     chkUseColor.checked = originalConfig.useCustomColors;

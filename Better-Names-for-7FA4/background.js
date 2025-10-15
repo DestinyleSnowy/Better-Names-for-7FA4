@@ -7,8 +7,80 @@ self.addEventListener('activate', (e) => {
   e.waitUntil(self.clients.claim());
 });
 
+const SUBMITTER_POPUP = 'submitter/popup.html';
+
+function applySubmitterState(enabled) {
+  try {
+    if (!chrome || !chrome.action) return;
+    const popup = enabled ? SUBMITTER_POPUP : '';
+    if (chrome.action.setPopup) {
+      chrome.action.setPopup({ popup }, () => {
+        // Touch lastError to suppress uncontrolled logs
+        void chrome.runtime && chrome.runtime.lastError;
+      });
+    }
+    if (enabled) {
+      if (chrome.action.enable) chrome.action.enable();
+    } else if (chrome.action.disable) {
+      chrome.action.disable();
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
+function ensureSubmitterStateFromStorage() {
+  try {
+    if (!chrome || !chrome.storage || !chrome.storage.local) {
+      applySubmitterState(true);
+      return;
+    }
+    chrome.storage.local.get({ enableSubmitter: true }, (items) => {
+      try {
+        const raw = items && Object.prototype.hasOwnProperty.call(items, 'enableSubmitter')
+          ? items.enableSubmitter
+          : true;
+        const enabled = raw !== false;
+        applySubmitterState(enabled);
+      } catch (e) {
+        applySubmitterState(true);
+      }
+    });
+  } catch (e) {
+    applySubmitterState(true);
+  }
+}
+
+ensureSubmitterStateFromStorage();
+
+if (chrome && chrome.runtime && chrome.runtime.onStartup) {
+  chrome.runtime.onStartup.addListener(() => ensureSubmitterStateFromStorage());
+}
+if (chrome && chrome.runtime && chrome.runtime.onInstalled) {
+  chrome.runtime.onInstalled.addListener(() => ensureSubmitterStateFromStorage());
+}
+if (chrome && chrome.storage && chrome.storage.onChanged) {
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== 'local') return;
+    if (Object.prototype.hasOwnProperty.call(changes, 'enableSubmitter')) {
+      const change = changes.enableSubmitter;
+      const enabled = change && Object.prototype.hasOwnProperty.call(change, 'newValue')
+        ? change.newValue !== false
+        : true;
+      applySubmitterState(enabled);
+    }
+  });
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || typeof msg !== 'object') return;
+
+  if (msg.type === 'bn_toggle_submitter') {
+    const enabled = msg.enabled !== false;
+    applySubmitterState(enabled);
+    sendResponse({ ok: true });
+    return true;
+  }
 
   if (msg.type === 'gm_notify') {
     const { title, message, iconUrl } = msg.payload || {};
