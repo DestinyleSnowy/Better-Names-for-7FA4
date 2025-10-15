@@ -553,12 +553,10 @@ window.getCurrentUserId = getCurrentUserId;
     }
 
     #bn-plan-options {
-      margin-left: 24px; display: ${enablePlanAdder ? 'block' : 'none'}; padding-top: 8px;
-      margin-top: 8px;
+      margin-left: 24px; display: ${enablePlanAdder ? 'block' : 'none'};
     }
     #bn-title-options, #bn-user-options {
-      margin-left: 24px; padding-top: 8px; border-top: 1px solid var(--bn-border-subtle);
-      margin-top: 8px;
+      margin-left: 24px;
     }
     #bn-title-options { display: ${isFinite(maxTitleUnits) ? 'block' : 'none'}; }
     #bn-user-options  { display: ${isFinite(maxUserUnits) ? 'block' : 'none'}; }
