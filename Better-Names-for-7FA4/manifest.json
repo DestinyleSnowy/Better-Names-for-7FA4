@@ -29,6 +29,16 @@
       "run_at": "document_end"
     }
   ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "data/users.json"
+      ],
+      "matches": [
+        "http://*.7fa4.cn:8888/*"
+      ]
+    }
+  ],
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
