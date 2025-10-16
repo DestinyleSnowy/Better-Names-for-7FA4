@@ -1,5 +1,5 @@
 // Better Names for 7FA4
-// 6.0.0 SP8 Developer
+// 6.0.0 SP9 Developer
 
 function getCurrentUserId() {
   const ud = document.querySelector('#user-dropdown');
@@ -823,7 +823,7 @@ window.getCurrentUserId = getCurrentUserId;
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
       <div class="bn-version">
-        <div class="bn-version-text">6.0.0 SP8 Developer</div>
+        <div class="bn-version-text">6.0.0 SP9 Developer</div>
       </div>
     </div>`;
   document.body.appendChild(container);
@@ -3329,22 +3329,16 @@ window.getCurrentUserId = getCurrentUserId;
     return true;
   }
 
-  function attachDownloadButton(container, table) {
-    let button = document.querySelector('#bn-ranking-download');
-    if (!button) {
-      button = document.createElement('button');
-      button.type = 'button';
-      button.id = 'bn-ranking-download';
-      button.className = 'ui button primary';
-      button.textContent = '下载表格';
-      container.appendChild(button);
-    } else if (!container.contains(button)) {
-      container.appendChild(button);
-    }
+  function attachDownloadButton(table) {
+    const button = document.querySelector('#table_download');
+    if (!button) return null;
+    if (button.classList) button.classList.add('ui', 'button', 'primary');
     if (!button.dataset.bnDownloadBound) {
       button.addEventListener('click', event => {
-        event.preventDefault();
-        exportVisibleRows(table);
+        const exported = exportVisibleRows(table);
+        if (exported) {
+          event.preventDefault();
+        }
       });
       button.dataset.bnDownloadBound = '1';
     }
@@ -3397,10 +3391,7 @@ window.getCurrentUserId = getCurrentUserId;
     }
     panel.appendChild(list);
 
-    const actions = document.createElement('div');
-    actions.className = 'bn-filter-actions';
-    panel.appendChild(actions);
-    attachDownloadButton(actions, table);
+    attachDownloadButton(table);
 
     if (parent && parent.insertBefore) parent.insertBefore(panel, table);
     else document.body.insertBefore(panel, document.body.firstChild);
@@ -3544,3 +3535,4 @@ window.getCurrentUserId = getCurrentUserId;
   if (typeof GM_addStyle === 'function') GM_addStyle(css);
   else { const s = document.createElement('style'); s.textContent = css; document.head.appendChild(s); }
 })();
+
