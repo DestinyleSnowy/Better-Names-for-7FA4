@@ -752,6 +752,27 @@ window.getCurrentUserId = getCurrentUserId;
           <div class="bn-section">
             <div class="bn-title">
               <svg class="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 11H5"/>
+                <path d="M21 7H3"/>
+                <path d="M17 15H7"/>
+                <path d="M15 19H9"/>
+              </svg>
+              榜单筛选
+            </div>
+            <label><input type="checkbox" id="bn-enable-ranking-filter" ${enableRankingFilterSetting ? 'checked' : ''}/> 启用榜单筛选</label>
+          </div>
+          <div class="bn-section">
+            <div class="bn-title">
+              <svg class="bn-icon" viewBox="0 0 24 24">
+                <path d="M2 21l21-9L2 3v7l15 2-15 2z"/>
+              </svg>
+              Submitter
+            </div>
+            <label><input type="checkbox" id="bn-enable-submitter" ${enableSubmitter ? 'checked' : ''}/> 启用 Submitter</label>
+          </div>
+          <div class="bn-section">
+            <div class="bn-title">
+              <svg class="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="23 4 23 10 17 10"/>
                 <polyline points="1 20 1 14 7 14"/>
                 <path d="M3.51 9a9 9 0 0 1 14.58-3.36L23 10"/>
@@ -780,28 +801,6 @@ window.getCurrentUserId = getCurrentUserId;
                 </select>
               </label>
             </div>
-          </div>
-          <div class="bn-section">
-            <div class="bn-title">
-              <svg class="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M19 11H5"/>
-                <path d="M21 7H3"/>
-                <path d="M17 15H7"/>
-                <path d="M15 19H9"/>
-              </svg>
-              榜单筛选
-            </div>
-            <label><input type="checkbox" id="bn-enable-ranking-filter" ${enableRankingFilterSetting ? 'checked' : ''}/> 启用榜单筛选</label>
-            <div class="bn-desc">合并榜单分页并在页面中按学校筛选参与者，仅在支持的榜单页生效。</div>
-          </div>
-          <div class="bn-section">
-            <div class="bn-title">
-              <svg class="bn-icon" viewBox="0 0 24 24">
-                <path d="M2 21l21-9L2 3v7l15 2-15 2z"/>
-              </svg>
-              Submitter
-            </div>
-            <label><input type="checkbox" id="bn-enable-submitter" ${enableSubmitter ? 'checked' : ''}/> 启用 Submitter</label>
           </div>
         </div>
         <div class="bn-color-sidebar" id="bn-color-sidebar">
