@@ -1,5 +1,5 @@
 // Better Names for 7FA4
-// 6.0.0 SP7 Developer
+// 6.0.0 SP8 Developer
 
 function getCurrentUserId() {
   const ud = document.querySelector('#user-dropdown');
@@ -32,6 +32,7 @@ window.getCurrentUserId = getCurrentUserId;
   const enablePlanAdder = GM_getValue('enablePlanAdder', true);
   const enableAutoRenew = GM_getValue('enableAutoRenew', false);
   const enableSubmitter = GM_getValue('enableSubmitter', true);
+  const enableRankingFilterSetting = GM_getValue('rankingFilter.enabled', false);
   const initialAutoExit = GM_getValue('planAdder.autoExit', true);
   let autoExit = initialAutoExit;
   const enableVjLink = GM_getValue('enableVjLink', true);
@@ -764,16 +765,7 @@ window.getCurrentUserId = getCurrentUserId;
             </div>
             <label><input type="checkbox" id="bn-enable-renew" ${enableAutoRenew ? 'checked' : ''}/> 启用题目自动更新</label>
           </div>
-          <div class="bn-section">
-            <div class="bn-title">
-              <svg class="bn-icon" viewBox="0 0 24 24">
-                <path d="M2 21l21-9L2 3v7l15 2-15 2z"/>
-              </svg>
-              Submitter
-            </div>
-            <label><input type="checkbox" id="bn-enable-submitter" ${enableSubmitter ? 'checked' : ''}/> 启用 Submitter</label>
-          </div>
-          <div class="bn-section">
+          <div class="bn-section bn-section-color-theme">
             <div class="bn-title">
               <svg class="bn-icon" viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 011.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
               颜色 & 主题
@@ -788,6 +780,28 @@ window.getCurrentUserId = getCurrentUserId;
                 </select>
               </label>
             </div>
+          </div>
+          <div class="bn-section">
+            <div class="bn-title">
+              <svg class="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 11H5"/>
+                <path d="M21 7H3"/>
+                <path d="M17 15H7"/>
+                <path d="M15 19H9"/>
+              </svg>
+              榜单筛选
+            </div>
+            <label><input type="checkbox" id="bn-enable-ranking-filter" ${enableRankingFilterSetting ? 'checked' : ''}/> 启用榜单筛选</label>
+            <div class="bn-desc">合并榜单分页并在页面中按学校筛选参与者，仅在支持的榜单页生效。</div>
+          </div>
+          <div class="bn-section">
+            <div class="bn-title">
+              <svg class="bn-icon" viewBox="0 0 24 24">
+                <path d="M2 21l21-9L2 3v7l15 2-15 2z"/>
+              </svg>
+              Submitter
+            </div>
+            <label><input type="checkbox" id="bn-enable-submitter" ${enableSubmitter ? 'checked' : ''}/> 启用 Submitter</label>
           </div>
         </div>
         <div class="bn-color-sidebar" id="bn-color-sidebar">
@@ -810,7 +824,7 @@ window.getCurrentUserId = getCurrentUserId;
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
       <div class="bn-version">
-        <div class="bn-version-text">6.0.0 SP7 Developer</div>
+        <div class="bn-version-text">6.0.0 SP8 Developer</div>
       </div>
     </div>`;
   document.body.appendChild(container);
@@ -854,6 +868,7 @@ window.getCurrentUserId = getCurrentUserId;
   const chkMenu = document.getElementById('bn-enable-user-menu');
   const chkPlan = document.getElementById('bn-enable-plan');
   const chkAutoRenew = document.getElementById('bn-enable-renew');
+  const chkRankingFilter = document.getElementById('bn-enable-ranking-filter');
   const chkSubmitter = document.getElementById('bn-enable-submitter');
   const planOpts = document.getElementById('bn-plan-options');
   const chkPlanAuto = document.getElementById('bn-plan-auto');
@@ -922,6 +937,7 @@ window.getCurrentUserId = getCurrentUserId;
     enableMenu,
     enablePlanAdder,
     enableAutoRenew,
+    enableRankingFilter: enableRankingFilterSetting,
     enableSubmitter,
     autoExit: initialAutoExit,
     useCustomColors,
@@ -1171,6 +1187,7 @@ window.getCurrentUserId = getCurrentUserId;
       (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) ||
       (document.getElementById('bn-enable-plan').checked !== originalConfig.enablePlanAdder) ||
       (document.getElementById('bn-enable-renew').checked !== originalConfig.enableAutoRenew) ||
+      (document.getElementById('bn-enable-ranking-filter').checked !== originalConfig.enableRankingFilter) ||
       (document.getElementById('bn-enable-submitter').checked !== originalConfig.enableSubmitter) ||
       (document.getElementById('bn-enable-vj').checked !== originalConfig.enableVjLink) ||
       (document.getElementById('bn-hide-done-skip').checked !== originalConfig.hideDoneSkip) ||
@@ -1216,6 +1233,7 @@ window.getCurrentUserId = getCurrentUserId;
   chkHideDoneSkip.onchange = () => { applyHideDoneSkip(chkHideDoneSkip.checked); checkChanged(); };
   chkPlan.onchange = () => { toggleOption(chkPlan, planOpts); checkChanged(); };
   chkAutoRenew.onchange = checkChanged;
+  chkRankingFilter.onchange = checkChanged;
   chkSubmitter.onchange = checkChanged;
   chkPlanAuto.onchange = () => { autoExit = chkPlanAuto.checked; checkChanged(); };
   widthModeSel.onchange = checkChanged;
@@ -1259,6 +1277,7 @@ window.getCurrentUserId = getCurrentUserId;
     GM_setValue('enablePlanAdder', chkPlan.checked);
     GM_setValue('enableAutoRenew', chkAutoRenew.checked);
     GM_setValue('enableSubmitter', chkSubmitter.checked);
+    GM_setValue('rankingFilter.enabled', chkRankingFilter.checked);
     GM_setValue('planAdder.autoExit', chkPlanAuto.checked);
     autoExit = chkPlanAuto.checked;
 
@@ -1290,6 +1309,7 @@ window.getCurrentUserId = getCurrentUserId;
     applyHideDoneSkip(originalConfig.hideDoneSkip);
     chkPlan.checked = originalConfig.enablePlanAdder;
     chkAutoRenew.checked = originalConfig.enableAutoRenew;
+    chkRankingFilter.checked = originalConfig.enableRankingFilter;
     chkSubmitter.checked = originalConfig.enableSubmitter;
     chkPlanAuto.checked = originalConfig.autoExit;
     autoExit = originalConfig.autoExit;
@@ -3088,6 +3108,403 @@ window.getCurrentUserId = getCurrentUserId;
   }`;
   if (typeof GM_addStyle === 'function') GM_addStyle(css);
   else { const s = document.createElement('style'); s.textContent = css; document.head.appendChild(s); }
+})();
+
+/* =================================================================
+ *  榜单页：学校筛选
+ * ================================================================= */
+(function () {
+  'use strict';
+
+  const PATH_RE = /^\/progress\/quiz/;
+  if (!PATH_RE.test(location.pathname)) return;
+
+  const TABLE_SELECTORS = [
+    '.progress-table table',
+    '.progress-container table',
+    '.contest-table table',
+    'table.ui.table',
+    'table.table'
+  ];
+
+  const collator = (typeof Intl !== 'undefined' && typeof Intl.Collator === 'function')
+    ? new Intl.Collator(['zh-Hans-CN', 'zh-CN', 'zh', 'zh-Hans'], { sensitivity: 'base', usage: 'sort' })
+    : null;
+
+  let cssInjected = false;
+  const RANKING_FILTER_ENABLED_KEY = 'rankingFilter.enabled';
+  const RANKING_FILTER_SELECTED_KEY = 'rankingFilter.selected';
+
+  function injectCSS() {
+    if (cssInjected) return;
+    const css = `
+    .bn-ranking-filter.ui.segment { margin-bottom: 1.5em; }
+    .bn-ranking-filter .bn-filter-header { display: flex; align-items: center; justify-content: space-between; gap: .75em; flex-wrap: wrap; }
+    .bn-ranking-filter .bn-filter-title { font-weight: 600; font-size: 1.05em; }
+    .bn-ranking-filter .bn-filter-summary { margin-top: .5em; font-size: .9em; color: rgba(0,0,0,.6); }
+    .bn-ranking-filter .bn-filter-summary.bn-active { color: #2185d0; font-weight: 600; }
+    .bn-ranking-filter .bn-filter-count { margin-top: .25em; font-size: .85em; color: rgba(0,0,0,.5); }
+    .bn-school-select { display: flex; margin-top: .75em; gap: .35em 1.25em; flex-wrap: wrap; }
+    .bn-school-select label { display: inline-flex; align-items: center; gap: .4em; padding: .2em .4em; border-radius: .3em; cursor: pointer; }
+    .bn-school-select label:hover { background: rgba(33,133,208,.08); }
+    .bn-school-select input[type="checkbox"] { width: 16px; height: 16px; margin: 0; }
+    .bn-filter-actions { margin-top: .75em; display: flex; gap: .5em; flex-wrap: wrap; }
+    .bn-filter-actions .ui.button { flex-shrink: 0; }
+    .bn-filter-hide { display: none !important; }
+    @media (max-width: 640px) {
+      .bn-school-select { flex-direction: column; align-items: flex-start; }
+      .bn-filter-actions { flex-direction: column; align-items: stretch; }
+    }`;
+    if (typeof GM_addStyle === 'function') GM_addStyle(css);
+    else {
+      const style = document.createElement('style');
+      style.textContent = css;
+      document.head.appendChild(style);
+    }
+    cssInjected = true;
+  }
+
+  function getText(node) {
+    return (node && node.textContent ? node.textContent : '').replace(/\s+/g, ' ').trim();
+  }
+
+  function findTable(root = document) {
+    for (const selector of TABLE_SELECTORS) {
+      const table = root.querySelector(selector);
+      if (table && table.tBodies && table.tBodies.length) return table;
+    }
+    const tables = root.querySelectorAll('table');
+    for (const table of tables) {
+      if (table && table.tBodies && table.tBodies.length) return table;
+    }
+    return null;
+  }
+
+  function waitForTable(timeout = 12000) {
+    const existing = findTable();
+    if (existing) return Promise.resolve(existing);
+    return new Promise(resolve => {
+      const observer = new MutationObserver(() => {
+        const table = findTable();
+        if (table) {
+          observer.disconnect();
+          resolve(table);
+        }
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      setTimeout(() => {
+        observer.disconnect();
+        resolve(findTable());
+      }, timeout);
+    });
+  }
+
+  function annotateRow(row, index, headerText) {
+    if (!row || typeof index !== 'number' || index < 0) return '';
+    const cell = row.cells && row.cells[index];
+    if (!cell) {
+      delete row.dataset.bnHeaderRow;
+      row.dataset.bnSchool = '';
+      return '';
+    }
+    const value = getText(cell);
+    const tag = (cell.tagName || '').toUpperCase();
+    const isHeader = tag === 'TH' || (headerText && value === headerText);
+    if (isHeader) {
+      row.dataset.bnHeaderRow = '1';
+      row.dataset.bnSchool = '';
+      return '';
+    }
+    delete row.dataset.bnHeaderRow;
+    row.dataset.bnSchool = value;
+    return value;
+  }
+
+  function isHeaderRow(row) {
+    if (!row || !row.cells || !row.cells.length) return false;
+    return Array.from(row.cells).every(cell => (cell.tagName || '').toUpperCase() === 'TH');
+  }
+
+  function collectRows(table) {
+    const rows = [];
+    if (!table || !table.tBodies) return rows;
+    Array.from(table.tBodies).forEach(tbody => {
+      rows.push(...Array.from(tbody.rows || []).filter(row => !isHeaderRow(row)));
+    });
+    return rows;
+  }
+
+  function detectSchoolColumn(table) {
+    if (!table) return -1;
+    const headers = table.querySelectorAll('thead th, th');
+    for (let i = 0; i < headers.length; i += 1) {
+      const text = getText(headers[i]);
+      if (/学校|院校|单位|School/i.test(text)) return i;
+    }
+    const firstRow = table.tBodies && table.tBodies[0] && table.tBodies[0].rows[0];
+    if (firstRow) {
+      const cells = Array.from(firstRow.cells || []);
+      for (let i = 0; i < cells.length; i += 1) {
+        const text = getText(cells[i]);
+        if (/大学|学院|学校|中学/.test(text)) return i;
+      }
+    }
+    return -1;
+  }
+
+  function uniqueSorted(values) {
+    const arr = Array.from(new Set(values.filter(Boolean)));
+    if (!arr.length) return arr;
+    if (collator) return arr.sort((a, b) => collator.compare(a, b));
+    return arr.sort((a, b) => a.localeCompare(b));
+  }
+
+  function applyFilter(table, state) {
+    const rows = collectRows(table).filter(row => row.dataset?.bnHeaderRow !== '1');
+    const total = rows.length;
+    if (!total) return { visible: 0, total: 0, summary: '暂无数据', active: false };
+    if (!state.enabled) {
+      rows.forEach(row => row.classList.remove('bn-filter-hide'));
+      return { visible: total, total, summary: '未启用筛选', active: false };
+    }
+    if (!state.selected.size) {
+      rows.forEach(row => row.classList.remove('bn-filter-hide'));
+      return { visible: total, total, summary: '未选择学校，显示全部', active: false };
+    }
+    const selected = state.selected;
+    let visible = 0;
+    rows.forEach(row => {
+      const key = row.dataset?.bnSchool || '';
+      if (selected.has(key)) {
+        row.classList.remove('bn-filter-hide');
+        visible += 1;
+      } else {
+        row.classList.add('bn-filter-hide');
+      }
+    });
+    return {
+      visible,
+      total,
+      summary: `已选学校：${Array.from(selected).join('、')}`,
+      active: true
+    };
+  }
+
+  function csvEscape(value) {
+    const text = (value || '').replace(/\r?\n|\r/g, ' ').trim();
+    if (/[",\n]/.test(text)) return '"' + text.replace(/"/g, '""') + '"';
+    return text;
+  }
+
+  function buildCsvFileName() {
+    const now = new Date();
+    const iso = now.toISOString().slice(0, 10).replace(/-/g, '');
+    return `ranking-${iso}.csv`;
+  }
+
+  function exportVisibleRows(table) {
+    const rows = collectRows(table).filter(row => row.dataset?.bnHeaderRow !== '1');
+    if (!rows.length) return false;
+    const headerRows = [];
+    if (table.tHead && table.tHead.rows.length) {
+      const head = table.tHead.rows[0];
+      headerRows.push(Array.from(head.cells || []).map(cell => csvEscape(getText(cell))));
+    }
+    const bodyRows = rows
+      .filter(row => !row.classList.contains('bn-filter-hide'))
+      .map(row => Array.from(row.cells || []).map(cell => csvEscape(getText(cell))));
+    if (!bodyRows.length) return false;
+    const lines = [...headerRows, ...bodyRows].map(cols => cols.join(','));
+    const content = '\ufeff' + lines.join('\r\n');
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = buildCsvFileName();
+    document.body.appendChild(anchor);
+    anchor.click();
+    setTimeout(() => {
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(url);
+    }, 0);
+    return true;
+  }
+
+  function attachDownloadButton(container, table) {
+    let button = document.querySelector('#bn-ranking-download');
+    if (!button) {
+      button = document.createElement('button');
+      button.type = 'button';
+      button.id = 'bn-ranking-download';
+      button.className = 'ui button primary';
+      button.textContent = '下载表格';
+      container.appendChild(button);
+    } else if (!container.contains(button)) {
+      container.appendChild(button);
+    }
+    if (!button.dataset.bnDownloadBound) {
+      button.addEventListener('click', event => {
+        event.preventDefault();
+        exportVisibleRows(table);
+      });
+      button.dataset.bnDownloadBound = '1';
+    }
+    return button;
+  }
+
+  function setupFilterUI(table, state, schools) {
+    injectCSS();
+    const parent = table.parentElement || table;
+    const panel = document.createElement('div');
+    panel.className = 'ui segment bn-ranking-filter';
+    panel.style.display = state.enabled && schools.length ? '' : 'none';
+
+    const header = document.createElement('div');
+    header.className = 'bn-filter-header';
+    const title = document.createElement('div');
+    title.className = 'bn-filter-title';
+    title.textContent = '榜单筛选';
+    header.appendChild(title);
+    panel.appendChild(header);
+
+    const summary = document.createElement('div');
+    summary.className = 'bn-filter-summary';
+    summary.textContent = state.enabled ? '筛选已启用' : '未启用筛选';
+    panel.appendChild(summary);
+
+    const count = document.createElement('div');
+    count.className = 'bn-filter-count';
+    panel.appendChild(count);
+
+    const list = document.createElement('div');
+    list.id = 'bn-school-select';
+    list.className = 'bn-school-select';
+    const checkboxRefs = [];
+    if (schools.length) {
+      schools.forEach(name => {
+        const label = document.createElement('label');
+        label.className = 'bn-filter-option';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = name;
+        checkbox.dataset.school = name;
+        if (state.selected.has(name)) checkbox.checked = true;
+        label.append(checkbox, document.createTextNode(name));
+        list.appendChild(label);
+        checkboxRefs.push(checkbox);
+      });
+    } else {
+      summary.textContent = '未找到学校信息，暂无法筛选';
+    }
+    panel.appendChild(list);
+
+    const actions = document.createElement('div');
+    actions.className = 'bn-filter-actions';
+    panel.appendChild(actions);
+    attachDownloadButton(actions, table);
+
+    if (parent && parent.insertBefore) parent.insertBefore(panel, table);
+    else document.body.insertBefore(panel, document.body.firstChild);
+
+    function syncCheckboxStates() {
+      checkboxRefs.forEach(checkbox => {
+        checkbox.checked = state.selected.has(checkbox.value);
+        checkbox.disabled = !state.enabled;
+      });
+    }
+
+    function syncVisibility() {
+      const visible = state.enabled && schools.length > 0;
+      panel.style.display = visible ? '' : 'none';
+    }
+
+    function refresh() {
+      syncCheckboxStates();
+      const result = applyFilter(table, state);
+      if (!schools.length) {
+        summary.textContent = '未找到学校信息，暂无法筛选';
+        summary.classList.remove('bn-active');
+        count.textContent = result.total ? `当前显示 ${result.visible} / ${result.total}` : '';
+        return;
+      }
+      summary.textContent = result.summary;
+      summary.classList.toggle('bn-active', !!result.active);
+      count.textContent = result.total ? `当前显示 ${result.visible} / ${result.total}` : '';
+    }
+
+    list.addEventListener('change', event => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement) || target.type !== 'checkbox') return;
+      if (!state.enabled) {
+        target.checked = state.selected.has(target.value);
+        return;
+      }
+      if (target.checked) state.selected.add(target.value);
+      else state.selected.delete(target.value);
+      GM_setValue(RANKING_FILTER_SELECTED_KEY, Array.from(state.selected));
+      refresh();
+    });
+
+    refresh();
+    syncVisibility();
+
+    return { panel, refresh, syncVisibility, syncCheckboxStates };
+  }
+
+  async function init() {
+    injectCSS();
+    const table = await waitForTable();
+    if (!table) return;
+    const schoolIndex = detectSchoolColumn(table);
+    const rows = collectRows(table);
+    let schoolHeaderText = '';
+    if (schoolIndex >= 0) {
+      const headRow = table.tHead && table.tHead.rows && table.tHead.rows[0];
+      if (headRow && headRow.cells && headRow.cells[schoolIndex]) {
+        schoolHeaderText = getText(headRow.cells[schoolIndex]);
+      }
+      if (!schoolHeaderText && table.tBodies && table.tBodies.length) {
+        const maybeHeaderRow = table.tBodies[0].rows && table.tBodies[0].rows[0];
+        if (maybeHeaderRow && maybeHeaderRow.cells && maybeHeaderRow.cells[schoolIndex]) {
+          const candidateCell = maybeHeaderRow.cells[schoolIndex];
+          const candidateText = getText(candidateCell);
+          if ((candidateCell.tagName || '').toUpperCase() === 'TH' || /学校|院校|单位|School/i.test(candidateText)) {
+            schoolHeaderText = candidateText;
+          }
+        }
+      }
+    }
+
+    rows.forEach(row => annotateRow(row, schoolIndex, schoolHeaderText));
+    const schools = schoolIndex >= 0
+      ? uniqueSorted(rows
+        .filter(row => row.dataset?.bnHeaderRow !== '1')
+        .map(row => row.dataset?.bnSchool || ''))
+      : [];
+
+    const savedSelectionRaw = GM_getValue(RANKING_FILTER_SELECTED_KEY, []);
+    const savedSelection = Array.isArray(savedSelectionRaw)
+      ? savedSelectionRaw.map(name => (typeof name === 'string' ? name.trim() : '')).filter(Boolean)
+      : [];
+    const dedupedSelection = Array.from(new Set(savedSelection));
+    const validSelected = dedupedSelection.filter(name => schools.includes(name));
+    if (validSelected.length !== dedupedSelection.length) {
+      GM_setValue(RANKING_FILTER_SELECTED_KEY, validSelected);
+    }
+
+    const requestedEnabled = !!GM_getValue(RANKING_FILTER_ENABLED_KEY, false);
+    const state = {
+      enabled: requestedEnabled && schools.length > 0,
+      requested: requestedEnabled,
+      selected: new Set(validSelected),
+      schoolIndex,
+      headerText: schoolHeaderText
+    };
+
+    setupFilterUI(table, state, schools);
+  }
+
+  init().catch(err => console.error('[BN] Ranking enhancement failed', err));
 })();
 
 /* === BN PATCH 2: user menu pure fade-in (no size change) + shadow fade === */
