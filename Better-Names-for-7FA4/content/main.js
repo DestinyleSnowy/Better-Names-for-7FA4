@@ -3199,11 +3199,24 @@ window.getCurrentUserId = getCurrentUserId;
     });
   }
 
-  function annotateRow(row, index) {
+  function annotateRow(row, index, headerText) {
     if (!row || typeof index !== 'number' || index < 0) return '';
     const cell = row.cells && row.cells[index];
-    const value = cell ? getText(cell) : '';
-    if (value !== undefined) row.dataset.bnSchool = value;
+    if (!cell) {
+      delete row.dataset.bnHeaderRow;
+      row.dataset.bnSchool = '';
+      return '';
+    }
+    const value = getText(cell);
+    const tag = (cell.tagName || '').toUpperCase();
+    const isHeader = tag === 'TH' || (headerText && value === headerText);
+    if (isHeader) {
+      row.dataset.bnHeaderRow = '1';
+      row.dataset.bnSchool = '';
+      return '';
+    }
+    delete row.dataset.bnHeaderRow;
+    row.dataset.bnSchool = value;
     return value;
   }
 
@@ -3247,7 +3260,7 @@ window.getCurrentUserId = getCurrentUserId;
   }
 
   function applyFilter(table, state) {
-    const rows = collectRows(table);
+    const rows = collectRows(table).filter(row => row.dataset?.bnHeaderRow !== '1');
     const total = rows.length;
     if (!total) return { visible: 0, total: 0, summary: '暂无数据', active: false };
     if (!state.enabled) {
@@ -3290,7 +3303,7 @@ window.getCurrentUserId = getCurrentUserId;
   }
 
   function exportVisibleRows(table) {
-    const rows = collectRows(table);
+    const rows = collectRows(table).filter(row => row.dataset?.bnHeaderRow !== '1');
     if (!rows.length) return false;
     const headerRows = [];
     if (table.tHead && table.tHead.rows.length) {
@@ -3444,8 +3457,30 @@ window.getCurrentUserId = getCurrentUserId;
     if (!table) return;
     const schoolIndex = detectSchoolColumn(table);
     const rows = collectRows(table);
-    rows.forEach(row => annotateRow(row, schoolIndex));
-    const schools = schoolIndex >= 0 ? uniqueSorted(rows.map(row => row.dataset?.bnSchool || '')) : [];
+    let schoolHeaderText = '';
+    if (schoolIndex >= 0) {
+      const headRow = table.tHead && table.tHead.rows && table.tHead.rows[0];
+      if (headRow && headRow.cells && headRow.cells[schoolIndex]) {
+        schoolHeaderText = getText(headRow.cells[schoolIndex]);
+      }
+      if (!schoolHeaderText && table.tBodies && table.tBodies.length) {
+        const maybeHeaderRow = table.tBodies[0].rows && table.tBodies[0].rows[0];
+        if (maybeHeaderRow && maybeHeaderRow.cells && maybeHeaderRow.cells[schoolIndex]) {
+          const candidateCell = maybeHeaderRow.cells[schoolIndex];
+          const candidateText = getText(candidateCell);
+          if ((candidateCell.tagName || '').toUpperCase() === 'TH' || /学校|院校|单位|School/i.test(candidateText)) {
+            schoolHeaderText = candidateText;
+          }
+        }
+      }
+    }
+
+    rows.forEach(row => annotateRow(row, schoolIndex, schoolHeaderText));
+    const schools = schoolIndex >= 0
+      ? uniqueSorted(rows
+        .filter(row => row.dataset?.bnHeaderRow !== '1')
+        .map(row => row.dataset?.bnSchool || ''))
+      : [];
 
     const savedSelectionRaw = GM_getValue(RANKING_FILTER_SELECTED_KEY, []);
     const savedSelection = Array.isArray(savedSelectionRaw)
@@ -3462,7 +3497,8 @@ window.getCurrentUserId = getCurrentUserId;
       enabled: requestedEnabled && schools.length > 0,
       requested: requestedEnabled,
       selected: new Set(validSelected),
-      schoolIndex
+      schoolIndex,
+      headerText: schoolHeaderText
     };
 
     setupFilterUI(table, state, schools);
