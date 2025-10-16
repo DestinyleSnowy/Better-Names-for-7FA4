@@ -121,7 +121,7 @@ window.getCurrentUserId = getCurrentUserId;
       if (!(host === '7fa4.cn' || host.endsWith('.7fa4.cn'))) return null;
       if (RENEW_SUFFIX_RE.test(url.pathname)) return null;
       const match = url.pathname.match(RENEW_PATH_RE);
-      if (!match) return null;
+      if (!match || match[1] % 100 == 0) return null;
       url.pathname = `/problems/tag/${match[1]}/renew`;
       return url.toString();
     } catch (err) {
