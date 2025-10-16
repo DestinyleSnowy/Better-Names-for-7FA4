@@ -1360,7 +1360,7 @@ window.getCurrentUserId = getCurrentUserId;
       try {
         urls.push(chrome.runtime.getURL('data/users.json'));
       } catch (err) {
-        console.warn('Failed to resolve users.json via chrome.runtime.getURL', err);
+        // console.warn('Failed to resolve users.json via chrome.runtime.getURL', err);
       }
     }
     urls.push('data/users.json');
@@ -1370,12 +1370,12 @@ window.getCurrentUserId = getCurrentUserId;
         if (resp && resp.ok) {
           return await resp.json();
         }
-        console.warn(`Failed to load users.json from ${url}: ${resp ? resp.status : 'no response'}`);
+        // console.warn(`Failed to load users.json from ${url}: ${resp ? resp.status : 'no response'}`);
       } catch (err) {
-        console.warn(`Failed to load users.json from ${url}`, err);
+        // console.warn(`Failed to load users.json from ${url}`, err);
       }
     }
-    console.warn('Users data could not be loaded; using empty map.');
+    // console.warn('Users data could not be loaded; using empty map.');
     return {};
   }
 
@@ -2409,7 +2409,7 @@ window.getCurrentUserId = getCurrentUserId;
     }, true);
 
   } catch (err) {
-    console.warn('[7fa4-better] submissions-guard error:', err);
+    // console.warn('[7fa4-better] submissions-guard error:', err);
   }
 })();
 
