@@ -3129,6 +3129,7 @@ window.getCurrentUserId = getCurrentUserId;
   const collator = (typeof Intl !== 'undefined' && typeof Intl.Collator === 'function')
     ? new Intl.Collator(['zh-Hans-CN', 'zh-CN', 'zh', 'zh-Hans'], { sensitivity: 'base', usage: 'sort' })
     : null;
+  const FALLBACK_SCHOOL_NAME = '其他';
 
   let cssInjected = false;
   const RANKING_FILTER_ENABLED_KEY = 'rankingFilter.enabled';
@@ -3215,8 +3216,9 @@ window.getCurrentUserId = getCurrentUserId;
       return '';
     }
     delete row.dataset.bnHeaderRow;
-    row.dataset.bnSchool = value;
-    return value;
+    const normalized = value || FALLBACK_SCHOOL_NAME;
+    row.dataset.bnSchool = normalized;
+    return normalized;
   }
 
   function isHeaderRow(row) {
@@ -3273,7 +3275,7 @@ window.getCurrentUserId = getCurrentUserId;
     const selected = state.selected;
     let visible = 0;
     rows.forEach(row => {
-      const key = row.dataset?.bnSchool || '';
+      const key = row.dataset?.bnSchool || FALLBACK_SCHOOL_NAME;
       if (selected.has(key)) {
         row.classList.remove('bn-filter-hide');
         visible += 1;
@@ -3469,12 +3471,15 @@ window.getCurrentUserId = getCurrentUserId;
     const schools = schoolIndex >= 0
       ? uniqueSorted(rows
         .filter(row => row.dataset?.bnHeaderRow !== '1')
-        .map(row => row.dataset?.bnSchool || ''))
+        .map(row => row.dataset?.bnSchool || FALLBACK_SCHOOL_NAME))
       : [];
 
     const savedSelectionRaw = GM_getValue(RANKING_FILTER_SELECTED_KEY, []);
     const savedSelection = Array.isArray(savedSelectionRaw)
-      ? savedSelectionRaw.map(name => (typeof name === 'string' ? name.trim() : '')).filter(Boolean)
+      ? savedSelectionRaw
+        .map(name => (typeof name === 'string' ? name.trim() : ''))
+        .map(name => name || FALLBACK_SCHOOL_NAME)
+        .filter(Boolean)
       : [];
     const dedupedSelection = Array.from(new Set(savedSelection));
     const validSelected = dedupedSelection.filter(name => schools.includes(name));
