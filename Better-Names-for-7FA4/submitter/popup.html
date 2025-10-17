@@ -1,19 +1,40 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="zh-CN">
 <head>
-	<meta charset="utf-8">
-	<link rel="stylesheet" href="popup.css">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="popup.css">
+    <title>Better Names for 7FA4</title>
 </head>
-
 <body>
-	<p id="loginStatus" class="text"></p>
-	<button id="sendPage" class="button">发送提交</button>
-	<button id="sendVjPage" class="button">发送提交 | vjudge 题号</button>
-	<button id="getCookies" class="button">更新 7FA4 登录信息</button>
-	<script src="jquery-3.7.0.min.js"></script>
-	<script src="jquery.cookie.js"></script>
-	<script src="popup.js"></script>
+    <div class="panel">
+        <header class="header">
+            <div class="heading">
+                <h1 class="title">Better Names</h1>
+                <p class="subtitle">HarmonyOS 风格的 7FA4 助手</p>
+            </div>
+            <button class="icon-btn" id="settingsBtn" title="打开设置">
+                <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+                    <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z" />
+                    <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16a2.887 2.887 0 0 0-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094a2.887 2.887 0 0 0 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292a2.887 2.887 0 0 0 2.54 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319a2.887 2.887 0 0 0 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16a2.887 2.887 0 0 0 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094a2.887 2.887 0 0 0 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292a2.887 2.887 0 0 0-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319z" />
+                </svg>
+            </button>
+        </header>
+        <section class="status-card" aria-live="polite">
+            <div class="status-label">登录状态</div>
+            <div id="loginStatus" class="status-value">正在检测...</div>
+        </section>
+        <section class="actions">
+            <button id="sendPage" class="btn primary-btn">发送提交</button>
+            <button id="sendVjPage" class="btn secondary-btn">发送提交 | vjudge 题号</button>
+            <button id="getCookies" class="btn tertiary-btn">更新 7FA4 登录信息</button>
+        </section>
+        <footer class="tips">
+            <p>按钮悬停与按压均带有柔和的触感反馈，符合 HarmonyOS 设计语言。</p>
+        </footer>
+    </div>
+    <script src="jquery-3.7.0.min.js"></script>
+    <script src="jquery.cookie.js"></script>
+    <script src="popup.js"></script>
 </body>
-
 </html>
