@@ -1,5 +1,5 @@
 // Better Names for 7FA4
-// 6.0.0 SP10 Developer
+// 6.0.0 SP11 Developer
 
 function getCurrentUserId() {
   const ud = document.querySelector('#user-dropdown');
@@ -852,7 +852,7 @@ window.getCurrentUserId = getCurrentUserId;
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
       <div class="bn-version">
-        <div class="bn-version-text">6.0.0 SP10 Developer</div>
+        <div class="bn-version-text">6.0.0 SP11 Developer</div>
       </div>
     </div>`;
   document.body.appendChild(container);
@@ -1879,6 +1879,9 @@ window.getCurrentUserId = getCurrentUserId;
   );
   let autoExit = GM_getValue(KEY.autoExit, true);
   let observer = null;
+  let currentDateIso = null;
+  const planCache = new Map();
+  let planRequestToken = 0;
 
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
@@ -1932,6 +1935,57 @@ window.getCurrentUserId = getCurrentUserId;
     const c = codeFromRow(r);
     return c && /^L/i.test(c);
   };
+
+  const findRowByPid = (pid) => {
+    const num = Number(pid);
+    if (!num) return null;
+    return $$(SEL.rows).find(row => Number(pidFromRow(row)) === num) || null;
+  };
+
+  function ensureRowSelection(pid, on) {
+    const row = findRowByPid(pid);
+    if (!row) return;
+    if (on && !row.querySelector('td.padder-cell')) {
+      const cell = makeCell(row, pid);
+      if (cell) row.prepend(cell);
+    }
+    const cb = row.querySelector('td.padder-cell input');
+    if (cb) cb.checked = !!on;
+    row.classList.toggle('padder-selected', !!(cb && cb.checked));
+  }
+
+  function applyPlanSelections(ids, { replace = false } = {}) {
+    if (replace) {
+      selected.clear();
+      $$(SEL.rows).forEach(row => {
+        row.classList.remove('padder-selected');
+        const cb = row.querySelector('td.padder-cell input');
+        if (cb) cb.checked = false;
+      });
+    }
+    if (!Array.isArray(ids) || !ids.length) {
+      persist();
+      syncHeader();
+      count();
+      return;
+    }
+    for (const rawId of ids) {
+      const pid = Number(rawId);
+      if (!pid) continue;
+      const row = findRowByPid(pid);
+      const code = row ? (codeFromRow(row) || `#${pid}`) : `#${pid}`;
+      const prev = selected.get(pid);
+      if (!prev) {
+        selected.set(pid, code);
+      } else if (prev.startsWith('#') && code && !code.startsWith('#')) {
+        selected.set(pid, code);
+      }
+      ensureRowSelection(pid, true);
+    }
+    persist();
+    syncHeader();
+    count();
+  }
 
   function toggleButton() {
     const host = $('.ui.grid .row .four.wide.right.aligned.column') || document.body;
@@ -2040,7 +2094,21 @@ window.getCurrentUserId = getCurrentUserId;
     const tomorrow = tomorrowISO();
     date.min = tomorrow;
     date.value = GM_getValue(KEY.date, tomorrow);
-    date.onchange = () => { if (date.value < tomorrow) date.value = tomorrow; GM_setValue(KEY.date, date.value); };
+    if (date.value < tomorrow) date.value = tomorrow;
+    currentDateIso = date.value;
+    const initSync = syncExistingPlan(currentDateIso, { force: true, silent: true });
+    if (initSync && typeof initSync.catch === 'function') {
+      initSync.catch(err => log('initial sync failed', err));
+    }
+    date.onchange = async () => {
+      if (date.value < tomorrow) date.value = tomorrow;
+      GM_setValue(KEY.date, date.value);
+      const newIso = date.value;
+      const changed = newIso !== currentDateIso;
+      if (changed) clearSelections();
+      currentDateIso = newIso;
+      await syncExistingPlan(newIso, { force: true });
+    };
     $('#pad-copy').onclick = () => { GM_setClipboard(JSON.stringify({ date: date.value, codes: [...selected.values()] }, null, 2)); notify(`已复制 ${selected.size} 个编号`); };
     $('#pad-clear').onclick = () => { if (!selected.size || !confirm('确认清空？')) return; clearSelections(); };
     $('#pad-ok').onclick = submitPlan;
@@ -2101,6 +2169,28 @@ window.getCurrentUserId = getCurrentUserId;
     return { id: up.id || up.plan_id || '', problemIds: arr };
   }
 
+  async function syncExistingPlan(dateIso, { force = false, silent = false } = {}) {
+    if (!dateIso) return null;
+    const uid = getCurrentUserId();
+    if (!uid) return null;
+    const requestId = ++planRequestToken;
+    const epoch = dateToEpoch(dateIso, CFG.tzOffsetHours);
+    let meta = planCache.get(dateIso);
+    if (!meta || force) {
+      try {
+        meta = await fetchPlanJSON({ uid, epoch });
+        planCache.set(dateIso, { ...meta, epoch });
+      } catch (err) {
+        log('syncExistingPlan: fetch failed', err);
+        if (requestId === planRequestToken && !silent) notify('[错误代码 D1] 未能读取计划，请稍后重试');
+        return null;
+      }
+    }
+    if (requestId !== planRequestToken) return meta || null;
+    applyPlanSelections((meta && Array.isArray(meta.problemIds)) ? meta.problemIds : [], { replace: true });
+    return meta;
+  }
+
   function buildBody({ id, epoch, uid, values }) {
     const p = new URLSearchParams();
     if (id) p.set('id', String(id));
@@ -2135,43 +2225,111 @@ window.getCurrentUserId = getCurrentUserId;
   }
 
   async function submitPlan() {
-    if (!selected.size) return notify('[错误代码 A1] 请先勾选题目');
-
     const iso = $('#pad-date')?.value || tomorrowISO();
+    currentDateIso = iso;
     const epoch = dateToEpoch(iso, CFG.tzOffsetHours);
-    const uid = getCurrentUserId(); if (!uid) { notify('[错误代码 B1] 无法识别 user_id'); return; }
+    const uid = getCurrentUserId();
+    if (!uid) { notify('[错误代码 B1] 无法识别 user_id'); return; }
 
-    const addIds = [...selected.keys()].map(Number);
-    if (!addIds.length) return notify('[错误代码 B2] 未解析到数字ID');
+    const rawSelectedKeys = [...selected.keys()];
+    const selectedIds = rawSelectedKeys.map(Number).filter(Boolean);
+    if (!selectedIds.length && selected.size) {
+      notify('[错误代码 B2] 未解析到数字ID');
+      return;
+    }
 
-    if (!confirm(`将提交 ${addIds.length} 个题到 ${iso}？`)) return;
+    let meta;
+    try {
+      meta = await fetchPlanJSON({ uid, epoch });
+      planCache.set(iso, { ...meta, epoch });
+    } catch (err) {
+      log('submitPlan: fetch existing plan failed', err);
+      notify('[错误代码 B3] 获取已有计划失败，请稍后再试');
+      return;
+    }
 
-    // 1) 读取现有 plan → id + 已有IDs
-    const meta = await fetchPlanJSON({ uid, epoch });
+    const baseList = Array.isArray(meta.problemIds) ? meta.problemIds.map(Number).filter(Boolean) : [];
+    const baseSet = new Set(baseList);
+    const selectedSet = new Set(selectedIds);
+
+    if (!selectedSet.size && !baseSet.size) {
+      notify('[提示] 当前无题目可提交');
+      return;
+    }
+
+    const desired = [];
+    const seen = new Set();
+    for (const id of baseList) {
+      if (selectedSet.has(id) && !seen.has(id)) { desired.push(id); seen.add(id); }
+    }
+    for (const id of selectedIds) {
+      if (!seen.has(id)) { desired.push(id); seen.add(id); }
+    }
+
+    const addedCount = desired.filter(id => !baseSet.has(id)).length;
+    const removedCount = baseList.filter(id => !selectedSet.has(id)).length;
+    const confirmMsg = `将提交 ${desired.length} 个题目（新增 ${addedCount} 个，移除 ${removedCount} 个）到 ${iso}？`;
+    if (!confirm(confirmMsg)) return;
+
     const planId = meta.id;
-    const set = new Set(meta.problemIds);
-    addIds.forEach(i => set.add(i));
-    const union = [...set];
 
     try {
-      const body = buildBody({ id: planId, epoch, uid, values: union });
+      const body = buildBody({ id: planId, epoch, uid, values: desired });
       await postPlan(body, uid);
       const after = await fetchPlanJSON({ uid, epoch });
-      const ok = union.every(x => after.problemIds.includes(x));
-      if (ok) { notify(`保存成功：加入 ${addIds.length} 题（共 ${union.length} 题）`); afterSuccess(); return; }
+      planCache.set(iso, { ...after, epoch });
+      const ok = Array.isArray(after.problemIds)
+        && desired.length === after.problemIds.length
+        && desired.every((x, i) => after.problemIds[i] === x);
+      if (ok) {
+        if (!autoExit) applyPlanSelections(after.problemIds || [], { replace: true });
+        notify(`保存成功：新增 ${addedCount} 题，移除 ${removedCount} 题，共 ${desired.length} 题`);
+        afterSuccess();
+        return;
+      }
     } catch (e) { }
 
-    // 逐条补齐
+    const removedList = baseList.filter(id => !selectedSet.has(id));
+
+    // 逐条同步，优先移除再补充
     try {
-      for (const id of addIds) {
-        const latest = await fetchPlanJSON({ uid, epoch });
-        const s2 = new Set(latest.problemIds); s2.add(id);
-        const body2 = buildBody({ id: latest.id || planId, epoch, uid, values: [...s2] });
+      let workingSet = new Set(baseList);
+      let workingPlanId = planId;
+      let latest = meta;
+
+      for (const id of removedList) {
+        if (!workingSet.has(id)) continue;
+        workingSet.delete(id);
+        const body2 = buildBody({ id: workingPlanId, epoch, uid, values: [...workingSet] });
         await postPlan(body2, uid);
+        latest = await fetchPlanJSON({ uid, epoch });
+        workingSet = new Set(latest.problemIds || []);
+        workingPlanId = latest.id || workingPlanId;
       }
+
+      for (const id of desired) {
+        if (workingSet.has(id)) continue;
+        workingSet.add(id);
+        const body3 = buildBody({ id: workingPlanId, epoch, uid, values: [...workingSet] });
+        await postPlan(body3, uid);
+        latest = await fetchPlanJSON({ uid, epoch });
+        workingSet = new Set(latest.problemIds || []);
+        workingPlanId = latest.id || workingPlanId;
+      }
+
+      const bodyFinal = buildBody({ id: latest.id || workingPlanId, epoch, uid, values: desired });
+      await postPlan(bodyFinal, uid);
       const final = await fetchPlanJSON({ uid, epoch });
-      const ok2 = union.every(x => final.problemIds.includes(x));
-      if (ok2) { notify(`保存成功（逐条补齐）：加入 ${addIds.length} 题（共 ${union.length} 题）`); afterSuccess(); return; }
+      planCache.set(iso, { ...final, epoch });
+      const ok2 = Array.isArray(final.problemIds)
+        && desired.length === final.problemIds.length
+        && desired.every((x, i) => final.problemIds[i] === x);
+      if (ok2) {
+        if (!autoExit) applyPlanSelections(final.problemIds || [], { replace: true });
+        notify(`保存成功（逐条同步）：新增 ${addedCount} 题，移除 ${removedCount} 题，共 ${desired.length} 题`);
+        afterSuccess();
+        return;
+      }
     } catch (e) { }
 
     notify('[错误代码 C1] 提交未生效');
