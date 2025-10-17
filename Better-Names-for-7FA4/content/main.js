@@ -1,5 +1,5 @@
 // Better Names for 7FA4
-// 6.0.0 SP9 Developer
+// 6.0.0 SP10 Developer
 
 function getCurrentUserId() {
   const ud = document.querySelector('#user-dropdown');
@@ -30,6 +30,7 @@ window.getCurrentUserId = getCurrentUserId;
   const hideOrig = GM_getValue('hideOrig', true);
   const enableMenu = GM_getValue('enableUserMenu', true);
   const enablePlanAdder = GM_getValue('enablePlanAdder', true);
+  const enableGuard = GM_getValue('enableGuard', false);
   const enableAutoRenew = GM_getValue('enableAutoRenew', false);
   const enableSubmitter = GM_getValue('enableSubmitter', true);
   const enableRankingFilterSetting = GM_getValue('rankingFilter.enabled', false);
@@ -430,6 +431,22 @@ window.getCurrentUserId = getCurrentUserId;
       color: #fff;
       box-shadow: 0 2px 6px rgba(0,123,255,0.35);
     }
+    .bn-info-icon.bn-info-icon-warning {
+      background: rgba(255,193,7,0.18);
+      color: #a66a00;
+    }
+    .bn-info-icon.bn-info-icon-warning svg {
+      width: 10px;
+      height: 10px;
+      fill: currentColor;
+    }
+    .bn-info.bn-info-active .bn-info-icon.bn-info-icon-warning,
+    .bn-info .bn-info-icon.bn-info-icon-warning:hover,
+    .bn-info .bn-info-icon.bn-info-icon-warning:focus-visible {
+      background: #ffb100;
+      color: #3f2a00;
+      box-shadow: 0 2px 6px rgba(255,177,0,0.4);
+    }
     .bn-info-tooltip {
       position: absolute;
       top: calc(100% + 8px);
@@ -736,8 +753,16 @@ window.getCurrentUserId = getCurrentUserId;
           <div class="bn-title">
               <svg class="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
               二三帮守护
+              <span class="bn-info">
+                <span class="bn-info-icon bn-info-icon-warning" tabindex="0" role="button" aria-label="该功能仍在实现中，存在在“统计”页面若该题未在第一次提交通过会错误触发拦截功能的问题。">
+                  <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                    <path d="M8.982 1.566a1.13 1.13 0 0 0-1.964 0L.165 13.233c-.457.778.091 1.767.982 1.767h13.706c.89 0 1.438-.99.982-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm0 7a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+                  </svg>
+                </span>
+                <span class="bn-info-tooltip" role="tooltip">该功能仍在实现中，存在在“统计”页面若该题未在第一次提交通过会错误触发拦截功能的问题。</span>
+              </span>
             </div>
-            <div class="bn-desc">该功能仍在精细实现中，仅供内部开发使用，暂未开放。</div>
+            <label><input type="checkbox" id="bn-enable-guard" ${enableGuard ? 'checked' : ''}/> 启用二三帮守护</label>
           </div>
           <div class="bn-section">
             <div class="bn-title">
@@ -780,7 +805,11 @@ window.getCurrentUserId = getCurrentUserId;
               </svg>
               自动更新
               <span class="bn-info">
-                <span class="bn-info-icon" tabindex="0" role="button" aria-label="由于用户脚本只能在首个请求返回后才能运行，因此首个“原始”页面请求无法被阻止，当前实现已经尽快中止并改写。">?</span>
+                <span class="bn-info-icon bn-info-icon-warning" tabindex="0" role="button" aria-label="由于用户脚本只能在首个请求返回后才能运行，因此首个“原始”页面请求无法被阻止，当前实现已经尽快中止并改写。">
+                  <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                    <path d="M8.982 1.566a1.13 1.13 0 0 0-1.964 0L.165 13.233c-.457.778.091 1.767.982 1.767h13.706c.89 0 1.438-.99.982-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm0 7a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+                  </svg>
+                </span>
                 <span class="bn-info-tooltip" role="tooltip">由于用户脚本只能在首个请求返回后才能运行，因此首个“原始”页面请求无法被阻止，当前实现已经尽快中止并改写。</span>
               </span>
             </div>
@@ -823,7 +852,7 @@ window.getCurrentUserId = getCurrentUserId;
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
       <div class="bn-version">
-        <div class="bn-version-text">6.0.0 SP9 Developer</div>
+        <div class="bn-version-text">6.0.0 SP10 Developer</div>
       </div>
     </div>`;
   document.body.appendChild(container);
@@ -865,6 +894,7 @@ window.getCurrentUserId = getCurrentUserId;
   const chkHo = document.getElementById('bn-hide-orig');
 
   const chkMenu = document.getElementById('bn-enable-user-menu');
+  const chkGuard = document.getElementById('bn-enable-guard');
   const chkPlan = document.getElementById('bn-enable-plan');
   const chkAutoRenew = document.getElementById('bn-enable-renew');
   const chkRankingFilter = document.getElementById('bn-enable-ranking-filter');
@@ -878,6 +908,13 @@ window.getCurrentUserId = getCurrentUserId;
   const saveActions = document.getElementById('bn-save-actions');
   const chkVj = document.getElementById('bn-enable-vj');
   const chkHideDoneSkip = document.getElementById('bn-hide-done-skip');
+
+  const disableNeedWarn = () => {
+    if (typeof window.needWarn === 'function' && !window.__bnGuardOriginalNeedWarn) {
+      window.__bnGuardOriginalNeedWarn = window.needWarn;
+    }
+    window.needWarn = async () => false;
+  };
 
   const infoPairs = [];
   panel.querySelectorAll('.bn-info').forEach((info, index) => {
@@ -934,6 +971,7 @@ window.getCurrentUserId = getCurrentUserId;
     enableCopy,
     hideOrig,
     enableMenu,
+    enableGuard,
     enablePlanAdder,
     enableAutoRenew,
     enableRankingFilter: enableRankingFilterSetting,
@@ -946,6 +984,10 @@ window.getCurrentUserId = getCurrentUserId;
     widthMode,
     themeMode
   };
+
+  if (!enableGuard) {
+    disableNeedWarn();
+  }
 
   pinBtn.classList.toggle('bn-pinned', pinned);
   if (pinned) {
@@ -1184,6 +1226,7 @@ window.getCurrentUserId = getCurrentUserId;
       (document.getElementById('bn-enable-copy').checked !== originalConfig.enableCopy) ||
       (document.getElementById('bn-hide-orig').checked !== originalConfig.hideOrig) ||
       (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) ||
+      (document.getElementById('bn-enable-guard').checked !== originalConfig.enableGuard) ||
       (document.getElementById('bn-enable-plan').checked !== originalConfig.enablePlanAdder) ||
       (document.getElementById('bn-enable-renew').checked !== originalConfig.enableAutoRenew) ||
       (document.getElementById('bn-enable-ranking-filter').checked !== originalConfig.enableRankingFilter) ||
@@ -1228,6 +1271,20 @@ window.getCurrentUserId = getCurrentUserId;
   chkCp.onchange = () => { checkChanged(); };
   chkHo.onchange = checkChanged;
   chkMenu.onchange = checkChanged;
+  chkGuard.onchange = () => {
+    if (!chkGuard.checked) {
+      disableNeedWarn();
+    } else if (typeof window.__bnGuardOriginalNeedWarn === 'function') {
+      window.needWarn = window.__bnGuardOriginalNeedWarn;
+    } else {
+      try {
+        delete window.needWarn;
+      } catch (e) {
+        window.needWarn = undefined;
+      }
+    }
+    checkChanged();
+  };
   chkVj.onchange = checkChanged;
   chkHideDoneSkip.onchange = () => { applyHideDoneSkip(chkHideDoneSkip.checked); checkChanged(); };
   chkPlan.onchange = () => { toggleOption(chkPlan, planOpts); checkChanged(); };
@@ -1272,6 +1329,7 @@ window.getCurrentUserId = getCurrentUserId;
     GM_setValue('hideOrig', chkHo.checked);
     GM_setValue('hideDoneSkip', chkHideDoneSkip.checked);
     GM_setValue('enableUserMenu', chkMenu.checked);
+    GM_setValue('enableGuard', chkGuard.checked);
     GM_setValue('enableVjLink', chkVj.checked);
     GM_setValue('enablePlanAdder', chkPlan.checked);
     GM_setValue('enableAutoRenew', chkAutoRenew.checked);
@@ -1303,6 +1361,18 @@ window.getCurrentUserId = getCurrentUserId;
     chkCp.checked = originalConfig.enableCopy;
     chkHo.checked = originalConfig.hideOrig;
     chkMenu.checked = originalConfig.enableMenu;
+    chkGuard.checked = originalConfig.enableGuard;
+    if (!originalConfig.enableGuard) {
+      disableNeedWarn();
+    } else if (typeof window.__bnGuardOriginalNeedWarn === 'function') {
+      window.needWarn = window.__bnGuardOriginalNeedWarn;
+    } else {
+      try {
+        delete window.needWarn;
+      } catch (e) {
+        window.needWarn = undefined;
+      }
+    }
     chkVj.checked = originalConfig.enableVjLink;
     chkHideDoneSkip.checked = originalConfig.hideDoneSkip;
     applyHideDoneSkip(originalConfig.hideDoneSkip);
@@ -3071,6 +3141,21 @@ window.getCurrentUserId = getCurrentUserId;
     };
     window.needWarn.clearCache = function () { warnCache.clear(); };
   } catch (_e) { /* ignore */ }
+})();
+
+/* === Guard Toggle Enforcement === */
+(function () {
+  try {
+    const guardEnabled = !!GM_getValue('enableGuard', false);
+    if (typeof window.needWarn === 'function' && !window.__bnGuardOriginalNeedWarn) {
+      window.__bnGuardOriginalNeedWarn = window.needWarn;
+    }
+    if (!guardEnabled) {
+      window.needWarn = async () => false;
+    } else if (typeof window.__bnGuardOriginalNeedWarn === 'function') {
+      window.needWarn = window.__bnGuardOriginalNeedWarn;
+    }
+  } catch (e) { /* ignore */ }
 })();
 
 /* === BN PATCH: user menu animation + shadow === */
