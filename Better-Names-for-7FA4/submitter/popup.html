@@ -1,19 +1,33 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="zh-CN">
 <head>
-	<meta charset="utf-8">
-	<link rel="stylesheet" href="popup.css">
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
 </head>
-
 <body>
-	<p id="loginStatus" class="text"></p>
-	<button id="sendPage" class="button">发送提交</button>
-	<button id="sendVjPage" class="button">发送提交 | vjudge 题号</button>
-	<button id="getCookies" class="button">更新 7FA4 登录信息</button>
-	<script src="jquery-3.7.0.min.js"></script>
-	<script src="jquery.cookie.js"></script>
-	<script src="popup.js"></script>
+  <div class="bn-popup" role="dialog" aria-labelledby="bn-popup-title" aria-describedby="bn-popup-subtitle">
+    <header class="bn-popup__header">
+      <div class="bn-popup__badge">Better Names for 7FA4</div>
+      <h1 id="bn-popup-title" class="bn-popup__title">提交助手</h1>
+      <p id="bn-popup-subtitle" class="bn-popup__subtitle">快速同步你的提交记录并保持登录状态</p>
+    </header>
+    <main class="bn-popup__body">
+      <div class="bn-status">
+        <span class="bn-status__label">7FA4 登录状态</span>
+        <p id="loginStatus" class="bn-status__value">&nbsp;</p>
+      </div>
+      <div class="bn-popup__actions" role="group" aria-label="提交操作">
+        <button id="sendPage" class="bn-button" type="button">发送提交</button>
+        <button id="sendVjPage" class="bn-button" type="button">发送提交 · vjudge 题号</button>
+        <button id="getCookies" class="bn-button bn-button--primary" type="button">更新 7FA4 登录信息</button>
+      </div>
+    </main>
+    <footer class="bn-popup__footer">
+      <p class="bn-popup__hint">提示：请在对应提交详情页或 7FA4 站点打开此面板以确保信息完整。</p>
+    </footer>
+  </div>
+  <script src="jquery-3.7.0.min.js"></script>
+  <script src="jquery.cookie.js"></script>
+  <script src="popup.js"></script>
 </body>
-
 </html>
