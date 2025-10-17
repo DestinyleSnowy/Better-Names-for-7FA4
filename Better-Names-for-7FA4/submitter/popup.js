@@ -97,6 +97,17 @@ document.getElementById('sendVjPage').addEventListener('click', async () => {
 	});
 });
 
+const settingsBtn = document.getElementById('settingsBtn');
+if (settingsBtn) {
+	settingsBtn.addEventListener('click', () => {
+		if (chrome.runtime.openOptionsPage) {
+			chrome.runtime.openOptionsPage();
+		} else {
+			alert('请在扩展管理页面中调整 Better Names for 7FA4 设置。');
+		}
+	});
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 	if(request.type != 'GCookies') return;
 	let window_host = sender.origin;
