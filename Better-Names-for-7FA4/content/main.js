@@ -1,5 +1,5 @@
 // Better Names for 7FA4
-// 6.0.0 SP12 Developer
+// 6.0.0 SP13 Developer
 
 function getCurrentUserId() {
   const ud = document.querySelector('#user-dropdown');
@@ -852,7 +852,7 @@ window.getCurrentUserId = getCurrentUserId;
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
       <div class="bn-version">
-        <div class="bn-version-text">6.0.0 SP12 Developer</div>
+        <div class="bn-version-text">6.0.0 SP13 Developer</div>
       </div>
     </div>`;
   document.body.appendChild(container);
@@ -2084,9 +2084,11 @@ window.getCurrentUserId = getCurrentUserId;
       const cell = makeCell(row, pid);
       if (cell) row.prepend(cell);
     }
+    attachRowToggle(row);
     const cb = row.querySelector('td.padder-cell input');
     if (cb) cb.checked = !!on;
     row.classList.toggle('padder-selected', !!(cb && cb.checked));
+    if (cb) animateSelection(row);
   }
 
   function applyPlanSelections(ids, { replace = false } = {}) {
@@ -2163,12 +2165,35 @@ window.getCurrentUserId = getCurrentUserId;
       if (!row.querySelector('td.padder-cell')) {
         const cell = makeCell(row, pid); if (cell) row.prepend(cell);
       }
+      attachRowToggle(row);
       const on = selected.has(pid);
       const cb = row.querySelector('td.padder-cell input');
       if (cb) { cb.checked = on; }
       row.classList.toggle('padder-selected', on);
     });
     syncHeader();
+  }
+  function attachRowToggle(row) {
+    if (!row || row.dataset.padderToggleBound) return;
+    row.dataset.padderToggleBound = '1';
+    row.addEventListener('click', event => {
+      if (!modeOn || event.defaultPrevented || event.button !== 0) return;
+      if (event.target?.closest?.('td.padder-cell')) return;
+      const pid = Number(pidFromRow(row));
+      if (!pid || isLProblemRow(row)) return;
+      const cb = row.querySelector('td.padder-cell input');
+      if (!cb) return;
+      const interactive = event.target?.closest?.('a,button,input,select,textarea,label');
+      const hasModifier = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+      if (interactive && interactive !== cb) {
+        if (hasModifier) return;
+        event.preventDefault();
+      }
+      const next = !cb.checked;
+      cb.checked = next;
+      toggleSelect(row, pid, next, false);
+      count();
+    });
   }
   function makeCell(row, pid) {
     const td = document.createElement('td');
@@ -2179,6 +2204,12 @@ window.getCurrentUserId = getCurrentUserId;
     cb.onchange = () => { toggleSelect(row, pid, cb.checked, false); count(); };
     row.classList.toggle('padder-selected', cb.checked);
     return td;
+  }
+  function animateSelection(row) {
+    if (!row) return;
+    row.classList.remove('padder-animate');
+    void row.offsetWidth;
+    row.classList.add('padder-animate');
   }
   function toggleSelect(row, pid, on, fromHeader) {
     const pidNum = Number(pid) || Number(pidFromRow(row));
@@ -2191,6 +2222,7 @@ window.getCurrentUserId = getCurrentUserId;
       persistPending();
     }
     row.classList.toggle('padder-selected', on);
+    animateSelection(row);
     if (!fromHeader) syncHeader();
     persist();
   }
@@ -2238,7 +2270,9 @@ window.getCurrentUserId = getCurrentUserId;
       #plan-bar .padder{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
       #pad-handle{cursor:move;opacity:.7}
       th#padder-th,td.padder-cell{width:46px;}
-      .padder-selected{background:rgba(0,150,255,.06)!important;}
+      .padder-selected{background:rgba(0,150,255,.06)!important;transition:background-color .24s ease;}
+      .padder-animate{animation:padder-pulse .45s ease;}
+      @keyframes padder-pulse{0%{box-shadow:0 0 0 0 rgba(0,150,255,0);transform:scale(1);}40%{box-shadow:0 0 0 6px rgba(0,150,255,.18);transform:scale(1.01);}100%{box-shadow:0 0 0 0 rgba(0,150,255,0);transform:scale(1);}}
     `);
 
     const date = $('#pad-date');
