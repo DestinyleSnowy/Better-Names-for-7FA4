@@ -1,5 +1,5 @@
 // Better Names for 7FA4
-// 6.0.0 SP11 Developer
+// 6.0.0 SP12 Developer
 
 function getCurrentUserId() {
   const ud = document.querySelector('#user-dropdown');
@@ -852,7 +852,7 @@ window.getCurrentUserId = getCurrentUserId;
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
       <div class="bn-version">
-        <div class="bn-version-text">6.0.0 SP11 Developer</div>
+        <div class="bn-version-text">6.0.0 SP12 Developer</div>
       </div>
     </div>`;
   document.body.appendChild(container);
@@ -2013,6 +2013,38 @@ window.getCurrentUserId = getCurrentUserId;
   const dateToEpoch = (iso, tz) => Math.floor(new Date(`${iso}T00:00:00${offsetStr(tz)}`).getTime() / 1000);
 
   const notify = m => GM_notification({ text: m, timeout: 2600 });
+
+  let planToastStyleInjected = false;
+  function showPlanToast(message) {
+    if (!message) return;
+    if (!planToastStyleInjected) {
+      GM_addStyle(`
+        #bn-plan-toast-container{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;align-items:flex-end;gap:8px;z-index:99999;pointer-events:none;}
+        .bn-plan-toast{background:rgba(33,133,208,.92);color:#fff;padding:10px 14px;border-radius:10px;font-size:14px;line-height:1.45;box-shadow:0 12px 28px rgba(0,0,0,.18);max-width:320px;opacity:0;transform:translateY(14px);transition:opacity .24s ease,transform .24s ease;pointer-events:auto;word-break:break-word;white-space:pre-line;}
+        .bn-plan-toast.bn-plan-toast-visible{opacity:1;transform:translateY(0);}
+      `);
+      planToastStyleInjected = true;
+    }
+    let container = document.getElementById('bn-plan-toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'bn-plan-toast-container';
+      document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    toast.className = 'bn-plan-toast';
+    toast.textContent = message;
+    container.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('bn-plan-toast-visible'));
+    const duration = 3200;
+    window.setTimeout(() => {
+      toast.classList.remove('bn-plan-toast-visible');
+      window.setTimeout(() => {
+        toast.remove();
+        if (!container.childElementCount) container.remove();
+      }, 280);
+    }, duration);
+  }
   const persist = () => {
     const iso = currentDateIso && typeof currentDateIso === 'string' ? currentDateIso : null;
     persistSelectionFor(iso, selected);
@@ -2440,7 +2472,9 @@ window.getCurrentUserId = getCurrentUserId;
         pendingSelected.clear();
         persistPending();
         if (!autoExit) applyPlanSelections(after.problemIds || [], { replace: true });
-        notify(`保存成功：新增 ${addedCount} 题，移除 ${removedCount} 题，共 ${desired.length} 题`);
+        const successMsg = `保存成功：新增 ${addedCount} 题，移除 ${removedCount} 题，共 ${desired.length} 题`;
+        notify(successMsg);
+        showPlanToast(`计划修改完成\n${successMsg}`);
         afterSuccess();
         return;
       }
@@ -2485,7 +2519,9 @@ window.getCurrentUserId = getCurrentUserId;
         pendingSelected.clear();
         persistPending();
         if (!autoExit) applyPlanSelections(final.problemIds || [], { replace: true });
-        notify(`保存成功（逐条同步）：新增 ${addedCount} 题，移除 ${removedCount} 题，共 ${desired.length} 题`);
+        const successMsg2 = `保存成功（逐条同步）：新增 ${addedCount} 题，移除 ${removedCount} 题，共 ${desired.length} 题`;
+        notify(successMsg2);
+        showPlanToast(`计划修改完成\n${successMsg2}`);
         afterSuccess();
         return;
       }
