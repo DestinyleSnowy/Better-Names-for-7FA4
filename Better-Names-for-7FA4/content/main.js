@@ -1867,7 +1867,8 @@ window.getCurrentUserId = getCurrentUserId;
     selected: 'planAdder.selected.v4', // [{pid, code}]
     date: 'planAdder.date',
     barPos: 'planAdder.barPos',
-    autoExit: 'planAdder.autoExit'
+    autoExit: 'planAdder.autoExit',
+    pending: 'planAdder.pending.v1'
   };
 
   const enablePlanAdder = GM_getValue('enablePlanAdder', true);
@@ -1875,13 +1876,55 @@ window.getCurrentUserId = getCurrentUserId;
   let selected = new Map(
     (GM_getValue(KEY.selected, []) || [])
       .filter(o => o.code && !/^L/i.test(o.code))
-      .map(o => [o.pid, o.code])
+      .map(o => [Number(o.pid) || o.pid, o.code])
   );
   let autoExit = GM_getValue(KEY.autoExit, true);
   let observer = null;
   let currentDateIso = null;
   const planCache = new Map();
   let planRequestToken = 0;
+  const normalizePendingEntry = (o) => {
+    if (!o || typeof o !== 'object') return null;
+    const pid = Number(o.pid);
+    const code = typeof o.code === 'string' ? o.code.trim() : '';
+    if (!pid || !code || /^L/i.test(code)) return null;
+    return { pid, code };
+  };
+  const loadPendingStore = () => {
+    const raw = GM_getValue(KEY.pending, {});
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+    const store = {};
+    for (const [iso, list] of Object.entries(raw)) {
+      if (!Array.isArray(list)) continue;
+      const cleaned = list
+        .map(normalizePendingEntry)
+        .filter(Boolean);
+      if (cleaned.length) store[iso] = cleaned;
+    }
+    return store;
+  };
+  let pendingStore = loadPendingStore();
+  const pendingFor = (iso) => {
+    if (!iso || typeof iso !== 'string') return new Map();
+    const list = pendingStore[iso] || [];
+    return new Map(list.map(({ pid, code }) => [Number(pid), code]));
+  };
+  const persistPendingStore = () => GM_setValue(KEY.pending, pendingStore);
+  const persistPendingFor = (iso, map) => {
+    if (!iso || typeof iso !== 'string') return;
+    const arr = [...map]
+      .map(([pid, code]) => ({ pid: Number(pid), code: typeof code === 'string' ? code : '' }))
+      .map(normalizePendingEntry)
+      .filter(Boolean);
+    if (arr.length) pendingStore[iso] = arr;
+    else delete pendingStore[iso];
+    persistPendingStore();
+  };
+  let pendingSelected = new Map();
+  const persistPending = () => {
+    if (!currentDateIso) return;
+    persistPendingFor(currentDateIso, pendingSelected);
+  };
 
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
@@ -1913,7 +1956,9 @@ window.getCurrentUserId = getCurrentUserId;
   const dateToEpoch = (iso, tz) => Math.floor(new Date(`${iso}T00:00:00${offsetStr(tz)}`).getTime() / 1000);
 
   const notify = m => GM_notification({ text: m, timeout: 2600 });
-  const persist = () => GM_setValue(KEY.selected, [...selected].map(([pid, code]) => ({ pid, code })));
+  const persist = () => {
+    GM_setValue(KEY.selected, [...selected].map(([pid, code]) => ({ pid: Number(pid) || pid, code })));
+  };
 
   let _codeColIdx = null; // 缓存编号列索引
   function codeColIndex() {
@@ -1963,13 +2008,8 @@ window.getCurrentUserId = getCurrentUserId;
         if (cb) cb.checked = false;
       });
     }
-    if (!Array.isArray(ids) || !ids.length) {
-      persist();
-      syncHeader();
-      count();
-      return;
-    }
-    for (const rawId of ids) {
+    const list = Array.isArray(ids) ? ids : [];
+    for (const rawId of list) {
       const pid = Number(rawId);
       if (!pid) continue;
       const row = findRowByPid(pid);
@@ -1977,10 +2017,19 @@ window.getCurrentUserId = getCurrentUserId;
       const prev = selected.get(pid);
       if (!prev) {
         selected.set(pid, code);
-      } else if (prev.startsWith('#') && code && !code.startsWith('#')) {
+      } else if (typeof prev === 'string' && prev.startsWith('#') && code && !code.startsWith('#')) {
         selected.set(pid, code);
       }
       ensureRowSelection(pid, true);
+    }
+    if (replace && pendingSelected.size) {
+      for (const [rawPid, rawCode] of pendingSelected) {
+        const pid = Number(rawPid);
+        if (!pid) continue;
+        const code = rawCode || `#${pid}`;
+        selected.set(pid, code);
+        ensureRowSelection(pid, true);
+      }
     }
     persist();
     syncHeader();
@@ -2044,8 +2093,15 @@ window.getCurrentUserId = getCurrentUserId;
   }
   function toggleSelect(row, pid, on, fromHeader) {
     if (skipRow(row)) return;
-    const code = codeFromRow(row) || `#${pid}`;
-    on ? selected.set(pid, code) : selected.delete(pid);
+    const pidNum = Number(pid) || Number(pidFromRow(row));
+    const key = pidNum || pid;
+    const code = codeFromRow(row) || `#${pidNum || pid}`;
+    if (on) selected.set(key, code); else selected.delete(key);
+    if (pidNum) {
+      if (on) pendingSelected.set(pidNum, code);
+      else pendingSelected.delete(pidNum);
+      persistPending();
+    }
     row.classList.toggle('padder-selected', on);
     if (!fromHeader) syncHeader();
     persist();
@@ -2062,6 +2118,8 @@ window.getCurrentUserId = getCurrentUserId;
 
   function clearSelections() {
     selected.clear();
+    pendingSelected.clear();
+    persistPending();
     persist();
     $$('.padder-cell input').forEach(cb => cb.checked = false);
     $$(SEL.rows).forEach(r => r.classList.remove('padder-selected'));
@@ -2096,6 +2154,19 @@ window.getCurrentUserId = getCurrentUserId;
     date.value = GM_getValue(KEY.date, tomorrow);
     if (date.value < tomorrow) date.value = tomorrow;
     currentDateIso = date.value;
+    pendingSelected = pendingFor(currentDateIso);
+    if (pendingSelected.size) {
+      let changed = false;
+      for (const [pid, code] of pendingSelected) {
+        const pidNum = Number(pid);
+        if (!pidNum) continue;
+        if (!selected.has(pidNum)) { selected.set(pidNum, code); changed = true; }
+        ensureRowSelection(pidNum, true);
+      }
+      if (changed) persist();
+      syncHeader();
+      count();
+    }
     const initSync = syncExistingPlan(currentDateIso, { force: true, silent: true });
     if (initSync && typeof initSync.catch === 'function') {
       initSync.catch(err => log('initial sync failed', err));
@@ -2107,6 +2178,19 @@ window.getCurrentUserId = getCurrentUserId;
       const changed = newIso !== currentDateIso;
       if (changed) clearSelections();
       currentDateIso = newIso;
+      pendingSelected = pendingFor(newIso);
+      if (pendingSelected.size) {
+        let changedSelections = false;
+        for (const [pid, code] of pendingSelected) {
+          const pidNum = Number(pid);
+          if (!pidNum) continue;
+          if (!selected.has(pidNum)) { selected.set(pidNum, code); changedSelections = true; }
+          ensureRowSelection(pidNum, true);
+        }
+        if (changedSelections) persist();
+        syncHeader();
+        count();
+      }
       await syncExistingPlan(newIso, { force: true });
     };
     $('#pad-copy').onclick = () => { GM_setClipboard(JSON.stringify({ date: date.value, codes: [...selected.values()] }, null, 2)); notify(`已复制 ${selected.size} 个编号`); };
@@ -2282,6 +2366,8 @@ window.getCurrentUserId = getCurrentUserId;
         && desired.length === after.problemIds.length
         && desired.every((x, i) => after.problemIds[i] === x);
       if (ok) {
+        pendingSelected.clear();
+        persistPending();
         if (!autoExit) applyPlanSelections(after.problemIds || [], { replace: true });
         notify(`保存成功：新增 ${addedCount} 题，移除 ${removedCount} 题，共 ${desired.length} 题`);
         afterSuccess();
@@ -2325,6 +2411,8 @@ window.getCurrentUserId = getCurrentUserId;
         && desired.length === final.problemIds.length
         && desired.every((x, i) => final.problemIds[i] === x);
       if (ok2) {
+        pendingSelected.clear();
+        persistPending();
         if (!autoExit) applyPlanSelections(final.problemIds || [], { replace: true });
         notify(`保存成功（逐条同步）：新增 ${addedCount} 题，移除 ${removedCount} 题，共 ${desired.length} 题`);
         afterSuccess();
