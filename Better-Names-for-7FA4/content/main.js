@@ -1864,7 +1864,7 @@ window.getCurrentUserId = getCurrentUserId;
 
   const KEY = {
     mode: 'planAdder.mode',
-    selected: 'planAdder.selected.v4', // [{pid, code}]
+    selected: 'planAdder.selected.v4', // { [iso]: [{pid, code}] }
     date: 'planAdder.date',
     barPos: 'planAdder.barPos',
     autoExit: 'planAdder.autoExit',
@@ -1873,11 +1873,68 @@ window.getCurrentUserId = getCurrentUserId;
 
   const enablePlanAdder = GM_getValue('enablePlanAdder', true);
   let modeOn = !!GM_getValue(KEY.mode, false);
-  let selected = new Map(
-    (GM_getValue(KEY.selected, []) || [])
-      .filter(o => o.code && !/^L/i.test(o.code))
-      .map(o => [Number(o.pid) || o.pid, o.code])
-  );
+
+  const normalizeSelectedEntry = (o) => {
+    if (!o || typeof o !== 'object') return null;
+    const rawPid = o.pid;
+    const pidNum = Number(rawPid);
+    const pid = pidNum || (typeof rawPid === 'string' ? rawPid : null);
+    const code = typeof o.code === 'string' ? o.code.trim() : '';
+    if (!pid || !code || /^L/i.test(code)) return null;
+    return { pid, code };
+  };
+
+  const loadSelectionStore = () => {
+    const raw = GM_getValue(KEY.selected, {});
+    if (Array.isArray(raw)) {
+      const legacy = raw
+        .map(normalizeSelectedEntry)
+        .filter(Boolean);
+      return legacy.length ? { __legacy__: legacy } : {};
+    }
+    if (!raw || typeof raw !== 'object') return {};
+    const store = {};
+    for (const [iso, list] of Object.entries(raw)) {
+      if (!Array.isArray(list)) continue;
+      const cleaned = list
+        .map(normalizeSelectedEntry)
+        .filter(Boolean);
+      if (cleaned.length) store[iso] = cleaned;
+    }
+    return store;
+  };
+
+  let selectionStore = loadSelectionStore();
+  const persistSelectionStore = () => GM_setValue(KEY.selected, selectionStore);
+  const maybeAdoptLegacySelection = (iso) => {
+    if (!iso || typeof iso !== 'string') return;
+    if (!selectionStore[iso] && selectionStore.__legacy__) {
+      selectionStore[iso] = selectionStore.__legacy__;
+      delete selectionStore.__legacy__;
+      persistSelectionStore();
+    }
+  };
+  const selectionFor = (iso) => {
+    if (iso && selectionStore[iso]) {
+      return new Map(selectionStore[iso].map(({ pid, code }) => [pid, code]));
+    }
+    if (selectionStore.__legacy__) {
+      return new Map(selectionStore.__legacy__.map(({ pid, code }) => [pid, code]));
+    }
+    return new Map();
+  };
+  const persistSelectionFor = (iso, map) => {
+    const key = (iso && typeof iso === 'string') ? iso : '__legacy__';
+    const arr = [...map]
+      .map(([pid, code]) => ({ pid: Number(pid) || pid, code: typeof code === 'string' ? code : '' }))
+      .map(normalizeSelectedEntry)
+      .filter(Boolean);
+    if (arr.length) selectionStore[key] = arr;
+    else delete selectionStore[key];
+    persistSelectionStore();
+  };
+
+  let selected = new Map();
   let autoExit = GM_getValue(KEY.autoExit, true);
   let observer = null;
   let currentDateIso = null;
@@ -1957,7 +2014,8 @@ window.getCurrentUserId = getCurrentUserId;
 
   const notify = m => GM_notification({ text: m, timeout: 2600 });
   const persist = () => {
-    GM_setValue(KEY.selected, [...selected].map(([pid, code]) => ({ pid: Number(pid) || pid, code })));
+    const iso = currentDateIso && typeof currentDateIso === 'string' ? currentDateIso : null;
+    persistSelectionFor(iso, selected);
   };
 
   let _codeColIdx = null; // 缓存编号列索引
@@ -2116,11 +2174,16 @@ window.getCurrentUserId = getCurrentUserId;
     h.checked = ids.length && ids.every(id => selected.has(id));
   }
 
-  function clearSelections() {
+  function clearSelections(options = {}) {
+    const { preservePending = false, preserveSelected = false } = options;
     selected.clear();
-    pendingSelected.clear();
+    if (!preservePending) {
+      pendingSelected.clear();
+    }
     persistPending();
-    persist();
+    if (!preserveSelected) {
+      persist();
+    }
     $$('.padder-cell input').forEach(cb => cb.checked = false);
     $$(SEL.rows).forEach(r => r.classList.remove('padder-selected'));
     syncHeader();
@@ -2154,6 +2217,10 @@ window.getCurrentUserId = getCurrentUserId;
     date.value = GM_getValue(KEY.date, tomorrow);
     if (date.value < tomorrow) date.value = tomorrow;
     currentDateIso = date.value;
+    maybeAdoptLegacySelection(currentDateIso);
+    selected = selectionFor(currentDateIso);
+    insertSelectColumn();
+    persist();
     pendingSelected = pendingFor(currentDateIso);
     if (pendingSelected.size) {
       let changed = false;
@@ -2176,8 +2243,12 @@ window.getCurrentUserId = getCurrentUserId;
       GM_setValue(KEY.date, date.value);
       const newIso = date.value;
       const changed = newIso !== currentDateIso;
-      if (changed) clearSelections();
+      if (changed) clearSelections({ preservePending: true, preserveSelected: true });
       currentDateIso = newIso;
+      maybeAdoptLegacySelection(newIso);
+      selected = selectionFor(newIso);
+      insertSelectColumn();
+      persist();
       pendingSelected = pendingFor(newIso);
       if (pendingSelected.size) {
         let changedSelections = false;
