@@ -2066,9 +2066,9 @@ window.getCurrentUserId = getCurrentUserId;
     const td = r.querySelector(`td:nth-child(${idx})`);
     return txt(td?.querySelector('b') || td);
   };
-  const skipRow = r => {
-    const c = codeFromRow(r);
-    return c && /^L/i.test(c);
+  const isLProblemRow = (row) => {
+    const code = codeFromRow(row);
+    return !!code && /^L/i.test(code);
   };
 
   const findRowByPid = (pid) => {
@@ -2148,7 +2148,7 @@ window.getCurrentUserId = getCurrentUserId;
       $('#padder-all').onchange = e => {
         const on = e.target.checked;
         $$(SEL.rows).forEach(row => {
-          const pid = +pidFromRow(row); if (!pid || skipRow(row)) return;
+          const pid = +pidFromRow(row); if (!pid || isLProblemRow(row)) return;
           let cell = row.querySelector('td.padder-cell');
           if (!cell) { cell = makeCell(row, pid); if (cell) row.prepend(cell); }
           if (!cell) return;
@@ -2159,7 +2159,7 @@ window.getCurrentUserId = getCurrentUserId;
       };
     }
     $$(SEL.rows).forEach(row => {
-      const pid = +pidFromRow(row); if (!pid || skipRow(row)) { row.querySelector('td.padder-cell')?.remove(); return; }
+      const pid = +pidFromRow(row); if (!pid) { row.querySelector('td.padder-cell')?.remove(); return; }
       if (!row.querySelector('td.padder-cell')) {
         const cell = makeCell(row, pid); if (cell) row.prepend(cell);
       }
@@ -2171,7 +2171,6 @@ window.getCurrentUserId = getCurrentUserId;
     syncHeader();
   }
   function makeCell(row, pid) {
-    if (skipRow(row)) return null;
     const td = document.createElement('td');
     td.className = 'padder-cell'; td.style.textAlign = 'center'; td.style.padding = '6px';
     td.innerHTML = `<input type="checkbox" style="vertical-align:middle;">`;
@@ -2182,7 +2181,6 @@ window.getCurrentUserId = getCurrentUserId;
     return td;
   }
   function toggleSelect(row, pid, on, fromHeader) {
-    if (skipRow(row)) return;
     const pidNum = Number(pid) || Number(pidFromRow(row));
     const key = pidNum || pid;
     const code = codeFromRow(row) || `#${pidNum || pid}`;
@@ -2199,7 +2197,7 @@ window.getCurrentUserId = getCurrentUserId;
   function syncHeader() {
     const h = $('#padder-all'); if (!h) return;
     const ids = $$(SEL.rows)
-      .filter(r => !skipRow(r))
+      .filter(r => !isLProblemRow(r))
       .map(pidFromRow)
       .filter(Boolean)
       .map(Number);
