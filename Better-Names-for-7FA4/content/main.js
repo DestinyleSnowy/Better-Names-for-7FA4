@@ -2116,9 +2116,12 @@ window.getCurrentUserId = getCurrentUserId;
     h.checked = ids.length && ids.every(id => selected.has(id));
   }
 
-  function clearSelections() {
+  function clearSelections(options = {}) {
+    const { preservePending = false } = options;
     selected.clear();
-    pendingSelected.clear();
+    if (!preservePending) {
+      pendingSelected.clear();
+    }
     persistPending();
     persist();
     $$('.padder-cell input').forEach(cb => cb.checked = false);
@@ -2176,7 +2179,7 @@ window.getCurrentUserId = getCurrentUserId;
       GM_setValue(KEY.date, date.value);
       const newIso = date.value;
       const changed = newIso !== currentDateIso;
-      if (changed) clearSelections();
+      if (changed) clearSelections({ preservePending: true });
       currentDateIso = newIso;
       pendingSelected = pendingFor(newIso);
       if (pendingSelected.size) {
