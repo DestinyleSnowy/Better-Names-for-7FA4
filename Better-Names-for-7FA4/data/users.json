@@ -6172,7 +6172,7 @@
     "colorKey": "uk"
   },
   "1544": {
-    "name": "戴千皓",
+    "name": "戴千皓-del",
     "colorKey": "c1"
   },
   "1545": {
@@ -9124,7 +9124,7 @@
     "colorKey": "c2"
   },
   "2282": {
-    "name": "lvboyuan",
+    "name": "吕博渊",
     "colorKey": "c2"
   },
   "2283": {
@@ -12350,5 +12350,57 @@
   "3088": {
     "name": "周楚乔",
     "colorKey": "c1"
+  },
+  "3089": {
+    "name": "黄清心",
+    "colorKey": "by"
+  },
+  "3090": {
+    "name": "谢乐平",
+    "colorKey": "by"
+  },
+  "3091": {
+    "name": "杨钦荣-del",
+    "colorKey": "d1"
+  },
+  "3092": {
+    "name": "田墌尧-del",
+    "colorKey": "c1"
+  },
+  "3093": {
+    "name": "姜佑锴-del",
+    "colorKey": "c1"
+  },
+  "3094": {
+    "name": "钟子恒",
+    "colorKey": "c2"
+  },
+  "3095": {
+    "name": "戴千皓",
+    "colorKey": "c2"
+  },
+  "3096": {
+    "name": "李佳图",
+    "colorKey": "c2"
+  },
+  "3097": {
+    "name": "饶海曦",
+    "colorKey": "c2"
+  },
+  "3098": {
+    "name": "薛恭子沁",
+    "colorKey": "c1"
+  },
+  "3099": {
+    "name": "陶罡铭",
+    "colorKey": "c2"
+  },
+  "3100": {
+    "name": "闫卓轩",
+    "colorKey": "by"
+  },
+  "3101": {
+    "name": "蒋哲君",
+    "colorKey": "by"
   }
 }
