@@ -2237,17 +2237,48 @@ window.getCurrentUserId = getCurrentUserId;
   }
 
   function clearSelections(options = {}) {
-    const { preservePending = false, preserveSelected = false } = options;
-    selected.clear();
+    const {
+      preservePending = false,
+      preserveSelected = false,
+      clearAll = false
+    } = options;
+
+    const pendingKeys = new Set(pendingSelected.keys());
+
+    if (clearAll) {
+      selected.clear();
+    } else {
+      for (const key of pendingKeys) {
+        const pid = Number(key);
+        const mapKey = Number.isNaN(pid) ? key : pid;
+        selected.delete(mapKey);
+        selected.delete(String(mapKey));
+      }
+    }
+
     if (!preservePending) {
       pendingSelected.clear();
     }
+
     persistPending();
+
     if (!preserveSelected) {
       persist();
     }
-    $$('.padder-cell input').forEach(cb => cb.checked = false);
-    $$(SEL.rows).forEach(r => r.classList.remove('padder-selected'));
+
+    if (clearAll) {
+      $$('.padder-cell input').forEach(cb => cb.checked = false);
+      $$(SEL.rows).forEach(r => r.classList.remove('padder-selected'));
+    } else {
+      for (const key of pendingKeys) {
+        const row = findRowByPid(key);
+        if (!row) continue;
+        const cb = row.querySelector('td.padder-cell input');
+        if (cb) cb.checked = false;
+        row.classList.remove('padder-selected');
+      }
+    }
+
     syncHeader();
     count();
   }
@@ -2307,7 +2338,7 @@ window.getCurrentUserId = getCurrentUserId;
       GM_setValue(KEY.date, date.value);
       const newIso = date.value;
       const changed = newIso !== currentDateIso;
-      if (changed) clearSelections({ preservePending: true, preserveSelected: true });
+      if (changed) clearSelections({ preservePending: true, preserveSelected: true, clearAll: true });
       currentDateIso = newIso;
       maybeAdoptLegacySelection(newIso);
       selected = selectionFor(newIso);
@@ -2438,7 +2469,7 @@ window.getCurrentUserId = getCurrentUserId;
 
   function afterSuccess() {
     if (autoExit) {
-      clearSelections();
+      clearSelections({ clearAll: true });
       exitMode();
     }
   }
