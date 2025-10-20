@@ -2201,6 +2201,7 @@ window.getCurrentUserId = getCurrentUserId;
     const hasModifier = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
     if (interactive && interactive !== cb) {
       if (hasModifier) return false;
+      if (interactive.matches?.('a[href]')) return false;
       event.preventDefault();
       event.stopPropagation();
     }
