@@ -2352,7 +2352,9 @@ window.getCurrentUserId = getCurrentUserId;
       if (date.value < tomorrow) date.value = tomorrow;
       GM_setValue(KEY.date, date.value);
       const newIso = date.value;
+      const oldIso = currentDateIso;
       const changed = newIso !== currentDateIso;
+      const previousPending = changed ? new Map(pendingSelected) : null;
       if (changed) clearSelections({ preservePending: true, preserveSelected: true, clearAll: true });
       currentDateIso = newIso;
       maybeAdoptLegacySelection(newIso);
@@ -2360,6 +2362,16 @@ window.getCurrentUserId = getCurrentUserId;
       insertSelectColumn();
       persist();
       pendingSelected = pendingFor(newIso);
+      if (changed && previousPending && previousPending.size) {
+        if (oldIso) persistPendingFor(oldIso, new Map());
+        for (const [pid, code] of previousPending) {
+          const pidNum = Number(pid);
+          if (!pidNum) continue;
+          pendingSelected.set(pidNum, code);
+        }
+        persistPendingFor(newIso, pendingSelected);
+        pendingSelected = pendingFor(newIso);
+      }
       if (pendingSelected.size) {
         let changedSelections = false;
         for (const [pid, code] of pendingSelected) {
