@@ -2307,6 +2307,7 @@ window.getCurrentUserId = getCurrentUserId;
         <label>日期：<input type="date" id="pad-date"></label>
         <button class="ui mini button" id="pad-copy">复制编号</button>
         <button class="ui mini button" id="pad-clear">清空</button>
+        <button class="ui mini red button" id="pad-delete-all">删除所有计划</button>
         <button class="ui mini primary button" id="pad-ok">确定（<span id="pad-count">0</span>）</button>
       </div>`;
     document.body.appendChild(bar);
@@ -2388,6 +2389,7 @@ window.getCurrentUserId = getCurrentUserId;
     };
     $('#pad-copy').onclick = () => { GM_setClipboard(JSON.stringify({ date: date.value, codes: [...selected.values()] }, null, 2)); notify(`已复制 ${selected.size} 个编号`); };
     $('#pad-clear').onclick = () => { if (!selected.size || !confirm('确认清空？')) return; clearSelections(); };
+    $('#pad-delete-all').onclick = deleteAllPlans;
     $('#pad-ok').onclick = submitPlan;
 
     count();
@@ -2499,6 +2501,62 @@ window.getCurrentUserId = getCurrentUserId;
       clearSelections({ clearAll: true });
       exitMode();
     }
+  }
+
+  async function deleteAllPlans() {
+    const iso = $('#pad-date')?.value || tomorrowISO();
+    currentDateIso = iso;
+    const epoch = dateToEpoch(iso, CFG.tzOffsetHours);
+    const uid = getCurrentUserId();
+    if (!uid) { notify('[错误代码 DA1] 无法识别 user_id'); return; }
+
+    let meta;
+    try {
+      meta = await fetchPlanJSON({ uid, epoch });
+      planCache.set(iso, { ...meta, epoch });
+    } catch (err) {
+      log('deleteAllPlans: fetch existing plan failed', err);
+      notify('[错误代码 DA2] 获取已有计划失败，请稍后再试');
+      return;
+    }
+
+    const hasServerPlan = Array.isArray(meta.problemIds) && meta.problemIds.length > 0;
+    const hasLocalPlan = selected.size > 0 || pendingSelected.size > 0;
+
+    if (!hasServerPlan && !hasLocalPlan && !meta.id) {
+      clearSelections({ clearAll: true });
+      planCache.set(iso, { ...meta, epoch, problemIds: [] });
+      notify(`当前 ${iso} 无计划可删除`);
+      return;
+    }
+
+    if (!confirm(`确认删除 ${iso} 的所有计划？此操作无法恢复。`)) return;
+
+    if (!hasServerPlan && !meta.id) {
+      clearSelections({ clearAll: true });
+      planCache.set(iso, { ...meta, epoch, problemIds: [] });
+      notify(`已删除 ${iso} 的所有计划`);
+      showPlanToast(`计划删除完成\n已清空 ${iso} 的所有题目`);
+      return;
+    }
+
+    try {
+      const body = buildBody({ id: meta.id, epoch, uid, values: [] });
+      await postPlan(body, uid);
+      const after = await fetchPlanJSON({ uid, epoch });
+      planCache.set(iso, { ...after, epoch });
+      const cleared = !Array.isArray(after.problemIds) || after.problemIds.length === 0;
+      if (cleared) {
+        clearSelections({ clearAll: true });
+        notify(`已删除 ${iso} 的所有计划`);
+        showPlanToast(`计划删除完成\n已清空 ${iso} 的所有题目`);
+        return;
+      }
+    } catch (err) {
+      log('deleteAllPlans: delete failed', err);
+    }
+
+    notify('[错误代码 DA3] 未能删除计划，请稍后再试');
   }
 
   async function submitPlan() {
