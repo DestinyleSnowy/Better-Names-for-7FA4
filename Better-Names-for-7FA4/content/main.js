@@ -2334,8 +2334,9 @@ window.getCurrentUserId = getCurrentUserId;
     document.body.appendChild(bar);
 
     GM_addStyle(`
-      #plan-bar{position:fixed;right:16px;bottom:120px;z-index:9999;background:#fff;border:1px solid #ddd;border-radius:10px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.12);min-width:460px;max-width:90vw;}
-      #plan-bar .padder{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+      #plan-bar{position:fixed;right:16px;bottom:120px;z-index:9999;background:#fff;border:1px solid #ddd;border-radius:10px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.12);max-width:calc(100vw - 32px);}
+      #plan-bar .padder{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;white-space:nowrap;}
+      #plan-bar .padder>*{flex:0 0 auto;}
       #pad-handle{cursor:move;opacity:.7}
       th#padder-th,td.padder-cell{width:46px;}
       .padder-selected{background:rgba(0,150,255,.06)!important;transition:background-color .24s ease;}
