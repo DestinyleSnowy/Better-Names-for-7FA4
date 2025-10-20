@@ -1873,6 +1873,7 @@ window.getCurrentUserId = getCurrentUserId;
 
   const enablePlanAdder = GM_getValue('enablePlanAdder', true);
   let modeOn = !!GM_getValue(KEY.mode, false);
+  const PADDER_HANDLED_FLAG = '__bnPlanHandled';
 
   const normalizeSelectedEntry = (o) => {
     if (!o || typeof o !== 'object') return null;
@@ -2188,28 +2189,47 @@ window.getCurrentUserId = getCurrentUserId;
     });
     syncHeader();
   }
+  function handlePlanRowClick(event, row) {
+    if (!modeOn || event.defaultPrevented || event.button !== 0) return false;
+    if (event[PADDER_HANDLED_FLAG]) return true;
+    if (event.target?.closest?.('td.padder-cell')) return false;
+    const pid = Number(pidFromRow(row));
+    if (!pid || isLProblemRow(row)) return false;
+    const cb = row.querySelector('td.padder-cell input');
+    if (!cb) return false;
+    const interactive = event.target?.closest?.('a,button,input,select,textarea,label');
+    const hasModifier = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+    if (interactive && interactive !== cb) {
+      if (hasModifier) return false;
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    event[PADDER_HANDLED_FLAG] = true;
+    const next = !cb.checked;
+    cb.checked = next;
+    toggleSelect(row, pid, next, false);
+    count();
+    return true;
+  }
   function attachRowToggle(row) {
     if (!row || row.dataset.padderToggleBound) return;
     row.dataset.padderToggleBound = '1';
     row.addEventListener('click', event => {
-      if (!modeOn || event.defaultPrevented || event.button !== 0) return;
-      if (event.target?.closest?.('td.padder-cell')) return;
-      const pid = Number(pidFromRow(row));
-      if (!pid || isLProblemRow(row)) return;
-      const cb = row.querySelector('td.padder-cell input');
-      if (!cb) return;
-      const interactive = event.target?.closest?.('a,button,input,select,textarea,label');
-      const hasModifier = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
-      if (interactive && interactive !== cb) {
-        if (hasModifier) return;
-        event.preventDefault();
-      }
-      const next = !cb.checked;
-      cb.checked = next;
-      toggleSelect(row, pid, next, false);
-      count();
+      if (event[PADDER_HANDLED_FLAG]) return;
+      handlePlanRowClick(event, row);
     });
   }
+  document.addEventListener('click', event => {
+    if (!modeOn || event.defaultPrevented || event.button !== 0) return;
+    if (event[PADDER_HANDLED_FLAG]) return;
+    const anchor = event.target?.closest?.('a[href]');
+    if (!anchor) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (event.target?.closest?.('td.padder-cell')) return;
+    const row = event.target?.closest?.(SEL.rows);
+    if (!row) return;
+    handlePlanRowClick(event, row);
+  }, true);
   function makeCell(row, pid) {
     const td = document.createElement('td');
     td.className = 'padder-cell'; td.style.textAlign = 'center'; td.style.padding = '6px';
