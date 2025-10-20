@@ -2101,9 +2101,11 @@ window.getCurrentUserId = getCurrentUserId;
       });
     }
     const list = Array.isArray(ids) ? ids : [];
+    const planIds = replace ? new Set() : null;
     for (const rawId of list) {
       const pid = Number(rawId);
       if (!pid) continue;
+      if (planIds) planIds.add(pid);
       const row = findRowByPid(pid);
       const code = row ? (codeFromRow(row) || `#${pid}`) : `#${pid}`;
       const prev = selected.get(pid);
@@ -2113,6 +2115,19 @@ window.getCurrentUserId = getCurrentUserId;
         selected.set(pid, code);
       }
       ensureRowSelection(pid, true);
+    }
+    if (replace && planIds && planIds.size && pendingSelected.size) {
+      let pendingChanged = false;
+      for (const pid of [...pendingSelected.keys()]) {
+        const num = Number(pid);
+        if (num && planIds.has(num)) {
+          pendingSelected.delete(pid);
+          pendingChanged = true;
+        }
+      }
+      if (pendingChanged) {
+        persistPending();
+      }
     }
     if (replace && pendingSelected.size) {
       for (const [rawPid, rawCode] of pendingSelected) {
