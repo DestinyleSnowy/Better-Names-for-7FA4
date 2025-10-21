@@ -295,12 +295,16 @@ window.getCurrentUserId = getCurrentUserId;
       color: var(--bn-text-muted); font-size: 18px;
       cursor: pointer; transition: all .3s cubic-bezier(.4,0,.2,1);
       box-shadow: var(--bn-trigger-shadow);
+      --bn-trigger-offset-x: 0px;
+      --bn-trigger-offset-y: 0px;
+      --bn-trigger-hover-y: 0px;
+      transform: translate3d(var(--bn-trigger-offset-x), calc(var(--bn-trigger-offset-y) + var(--bn-trigger-hover-y)), 0);
     }
     #bn-trigger:hover {
       background: var(--bn-hover-bg);
       border-color: var(--bn-border-subtle);
       color: var(--bn-text);
-      transform: translateY(-2px);
+      --bn-trigger-hover-y: -2px;
       box-shadow: 0 6px 20px rgba(0,0,0,0.18);
     }
 
@@ -675,6 +679,17 @@ window.getCurrentUserId = getCurrentUserId;
   #bn-container.bn-pos-tl #bn-panel { transform: scale(.95) translateY(-10px); }
 
   #bn-container.bn-dragging #bn-panel { display: none !important; }
+  #bn-container.bn-peek #bn-trigger { opacity: .75; }
+  #bn-container.bn-peek.bn-pos-br #bn-trigger { --bn-trigger-offset-x: 18px; --bn-trigger-offset-y: 14px; }
+  #bn-container.bn-peek.bn-pos-bl #bn-trigger { --bn-trigger-offset-x: -18px; --bn-trigger-offset-y: 14px; }
+  #bn-container.bn-peek.bn-pos-tr #bn-trigger { --bn-trigger-offset-x: 18px; --bn-trigger-offset-y: -14px; }
+  #bn-container.bn-peek.bn-pos-tl #bn-trigger { --bn-trigger-offset-x: -18px; --bn-trigger-offset-y: -14px; }
+  #bn-container.bn-peek:hover #bn-trigger,
+  #bn-container.bn-active #bn-trigger {
+    --bn-trigger-offset-x: 0px;
+    --bn-trigger-offset-y: 0px;
+    opacity: 1;
+  }
   .bn-hide-done-skip{display:none!important;}`);
 
   const colorInputsHTML = COLOR_KEYS.map(k => `
@@ -867,8 +882,7 @@ window.getCurrentUserId = getCurrentUserId;
   let isDragging = false;
   let wasPinned = false;
   let gearW = 48, gearH = 48;
-  let __bn_trail = [];
-  let __bn_raf = null;
+  let dragOffsetX = 0, dragOffsetY = 0;
   let __bn_dragX = 0, __bn_dragY = 0;
   let __bn_pointerId = null;
 
@@ -994,6 +1008,7 @@ window.getCurrentUserId = getCurrentUserId;
     panel.classList.add('bn-show');
     container.style.pointerEvents = 'auto';
   }
+  syncPeekState();
 
   titleOpts.style.display = originalConfig.titleTruncate ? 'block' : 'none';
   userOpts.style.display = originalConfig.userTruncate ? 'block' : 'none';
@@ -1049,18 +1064,26 @@ window.getCurrentUserId = getCurrentUserId;
     checkChanged();
   };
 
+  const syncPeekState = () => {
+    const shouldStayVisible = pinned || panel.classList.contains('bn-show') || isDragging;
+    container.classList.toggle('bn-active', shouldStayVisible);
+    container.classList.toggle('bn-peek', !shouldStayVisible);
+  };
+
   let hideTimer = null;
   const showPanel = () => {
     if (isDragging || container.classList.contains('bn-dragging')) return;
     clearTimeout(hideTimer);
     panel.classList.add('bn-show');
     container.style.pointerEvents = 'auto';
+    syncPeekState();
   };
   const hidePanel = () => {
     if (pinned) return;
     panel.classList.remove('bn-show');
     container.style.pointerEvents = 'none';
     if (panel.contains(document.activeElement)) document.activeElement.blur();
+    syncPeekState();
   };
   trigger.addEventListener('mouseenter', showPanel);
   const maybeHidePanel = () => {
@@ -1073,47 +1096,26 @@ window.getCurrentUserId = getCurrentUserId;
   trigger.addEventListener('mouseleave', maybeHidePanel);
   panel.addEventListener('mouseleave', maybeHidePanel);
 
-  const __bn_lagMs = 100;
-  const __bn_trailWindow = 400;
-  const __bn_now = () => (window.performance && performance.now) ? performance.now() : Date.now();
-
-  function __bn_pushTrail(e) {
-    const t = __bn_now();
-    __bn_trail.push({ t, x: e.clientX, y: e.clientY });
-    const cutoff = t - __bn_trailWindow;
-    while (__bn_trail.length && __bn_trail[0].t < cutoff) __bn_trail.shift();
-  }
-  function __bn_sampleAt(tgt) {
-    if (!__bn_trail.length) return null;
-    if (tgt <= __bn_trail[0].t) return __bn_trail[0];
-    const last = __bn_trail[__bn_trail.length - 1];
-    if (tgt >= last.t) return last;
-    let lo = 0, hi = __bn_trail.length - 1;
-    while (lo <= hi) { const mid = (lo + hi) >> 1; (__bn_trail[mid].t < tgt) ? (lo = mid + 1) : (hi = mid - 1); }
-    const a = __bn_trail[lo - 1], b = __bn_trail[lo];
-    const r = (tgt - a.t) / Math.max(1, b.t - a.t);
-    return { t: tgt, x: a.x + (b.x - a.x) * r, y: a.y + (b.y - a.y) * r };
-  }
   function __bn_applyTransform(x, y) {
     __bn_dragX = x; __bn_dragY = y;
     trigger.style.transform = `translate3d(${x}px, ${y}px, 0)`;
   }
-  function __bn_tick() {
-    if (!isDragging) { __bn_raf = null; return; }
-    const s = __bn_sampleAt(__bn_now() - __bn_lagMs);
-    if (s) __bn_applyTransform(s.x - gearW / 2, s.y - gearH / 2);
-    __bn_raf = requestAnimationFrame(__bn_tick);
-  }
   function __bn_onMove(e) {
     if (!isDragging) return;
-    __bn_pushTrail(e);
-    if (!__bn_raf) __bn_raf = requestAnimationFrame(__bn_tick);
+    __bn_applyTransform(e.clientX - dragOffsetX, e.clientY - dragOffsetY);
   }
-  function __bn_onUp(e) {
+  function __bn_onUp() {
     if (!isDragging) return;
     isDragging = false;
-    if (__bn_raf) cancelAnimationFrame(__bn_raf);
-    __bn_raf = null;
+
+    if (__bn_pointerId !== null && trigger.releasePointerCapture) {
+      try { trigger.releasePointerCapture(__bn_pointerId); } catch (_) { }
+    }
+    document.removeEventListener('pointermove', __bn_onMove);
+    document.removeEventListener('pointerup', __bn_onUp);
+    document.removeEventListener('mousemove', __bn_onMove);
+    document.removeEventListener('mouseup', __bn_onUp);
+    __bn_pointerId = null;
 
     const cx = __bn_dragX + gearW / 2;
     const cy = __bn_dragY + gearH / 2;
@@ -1132,7 +1134,7 @@ window.getCurrentUserId = getCurrentUserId;
     const fx = corners[best].x - gearW / 2;
     const fy = corners[best].y - gearH / 2;
 
-    trigger.style.transition = 'transform 0.24s ease-out';
+    trigger.style.transition = 'transform 0.25s cubic-bezier(0.22, 0.61, 0.36, 1)';
     __bn_applyTransform(fx, fy);
 
     setTimeout(() => {
@@ -1141,16 +1143,13 @@ window.getCurrentUserId = getCurrentUserId;
       trigger.style.position = '';
       trigger.style.left = trigger.style.top = '';
       trigger.style.bottom = trigger.style.right = '';
+      trigger.style.willChange = '';
+      trigger.style.touchAction = '';
       trigger.style.transform = '';
       container.classList.remove('bn-dragging');
       if (wasPinned) { panel.classList.add('bn-show'); container.style.pointerEvents = 'auto'; }
 
-      if (__bn_pointerId !== null && trigger.releasePointerCapture) { try { trigger.releasePointerCapture(__bn_pointerId); } catch (_) { } }
-      document.removeEventListener('pointermove', __bn_onMove);
-      document.removeEventListener('pointerup', __bn_onUp);
-      document.removeEventListener('mousemove', __bn_onMove);
-      document.removeEventListener('mouseup', __bn_onUp);
-      __bn_trail = []; __bn_pointerId = null;
+      syncPeekState();
     }, 260);
   }
   const __bn_onDown = (e) => {
@@ -1171,12 +1170,14 @@ window.getCurrentUserId = getCurrentUserId;
     trigger.style.willChange = 'transform';
     trigger.style.touchAction = 'none';
 
+    dragOffsetX = e.clientX - rect.left;
+    dragOffsetY = e.clientY - rect.top;
+
     isDragging = true;
     container.classList.add('bn-dragging');
 
-    __bn_trail = [];
-    __bn_pushTrail(e);
-    __bn_applyTransform(e.clientX - gearW / 2, e.clientY - gearH / 2);
+    __bn_applyTransform(rect.left, rect.top);
+    syncPeekState();
 
     if (e.pointerId != null && trigger.setPointerCapture) {
       __bn_pointerId = e.pointerId;
@@ -1187,7 +1188,6 @@ window.getCurrentUserId = getCurrentUserId;
       document.addEventListener('mousemove', __bn_onMove);
       document.addEventListener('mouseup', __bn_onUp);
     }
-    if (!__bn_raf) __bn_raf = requestAnimationFrame(__bn_tick);
   };
   if (window.PointerEvent) {
     trigger.addEventListener('pointerdown', __bn_onDown, { passive: false });
@@ -1201,6 +1201,7 @@ window.getCurrentUserId = getCurrentUserId;
     pinBtn.classList.toggle('bn-pinned', pinned);
     if (pinned) showPanel();
     else if (!trigger.matches(':hover') && !panel.matches(':hover')) hidePanel();
+    else syncPeekState();
   });
 
   function markOnce(el, key) {
