@@ -1,5 +1,5 @@
 // Better Names for 7FA4
-// 6.0.0 SP13 Developer
+// 6.0.0 SP14 Developer
 
 function getCurrentUserId() {
   const ud = document.querySelector('#user-dropdown');
@@ -852,7 +852,7 @@ window.getCurrentUserId = getCurrentUserId;
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
       <div class="bn-version">
-        <div class="bn-version-text">6.0.0 SP13 Developer</div>
+        <div class="bn-version-text">6.0.0 SP14 Developer</div>
       </div>
     </div>`;
   document.body.appendChild(container);
@@ -3738,10 +3738,12 @@ window.getCurrentUserId = getCurrentUserId;
     ? new Intl.Collator(['zh-Hans-CN', 'zh-CN', 'zh', 'zh-Hans'], { sensitivity: 'base', usage: 'sort' })
     : null;
   const FALLBACK_SCHOOL_NAME = '其他';
+  const FALLBACK_GRADE_NAME = '未填写时年';
 
   let cssInjected = false;
   const RANKING_FILTER_ENABLED_KEY = 'rankingFilter.enabled';
   const RANKING_FILTER_SELECTED_KEY = 'rankingFilter.selected';
+  const RANKING_FILTER_GRADE_KEY = 'rankingFilter.grade.selected';
 
   function injectCSS() {
     if (cssInjected) return;
@@ -3752,15 +3754,17 @@ window.getCurrentUserId = getCurrentUserId;
     .bn-ranking-filter .bn-filter-summary { margin-top: .5em; font-size: .9em; color: rgba(0,0,0,.6); }
     .bn-ranking-filter .bn-filter-summary.bn-active { color: #2185d0; font-weight: 600; }
     .bn-ranking-filter .bn-filter-count { margin-top: .25em; font-size: .85em; color: rgba(0,0,0,.5); }
-    .bn-school-select { display: flex; margin-top: .75em; gap: .35em 1.25em; flex-wrap: wrap; }
-    .bn-school-select label { display: inline-flex; align-items: center; gap: .4em; padding: .2em .4em; border-radius: .3em; cursor: pointer; }
-    .bn-school-select label:hover { background: rgba(33,133,208,.08); }
-    .bn-school-select input[type="checkbox"] { width: 16px; height: 16px; margin: 0; }
+    .bn-filter-group { margin-top: .75em; }
+    .bn-filter-group-title { font-weight: 600; font-size: .95em; color: rgba(0,0,0,.55); }
+    .bn-filter-options { display: flex; margin-top: .35em; gap: .35em 1.25em; flex-wrap: wrap; }
+    .bn-filter-options label { display: inline-flex; align-items: center; gap: .4em; padding: .2em .4em; border-radius: .3em; cursor: pointer; }
+    .bn-filter-options label:hover { background: rgba(33,133,208,.08); }
+    .bn-filter-options input[type="checkbox"] { width: 16px; height: 16px; margin: 0; }
     .bn-filter-actions { margin-top: .75em; display: flex; gap: .5em; flex-wrap: wrap; }
     .bn-filter-actions .ui.button { flex-shrink: 0; }
     .bn-filter-hide { display: none !important; }
     @media (max-width: 640px) {
-      .bn-school-select { flex-direction: column; align-items: flex-start; }
+      .bn-filter-options { flex-direction: column; align-items: flex-start; }
       .bn-filter-actions { flex-direction: column; align-items: stretch; }
     }`;
     if (typeof GM_addStyle === 'function') GM_addStyle(css);
@@ -3807,26 +3811,43 @@ window.getCurrentUserId = getCurrentUserId;
     });
   }
 
-  function annotateRow(row, index, headerText) {
+  function getCellValue(row, index) {
     if (!row || typeof index !== 'number' || index < 0) return '';
     const cell = row.cells && row.cells[index];
-    if (!cell) {
-      delete row.dataset.bnHeaderRow;
-      row.dataset.bnSchool = '';
-      return '';
-    }
-    const value = getText(cell);
+    if (!cell) return '';
+    return getText(cell);
+  }
+
+  function isHeaderCell(row, index, headerText) {
+    if (!row || typeof index !== 'number' || index < 0) return false;
+    const cell = row.cells && row.cells[index];
+    if (!cell) return false;
     const tag = (cell.tagName || '').toUpperCase();
-    const isHeader = tag === 'TH' || (headerText && value === headerText);
-    if (isHeader) {
-      row.dataset.bnHeaderRow = '1';
-      row.dataset.bnSchool = '';
-      return '';
+    if (tag === 'TH') return true;
+    const value = getText(cell);
+    return !!headerText && value === headerText;
+  }
+
+  function annotateRow(row, schoolIndex, schoolHeaderText, gradeIndex, gradeHeaderText) {
+    if (!row) return;
+    const header = isHeaderCell(row, schoolIndex, schoolHeaderText)
+      || isHeaderCell(row, gradeIndex, gradeHeaderText);
+    if (header) row.dataset.bnHeaderRow = '1';
+    else delete row.dataset.bnHeaderRow;
+
+    if (typeof schoolIndex === 'number' && schoolIndex >= 0) {
+      const value = header ? '' : getCellValue(row, schoolIndex) || FALLBACK_SCHOOL_NAME;
+      row.dataset.bnSchool = value;
+    } else {
+      delete row.dataset.bnSchool;
     }
-    delete row.dataset.bnHeaderRow;
-    const normalized = value || FALLBACK_SCHOOL_NAME;
-    row.dataset.bnSchool = normalized;
-    return normalized;
+
+    if (typeof gradeIndex === 'number' && gradeIndex >= 0) {
+      const value = header ? '' : getCellValue(row, gradeIndex) || FALLBACK_GRADE_NAME;
+      row.dataset.bnGrade = value;
+    } else {
+      delete row.dataset.bnGrade;
+    }
   }
 
   function isHeaderRow(row) {
@@ -3861,6 +3882,26 @@ window.getCurrentUserId = getCurrentUserId;
     return -1;
   }
 
+  function detectGradeColumn(table) {
+    if (!table) return -1;
+    const headers = table.querySelectorAll('thead th, th');
+    for (let i = 0; i < headers.length; i += 1) {
+      const text = getText(headers[i]);
+      if (/时年|年级|年紀|年級|Grade/i.test(text)) return i;
+    }
+    const firstRow = table.tBodies && table.tBodies[0] && table.tBodies[0].rows[0];
+    if (firstRow) {
+      const cells = Array.from(firstRow.cells || []);
+      for (let i = 0; i < cells.length; i += 1) {
+        const text = getText(cells[i]);
+        const className = cells[i].className || '';
+        if (/时年|年级|年紀|年級|高一|高二|高三|初一|初二|初三|小学|一年级|二年级|Grade/i.test(text)) return i;
+        if (/\bgrade\b/i.test(className) || /grade_\d+/i.test(className)) return i;
+      }
+    }
+    return -1;
+  }
+
   function uniqueSorted(values) {
     const arr = Array.from(new Set(values.filter(Boolean)));
     if (!arr.length) return arr;
@@ -3876,25 +3917,32 @@ window.getCurrentUserId = getCurrentUserId;
       rows.forEach(row => row.classList.remove('bn-filter-hide'));
       return { visible: total, total, summary: '未启用筛选', active: false };
     }
-    if (!state.selected.size) {
+    const hasSchoolFilter = state.schoolSelected && state.schoolSelected.size > 0;
+    const hasGradeFilter = state.gradeSelected && state.gradeSelected.size > 0;
+    if (!hasSchoolFilter && !hasGradeFilter) {
       rows.forEach(row => row.classList.remove('bn-filter-hide'));
-      return { visible: total, total, summary: '未选择学校，显示全部', active: false };
+      return { visible: total, total, summary: '未选择筛选条件，显示全部', active: false };
     }
-    const selected = state.selected;
     let visible = 0;
     rows.forEach(row => {
       const key = row.dataset?.bnSchool || FALLBACK_SCHOOL_NAME;
-      if (selected.has(key)) {
+      const grade = row.dataset?.bnGrade || FALLBACK_GRADE_NAME;
+      const matchSchool = !hasSchoolFilter || state.schoolSelected.has(key);
+      const matchGrade = !hasGradeFilter || state.gradeSelected.has(grade);
+      if (matchSchool && matchGrade) {
         row.classList.remove('bn-filter-hide');
         visible += 1;
       } else {
         row.classList.add('bn-filter-hide');
       }
     });
+    const parts = [];
+    if (hasSchoolFilter) parts.push(`学校：${Array.from(state.schoolSelected).join('、')}`);
+    if (hasGradeFilter) parts.push(`时年：${Array.from(state.gradeSelected).join('、')}`);
     return {
       visible,
       total,
-      summary: `已选学校：${Array.from(selected).join('、')}`,
+      summary: parts.length ? `已选${parts.join('；')}` : '未选择筛选条件，显示全部',
       active: true
     };
   }
@@ -3955,12 +4003,12 @@ window.getCurrentUserId = getCurrentUserId;
     return button;
   }
 
-  function setupFilterUI(table, state, schools) {
+  function setupFilterUI(table, state, schools, grades) {
     injectCSS();
     const parent = table.parentElement || table;
     const panel = document.createElement('div');
     panel.className = 'ui segment bn-ranking-filter';
-    panel.style.display = state.enabled && schools.length ? '' : 'none';
+    panel.style.display = state.enabled && (schools.length || grades.length) ? '' : 'none';
 
     const header = document.createElement('div');
     header.className = 'bn-filter-header';
@@ -3979,27 +4027,44 @@ window.getCurrentUserId = getCurrentUserId;
     count.className = 'bn-filter-count';
     panel.appendChild(count);
 
-    const list = document.createElement('div');
-    list.id = 'bn-school-select';
-    list.className = 'bn-school-select';
-    const checkboxRefs = [];
-    if (schools.length) {
-      schools.forEach(name => {
+    const schoolCheckboxRefs = [];
+    const gradeCheckboxRefs = [];
+
+    function createOptionGroup(titleText, options, checkboxRefs, type) {
+      if (!options.length) return null;
+      const group = document.createElement('div');
+      group.className = 'bn-filter-group';
+      const groupTitle = document.createElement('div');
+      groupTitle.className = 'bn-filter-group-title';
+      groupTitle.textContent = titleText;
+      group.appendChild(groupTitle);
+      const list = document.createElement('div');
+      list.className = `bn-filter-options bn-${type}-select`;
+      if (type === 'school') list.id = 'bn-school-select';
+      if (type === 'grade') list.id = 'bn-grade-select';
+      options.forEach(name => {
         const label = document.createElement('label');
         label.className = 'bn-filter-option';
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.value = name;
-        checkbox.dataset.school = name;
-        if (state.selected.has(name)) checkbox.checked = true;
+        if (type === 'school') checkbox.dataset.school = name;
+        if ((type === 'school' ? state.schoolSelected : state.gradeSelected).has(name)) checkbox.checked = true;
         label.append(checkbox, document.createTextNode(name));
         list.appendChild(label);
         checkboxRefs.push(checkbox);
       });
-    } else {
-      summary.textContent = '未找到学校信息，暂无法筛选';
+      group.appendChild(list);
+      panel.appendChild(group);
+      return list;
     }
-    panel.appendChild(list);
+
+    const schoolList = createOptionGroup('按学校', schools, schoolCheckboxRefs, 'school');
+    const gradeList = createOptionGroup('按时年', grades, gradeCheckboxRefs, 'grade');
+
+    if (!schools.length && !grades.length) {
+      summary.textContent = '未找到可筛选的信息，暂无法筛选';
+    }
 
     attachDownloadButton(table);
 
@@ -4007,22 +4072,26 @@ window.getCurrentUserId = getCurrentUserId;
     else document.body.insertBefore(panel, document.body.firstChild);
 
     function syncCheckboxStates() {
-      checkboxRefs.forEach(checkbox => {
-        checkbox.checked = state.selected.has(checkbox.value);
+      schoolCheckboxRefs.forEach(checkbox => {
+        checkbox.checked = state.schoolSelected.has(checkbox.value);
+        checkbox.disabled = !state.enabled;
+      });
+      gradeCheckboxRefs.forEach(checkbox => {
+        checkbox.checked = state.gradeSelected.has(checkbox.value);
         checkbox.disabled = !state.enabled;
       });
     }
 
     function syncVisibility() {
-      const visible = state.enabled && schools.length > 0;
+      const visible = state.enabled && (schools.length > 0 || grades.length > 0);
       panel.style.display = visible ? '' : 'none';
     }
 
     function refresh() {
       syncCheckboxStates();
       const result = applyFilter(table, state);
-      if (!schools.length) {
-        summary.textContent = '未找到学校信息，暂无法筛选';
+      if (!schools.length && !grades.length) {
+        summary.textContent = '未找到可筛选的信息，暂无法筛选';
         summary.classList.remove('bn-active');
         count.textContent = result.total ? `当前显示 ${result.visible} / ${result.total}` : '';
         return;
@@ -4032,18 +4101,24 @@ window.getCurrentUserId = getCurrentUserId;
       count.textContent = result.total ? `当前显示 ${result.visible} / ${result.total}` : '';
     }
 
-    list.addEventListener('change', event => {
-      const target = event.target;
-      if (!(target instanceof HTMLInputElement) || target.type !== 'checkbox') return;
-      if (!state.enabled) {
-        target.checked = state.selected.has(target.value);
-        return;
-      }
-      if (target.checked) state.selected.add(target.value);
-      else state.selected.delete(target.value);
-      GM_setValue(RANKING_FILTER_SELECTED_KEY, Array.from(state.selected));
-      refresh();
-    });
+    function bindList(list, selectedSet, storageKey) {
+      if (!list) return;
+      list.addEventListener('change', event => {
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement) || target.type !== 'checkbox') return;
+        if (!state.enabled) {
+          target.checked = selectedSet.has(target.value);
+          return;
+        }
+        if (target.checked) selectedSet.add(target.value);
+        else selectedSet.delete(target.value);
+        GM_setValue(storageKey, Array.from(selectedSet));
+        refresh();
+      });
+    }
+
+    bindList(schoolList, state.schoolSelected, RANKING_FILTER_SELECTED_KEY);
+    bindList(gradeList, state.gradeSelected, RANKING_FILTER_GRADE_KEY);
 
     refresh();
     syncVisibility();
@@ -4056,6 +4131,7 @@ window.getCurrentUserId = getCurrentUserId;
     const table = await waitForTable();
     if (!table) return;
     const schoolIndex = detectSchoolColumn(table);
+    const gradeIndex = detectGradeColumn(table);
     const rows = collectRows(table);
     let schoolHeaderText = '';
     if (schoolIndex >= 0) {
@@ -4075,11 +4151,34 @@ window.getCurrentUserId = getCurrentUserId;
       }
     }
 
-    rows.forEach(row => annotateRow(row, schoolIndex, schoolHeaderText));
+    let gradeHeaderText = '';
+    if (gradeIndex >= 0) {
+      const headRow = table.tHead && table.tHead.rows && table.tHead.rows[0];
+      if (headRow && headRow.cells && headRow.cells[gradeIndex]) {
+        gradeHeaderText = getText(headRow.cells[gradeIndex]);
+      }
+      if (!gradeHeaderText && table.tBodies && table.tBodies.length) {
+        const maybeHeaderRow = table.tBodies[0].rows && table.tBodies[0].rows[0];
+        if (maybeHeaderRow && maybeHeaderRow.cells && maybeHeaderRow.cells[gradeIndex]) {
+          const candidateCell = maybeHeaderRow.cells[gradeIndex];
+          const candidateText = getText(candidateCell);
+          if ((candidateCell.tagName || '').toUpperCase() === 'TH' || /时年|年级|年紀|年級|Grade/i.test(candidateText)) {
+            gradeHeaderText = candidateText;
+          }
+        }
+      }
+    }
+
+    rows.forEach(row => annotateRow(row, schoolIndex, schoolHeaderText, gradeIndex, gradeHeaderText));
     const schools = schoolIndex >= 0
       ? uniqueSorted(rows
         .filter(row => row.dataset?.bnHeaderRow !== '1')
         .map(row => row.dataset?.bnSchool || FALLBACK_SCHOOL_NAME))
+      : [];
+    const grades = gradeIndex >= 0
+      ? uniqueSorted(rows
+        .filter(row => row.dataset?.bnHeaderRow !== '1')
+        .map(row => row.dataset?.bnGrade || FALLBACK_GRADE_NAME))
       : [];
 
     const savedSelectionRaw = GM_getValue(RANKING_FILTER_SELECTED_KEY, []);
@@ -4095,16 +4194,28 @@ window.getCurrentUserId = getCurrentUserId;
       GM_setValue(RANKING_FILTER_SELECTED_KEY, validSelected);
     }
 
+    const savedGradeRaw = GM_getValue(RANKING_FILTER_GRADE_KEY, []);
+    const savedGrades = Array.isArray(savedGradeRaw)
+      ? savedGradeRaw
+        .map(name => (typeof name === 'string' ? name.trim() : ''))
+        .map(name => name || FALLBACK_GRADE_NAME)
+        .filter(Boolean)
+      : [];
+    const dedupedGrades = Array.from(new Set(savedGrades));
+    const validGrades = dedupedGrades.filter(name => grades.includes(name));
+    if (validGrades.length !== dedupedGrades.length) {
+      GM_setValue(RANKING_FILTER_GRADE_KEY, validGrades);
+    }
+
     const requestedEnabled = !!GM_getValue(RANKING_FILTER_ENABLED_KEY, false);
     const state = {
-      enabled: requestedEnabled && schools.length > 0,
+      enabled: requestedEnabled && (schools.length > 0 || grades.length > 0),
       requested: requestedEnabled,
-      selected: new Set(validSelected),
-      schoolIndex,
-      headerText: schoolHeaderText
+      schoolSelected: new Set(validSelected),
+      gradeSelected: new Set(validGrades)
     };
 
-    setupFilterUI(table, state, schools);
+    setupFilterUI(table, state, schools, grades);
   }
 
   init().catch(err => console.error('[BN] Ranking enhancement failed', err));
