@@ -871,7 +871,6 @@ window.getCurrentUserId = getCurrentUserId;
       </div>
     </div>`;
   document.body.appendChild(container);
-  container.style.pointerEvents = 'none';
 
   const trigger = document.getElementById('bn-trigger');
   const panel = document.getElementById('bn-panel');
@@ -885,6 +884,22 @@ window.getCurrentUserId = getCurrentUserId;
   let dragOffsetX = 0, dragOffsetY = 0;
   let __bn_dragX = 0, __bn_dragY = 0;
   let __bn_pointerId = null;
+
+  const syncPeekState = () => {
+    const shouldStayVisible = pinned || panel.classList.contains('bn-show') || isDragging;
+    container.classList.toggle('bn-active', shouldStayVisible);
+    container.classList.toggle('bn-peek', !shouldStayVisible);
+    if (shouldStayVisible || !trigger) {
+      container.style.width = '';
+      container.style.height = '';
+    } else {
+      const rect = trigger.getBoundingClientRect();
+      const width = Math.max(1, Math.ceil(rect.width || trigger.offsetWidth || 48));
+      const height = Math.max(1, Math.ceil(rect.height || trigger.offsetHeight || 48));
+      container.style.width = `${width}px`;
+      container.style.height = `${height}px`;
+    }
+  };
 
   function applyCorner(pos) {
     container.classList.remove('bn-pos-br', 'bn-pos-bl', 'bn-pos-tr', 'bn-pos-tl');
@@ -1006,7 +1021,6 @@ window.getCurrentUserId = getCurrentUserId;
   pinBtn.classList.toggle('bn-pinned', pinned);
   if (pinned) {
     panel.classList.add('bn-show');
-    container.style.pointerEvents = 'auto';
   }
   syncPeekState();
 
@@ -1064,24 +1078,16 @@ window.getCurrentUserId = getCurrentUserId;
     checkChanged();
   };
 
-  const syncPeekState = () => {
-    const shouldStayVisible = pinned || panel.classList.contains('bn-show') || isDragging;
-    container.classList.toggle('bn-active', shouldStayVisible);
-    container.classList.toggle('bn-peek', !shouldStayVisible);
-  };
-
   let hideTimer = null;
   const showPanel = () => {
     if (isDragging || container.classList.contains('bn-dragging')) return;
     clearTimeout(hideTimer);
     panel.classList.add('bn-show');
-    container.style.pointerEvents = 'auto';
     syncPeekState();
   };
   const hidePanel = () => {
     if (pinned) return;
     panel.classList.remove('bn-show');
-    container.style.pointerEvents = 'none';
     if (panel.contains(document.activeElement)) document.activeElement.blur();
     syncPeekState();
   };
@@ -1147,7 +1153,7 @@ window.getCurrentUserId = getCurrentUserId;
       trigger.style.touchAction = '';
       trigger.style.transform = '';
       container.classList.remove('bn-dragging');
-      if (wasPinned) { panel.classList.add('bn-show'); container.style.pointerEvents = 'auto'; }
+      if (wasPinned) { panel.classList.add('bn-show'); }
 
       syncPeekState();
     }, 260);
@@ -1159,7 +1165,6 @@ window.getCurrentUserId = getCurrentUserId;
 
     wasPinned = pinned;
     panel.classList.remove('bn-show');
-    container.style.pointerEvents = 'none';
 
     const rect = trigger.getBoundingClientRect();
     gearW = rect.width; gearH = rect.height;
