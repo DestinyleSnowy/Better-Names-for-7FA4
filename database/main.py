@@ -44,6 +44,9 @@ GRADE_TO_COLORKEY = {
 }
 ALT_TEXT = {"大  一": "大一", "大  二": "大二", "大  三": "大三", "大  四": "大四", "教  练": "教练", "其  他": "其他"}
 SPECIAL_JL_NAMES = {"陈许旻", "程宇轩", "钟胡天翔", "陈恒宇", "徐淑君", "徐苒茨", "王多灵", "李雪梅"}
+SPECIAL_UID_OVERRIDES = {
+    1340: {"name": "board", "colorKey": "jl"},
+}
 
 def build_user_plan_url(uid: int) -> str:
     # 这个接口示例：/user_plan?user_id=650&date=1757928000&type=day&format=td
@@ -188,6 +191,11 @@ def apply_special_colorkeys(users: Dict[int, Dict[str, str]]) -> None:
     for info in users.values():
         if info.get("name") in SPECIAL_JL_NAMES and info.get("name"):
             info["colorKey"] = "jl"
+    for uid, override in SPECIAL_UID_OVERRIDES.items():
+        if uid in users:
+            users[uid].update(override)
+        else:
+            users[uid] = dict(override)
 
 def write_outputs(users: Dict[int, Dict[str, str]]) -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
