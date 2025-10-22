@@ -1,5 +1,5 @@
 // Better Names for 7FA4
-// 6.0.0 SP14 Developer
+// 6.0.0 SP15 Developer
 
 function getCurrentUserId() {
   const ud = document.querySelector('#user-dropdown');
@@ -852,7 +852,7 @@ window.getCurrentUserId = getCurrentUserId;
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
       <div class="bn-version">
-        <div class="bn-version-text">6.0.0 SP14 Developer</div>
+        <div class="bn-version-text">6.0.0 SP15 Developer</div>
       </div>
     </div>`;
   document.body.appendChild(container);
@@ -3909,6 +3909,69 @@ window.getCurrentUserId = getCurrentUserId;
     return arr.sort((a, b) => a.localeCompare(b));
   }
 
+  // Custom grade sorter: try to order grades from youngest -> oldest
+  // e.g. 小一..小学.. -> 初一..初三 -> 高一..高三 -> 大一..大四 -> 毕业 / other
+  function sortGrades(values) {
+    const arr = Array.from(new Set(values.filter(Boolean)));
+    if (!arr.length) return arr;
+
+    const chineseMap = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10 };
+
+    function extractNum(s) {
+      if (!s) return null;
+      // try arabic numbers first
+      const m = s.match(/(\d{1,4})/);
+      if (m) return Number(m[1]);
+      // try chinese numerals like 小五 初三
+      const mc = s.match(/[一二三四五六七八九十]+/);
+      if (mc) {
+        const chars = mc[0].split('');
+        // handle simple up to 10
+        let v = 0;
+        if (chars.length === 1) return chineseMap[chars[0]] || null;
+        // rudimentary handling for 十, e.g. 十一
+        for (let i = 0; i < chars.length; i++) v += chineseMap[chars[i]] || 0;
+        return v || null;
+      }
+      return null;
+    }
+
+    function gradeKey(s) {
+      const text = (s || '').trim();
+      // level order: 小(小学) -> 初(初中) -> 高(高中) -> 大(大学) -> 毕业 -> 教练 -> 其他
+      let level = 6;
+      if (/小|小学|小学部/.test(text)) level = 0;
+      else if (/初|初中|初级/.test(text)) level = 1;
+      else if (/高|高中|高级/.test(text)) level = 2;
+      else if (/大|大学|本科/.test(text)) level = 3;
+      else if (/毕业|已毕业/.test(text)) level = 4;
+      else if (/教练|老师|教师/.test(text)) level = 5;
+
+      const num = extractNum(text);
+      // For cohort-like labels such as "2022级", try to invert order so lower grade (more recent) considered younger
+      // but keep numeric if it's small (<=12) as grade number
+      let numKey = null;
+      if (num != null) {
+        if (num <= 12) numKey = num; // typical grade numbers
+        else numKey = num; // fallback: large numbers will still be compared
+      }
+      return { level, num: numKey, raw: text };
+    }
+
+    arr.sort((a, b) => {
+      const A = gradeKey(a);
+      const B = gradeKey(b);
+      if (A.level !== B.level) return A.level - B.level;
+      if (A.num != null && B.num != null) return A.num - B.num;
+      if (A.num != null) return -1;
+      if (B.num != null) return 1;
+      // fallback to locale compare
+      if (collator) return collator.compare(A.raw, B.raw);
+      return (A.raw || '').localeCompare(B.raw || '');
+    });
+    return arr;
+  }
+
   function applyFilter(table, state) {
     const rows = collectRows(table).filter(row => row.dataset?.bnHeaderRow !== '1');
     const total = rows.length;
@@ -4164,7 +4227,7 @@ window.getCurrentUserId = getCurrentUserId;
           const candidateText = getText(candidateCell);
           if ((candidateCell.tagName || '').toUpperCase() === 'TH' || /时年|年级|年紀|年級|Grade/i.test(candidateText)) {
             gradeHeaderText = candidateText;
-          }
+          } 
         }
       }
     }
@@ -4176,7 +4239,7 @@ window.getCurrentUserId = getCurrentUserId;
         .map(row => row.dataset?.bnSchool || FALLBACK_SCHOOL_NAME))
       : [];
     const grades = gradeIndex >= 0
-      ? uniqueSorted(rows
+      ? sortGrades(rows
         .filter(row => row.dataset?.bnHeaderRow !== '1')
         .map(row => row.dataset?.bnGrade || FALLBACK_GRADE_NAME))
       : [];
