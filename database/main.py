@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup
 
 BASE = "http://jx.7fa4.cn:8888"
 
-UID_START, UID_END = 1, 3101
+UID_START, UID_END = 1, 3105
 RANKLIST_PAGES = range(1, 61)  # 1..60
 DATA_DIR = Path(__file__).resolve().parents[1] / 'Better-Names-for-7FA4' / 'data'
 
