@@ -1942,7 +1942,42 @@ window.getCurrentUserId = getCurrentUserId;
     btn.innerHTML = '<i class="coffee icon" aria-hidden="true"></i><span>Skip</span>';
     btn.setAttribute('title', '跳过该题目');
     btn.setAttribute('aria-label', '跳过该题目');
+    const handleClick = async (event) => {
+      if (!event) return;
+      if (event.defaultPrevented) return;
+      if (typeof event.button === 'number' && event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (btn.dataset.bnQuickSkipPending === '1') return;
+      btn.dataset.bnQuickSkipPending = '1';
+      const targetUrl = btn.href;
+      try {
+        const response = await fetch(targetUrl, {
+          method: 'GET',
+          credentials: 'include',
+          redirect: 'follow',
+        });
+        if (!response || !response.ok) throw new Error('Skip request failed');
+      } catch (err) {
+        delete btn.dataset.bnQuickSkipPending;
+        location.href = targetUrl;
+        return;
+      }
+      location.reload();
+    };
+    btn.addEventListener('click', handleClick);
     return btn;
+  }
+
+  function isQuickSkipProhibitedTable(table) {
+    if (!table) return false;
+    const path = (location && typeof location.pathname === 'string') ? location.pathname : '';
+    const normalizedPath = path ? path.replace(/\/+/g, '/').replace(/\/$/, '') : '';
+    const isHomePath = normalizedPath === '' || normalizedPath === '/' || normalizedPath === '/index' || normalizedPath === '/index.html';
+    if (isHomePath) return true;
+    if (table.querySelector('tbody#announces')) return true;
+    return false;
   }
 
   function ensureQuickSkipCellAt(tr, insertIndex) {
@@ -1998,7 +2033,7 @@ window.getCurrentUserId = getCurrentUserId;
       const rows = Array.from(table.querySelectorAll('tbody > tr'));
       rows.forEach(removeQuickSkip);
 
-      if (!enabled) {
+      if (!enabled || isQuickSkipProhibitedTable(table)) {
         const header = table.querySelector('th[data-bn-quick-skip-header="1"]');
         if (header) header.remove();
         if (table.dataset) delete table.dataset.bnQuickSkipIndex;
