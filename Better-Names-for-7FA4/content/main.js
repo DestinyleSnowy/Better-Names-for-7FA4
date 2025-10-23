@@ -1,5 +1,5 @@
 // Better Names for 7FA4
-// 6.0.0 SP15 Developer
+// 6.0.0 SP16 Developer
 
 function getCurrentUserId() {
   const ud = document.querySelector('#user-dropdown');
@@ -38,12 +38,14 @@ window.getCurrentUserId = getCurrentUserId;
   let autoExit = initialAutoExit;
   const enableVjLink = GM_getValue('enableVjLink', true);
   const hideDoneSkip = GM_getValue('hideDoneSkip', false);
+  const enableQuickSkip = GM_getValue('enableQuickSkip', false);
   const WIDTH_MODE_KEY = 'truncate.widthMode';
   const widthMode = GM_getValue(WIDTH_MODE_KEY, 'visual');
   const THEME_KEY = 'colorTheme';
   const themeMode = GM_getValue(THEME_KEY, 'auto');
   const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   const effectiveTheme = themeMode === 'auto' ? (prefersDark ? 'dark' : 'light') : themeMode;
+  const BN_TABLE_ROWS_SELECTOR = 'table.ui.very.basic.center.aligned.table tbody tr';
 
   const REPO_URLS = {
     github: 'https://github.com/DestinyleSnowy/Better-Names-for-7FA4',
@@ -636,6 +638,60 @@ window.getCurrentUserId = getCurrentUserId;
       text-align: center;
     }
 
+    a[data-bn-quick-skip="1"],
+    .bn-quick-skip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #f1e5ff;
+      color: #4b2c92;
+      font-size: 12px;
+      line-height: 1;
+      text-decoration: none;
+      border: 1px solid rgba(123, 76, 217, 0.28);
+      white-space: nowrap;
+      transition: background .2s ease, color .2s ease, transform .2s ease, box-shadow .2s ease;
+    }
+    a[data-bn-quick-skip="1"]:hover,
+    .bn-quick-skip:hover {
+      background: #e4d4ff;
+      color: #3d237e;
+      box-shadow: 0 3px 8px rgba(79, 46, 138, 0.25);
+      transform: translateY(-1px);
+    }
+    a[data-bn-quick-skip="1"]:visited,
+    .bn-quick-skip:visited {
+      color: #4b2c92;
+    }
+    a[data-bn-quick-skip="1"]:active,
+    .bn-quick-skip:active {
+      transform: translateY(0);
+      box-shadow: none;
+    }
+    a[data-bn-quick-skip="1"] i.icon,
+    .bn-quick-skip i.icon {
+      margin: 0 !important;
+      color: #7f3dcf;
+    }
+    .bn-quick-skip-cell {
+      text-align: center;
+      vertical-align: middle;
+      white-space: nowrap;
+      padding: 4px 6px !important;
+    }
+    .bn-quick-skip-head {
+      text-align: center;
+      color: #7f3dcf;
+      width: 1%;
+    }
+    .bn-quick-skip-head i.icon {
+      margin: 0 !important;
+      color: #7f3dcf;
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .bn-save-actions {
         transition: none;
@@ -748,6 +804,7 @@ window.getCurrentUserId = getCurrentUserId;
             <label><input type="checkbox" id="bn-enable-copy" ${enableCopy ? 'checked' : ''}/> 启用题面快捷复制</label>
             <label><input type="checkbox" id="bn-hide-orig" ${hideOrig ? 'checked' : ''}/> 隐藏题目源码按钮</label>
             <label><input type="checkbox" id="bn-hide-done-skip" ${hideDoneSkip ? 'checked' : ''}/> 隐藏已通过&已跳过题目</label>
+            <label><input type="checkbox" id="bn-enable-quick-skip" ${enableQuickSkip ? 'checked' : ''}/> 启用快捷跳过按钮</label>
           </div>
           <div class="bn-section">
           <div class="bn-title">
@@ -852,7 +909,7 @@ window.getCurrentUserId = getCurrentUserId;
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
       <div class="bn-version">
-        <div class="bn-version-text">6.0.0 SP15 Developer</div>
+        <div class="bn-version-text">6.0.0 SP16 Developer</div>
       </div>
     </div>`;
   document.body.appendChild(container);
@@ -908,6 +965,7 @@ window.getCurrentUserId = getCurrentUserId;
   const saveActions = document.getElementById('bn-save-actions');
   const chkVj = document.getElementById('bn-enable-vj');
   const chkHideDoneSkip = document.getElementById('bn-hide-done-skip');
+  const chkQuickSkip = document.getElementById('bn-enable-quick-skip');
 
   const disableNeedWarn = () => {
     if (typeof window.needWarn === 'function' && !window.__bnGuardOriginalNeedWarn) {
@@ -981,6 +1039,7 @@ window.getCurrentUserId = getCurrentUserId;
     palette: Object.assign({}, palette),
     enableVjLink,
     hideDoneSkip,
+    enableQuickSkip,
     widthMode,
     themeMode
   };
@@ -1233,6 +1292,7 @@ window.getCurrentUserId = getCurrentUserId;
       (document.getElementById('bn-enable-submitter').checked !== originalConfig.enableSubmitter) ||
       (document.getElementById('bn-enable-vj').checked !== originalConfig.enableVjLink) ||
       (document.getElementById('bn-hide-done-skip').checked !== originalConfig.hideDoneSkip) ||
+      (document.getElementById('bn-enable-quick-skip').checked !== originalConfig.enableQuickSkip) ||
       (document.getElementById('bn-plan-auto').checked !== originalConfig.autoExit) ||
       (document.getElementById('bn-use-custom-color').checked !== originalConfig.useCustomColors) ||
       (document.getElementById('bn-width-mode').value !== originalConfig.widthMode) ||
@@ -1287,6 +1347,7 @@ window.getCurrentUserId = getCurrentUserId;
   };
   chkVj.onchange = checkChanged;
   chkHideDoneSkip.onchange = () => { applyHideDoneSkip(chkHideDoneSkip.checked); checkChanged(); };
+  chkQuickSkip.onchange = () => { applyQuickSkip(chkQuickSkip.checked); checkChanged(); };
   chkPlan.onchange = () => { toggleOption(chkPlan, planOpts); checkChanged(); };
   chkAutoRenew.onchange = checkChanged;
   chkRankingFilter.onchange = checkChanged;
@@ -1328,6 +1389,7 @@ window.getCurrentUserId = getCurrentUserId;
     GM_setValue('enableCopy', chkCp.checked);
     GM_setValue('hideOrig', chkHo.checked);
     GM_setValue('hideDoneSkip', chkHideDoneSkip.checked);
+    GM_setValue('enableQuickSkip', chkQuickSkip.checked);
     GM_setValue('enableUserMenu', chkMenu.checked);
     GM_setValue('enableGuard', chkGuard.checked);
     GM_setValue('enableVjLink', chkVj.checked);
@@ -1376,6 +1438,8 @@ window.getCurrentUserId = getCurrentUserId;
     chkVj.checked = originalConfig.enableVjLink;
     chkHideDoneSkip.checked = originalConfig.hideDoneSkip;
     applyHideDoneSkip(originalConfig.hideDoneSkip);
+    chkQuickSkip.checked = originalConfig.enableQuickSkip;
+    applyQuickSkip(originalConfig.enableQuickSkip);
     chkPlan.checked = originalConfig.enablePlanAdder;
     chkAutoRenew.checked = originalConfig.enableAutoRenew;
     chkRankingFilter.checked = originalConfig.enableRankingFilter;
@@ -1756,6 +1820,260 @@ window.getCurrentUserId = getCurrentUserId;
 
   }
 
+  function getProblemIdFromRow(tr) {
+    if (!tr || typeof tr.querySelector !== 'function') return null;
+    const dataEl = tr.querySelector('[data-problem_id], [data-problem-id], [data-problemId]');
+    let pid = null;
+    if (dataEl) {
+      const ds = dataEl.dataset || {};
+      pid = ds.problemId || ds.problem_id || ds.problemid || ds.problemID || null;
+      if (!pid) {
+        pid = dataEl.getAttribute('data-problem_id') || dataEl.getAttribute('data-problem-id') || dataEl.getAttribute('data-problemId');
+      }
+    }
+    if (!pid) {
+      const anchors = tr.querySelectorAll('a[href^="/problem/"]');
+      for (const anchor of anchors) {
+        if (!anchor || anchor.getAttribute('data-bn-quick-skip') === '1') continue;
+        const href = anchor.getAttribute('href') || '';
+        const match = href.match(/^\/problem\/(\d+)(?:[\/?#]|$)/);
+        if (match) { pid = match[1]; break; }
+      }
+    }
+    if (!pid) return null;
+    return String(pid);
+  }
+
+  function removeQuickSkip(tr) {
+    if (!tr || !tr.cells) return;
+    for (let i = tr.cells.length - 1; i >= 0; i--) {
+      const cell = tr.cells[i];
+      if (!cell) continue;
+      if (cell.dataset && cell.dataset.bnQuickSkipCell === '1') {
+        try { tr.deleteCell(i); } catch (e) { }
+        continue;
+      }
+      cell.querySelectorAll('a[data-bn-quick-skip="1"]').forEach(el => {
+        try { el.remove(); } catch (e) { }
+      });
+    }
+  }
+
+  function ensureQuickSkipHeaderCell(table, insertIndex) {
+    if (!table || typeof insertIndex !== 'number' || insertIndex < 0) return;
+    const headRow = table.querySelector('thead > tr');
+    if (!headRow) return;
+    const headerCells = Array.from(headRow.children);
+    const boundedIndex = Math.min(insertIndex, headerCells.length);
+    let th = headerCells.find(cell => cell.dataset && cell.dataset.bnQuickSkipHeader === '1');
+    const reference = headRow.children[boundedIndex] || null;
+    if (th) {
+      if (Array.prototype.indexOf.call(headRow.children, th) !== boundedIndex) {
+        headRow.insertBefore(th, reference);
+      }
+    } else {
+      th = document.createElement('th');
+      th.dataset.bnQuickSkipHeader = '1';
+      th.classList.add('bn-quick-skip-head');
+      th.innerHTML = '<i class="coffee icon" aria-hidden="true"></i>';
+      headRow.insertBefore(th, reference);
+    }
+    if (table.dataset) table.dataset.bnQuickSkipIndex = String(boundedIndex);
+  }
+
+  function pruneQuickSkipHeaders() {
+    document.querySelectorAll('th[data-bn-quick-skip-header="1"]').forEach(th => {
+      const table = th.closest('table');
+      if (!table) { th.remove(); return; }
+      if (!table.querySelector('td[data-bn-quick-skip-cell="1"]')) {
+        if (table.dataset) delete table.dataset.bnQuickSkipIndex;
+        th.remove();
+      }
+    });
+  }
+
+  function analyzeQuickSkipRow(tr) {
+    if (!tr || !tr.cells) return { qualifies: false, insertIndex: null, questionIcon: false };
+    const cells = Array.from(tr.cells);
+    if (!cells.length) return { qualifies: false, insertIndex: null, questionIcon: false };
+
+    const questionIconEl = Array.from(tr.querySelectorAll('i.question.icon')).find(icon => {
+      if (!icon) return false;
+      const skipCell = icon.closest('td[data-bn-quick-skip-cell="1"]');
+      return !skipCell;
+    });
+    if (!questionIconEl) return { qualifies: false, insertIndex: null, questionIcon: false };
+
+    let computedIndex = null;
+
+    const anchorIndex = cells.findIndex(td => {
+      const anchor = td.querySelector('a[href^="/problem/"]');
+      if (!anchor || anchor.getAttribute('data-bn-quick-skip') === '1') return false;
+      const text = (anchor.textContent || '').trim();
+      if (!text) return false;
+      if (/^L/i.test(text)) return false;
+      return /^[A-Za-z]/.test(text);
+    });
+    if (anchorIndex > -1) computedIndex = anchorIndex + 1;
+
+    if (computedIndex === null) {
+      const codeCellIndex = cells.findIndex(td => {
+        const bold = td.querySelector('b');
+        if (!bold) return false;
+        const text = (bold.textContent || '').trim();
+        if (!text) return false;
+        if (/^L/i.test(text)) return false;
+        return /^[A-Za-z]/.test(text);
+      });
+      if (codeCellIndex > -1) computedIndex = codeCellIndex;
+    }
+
+    if (computedIndex === null) return { qualifies: false, insertIndex: null, questionIcon: true };
+
+    return { qualifies: true, insertIndex: computedIndex, questionIcon: true };
+  }
+
+  function createQuickSkipButton(problemId) {
+    const btn = document.createElement('a');
+    btn.setAttribute('data-bn-quick-skip', '1');
+    btn.href = `/problem/${problemId}/skip`;
+    btn.dataset.problemId = String(problemId);
+    btn.className = 'bn-quick-skip';
+    btn.innerHTML = '<i class="coffee icon" aria-hidden="true"></i><span>Skip</span>';
+    btn.setAttribute('title', '跳过该题目');
+    btn.setAttribute('aria-label', '跳过该题目');
+    const handleClick = async (event) => {
+      if (!event) return;
+      if (event.defaultPrevented) return;
+      if (typeof event.button === 'number' && event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (btn.dataset.bnQuickSkipPending === '1') return;
+      btn.dataset.bnQuickSkipPending = '1';
+      const targetUrl = btn.href;
+      try {
+        const response = await fetch(targetUrl, {
+          method: 'GET',
+          credentials: 'include',
+          redirect: 'follow',
+        });
+        if (!response || !response.ok) throw new Error('Skip request failed');
+      } catch (err) {
+        delete btn.dataset.bnQuickSkipPending;
+        location.href = targetUrl;
+        return;
+      }
+      location.reload();
+    };
+    btn.addEventListener('click', handleClick);
+    return btn;
+  }
+
+  function isQuickSkipProhibitedTable(table) {
+    if (!table) return false;
+    const path = (location && typeof location.pathname === 'string') ? location.pathname : '';
+    const normalizedPath = path ? path.replace(/\/+/g, '/').replace(/\/$/, '') : '';
+    const isHomePath = normalizedPath === '' || normalizedPath === '/' || normalizedPath === '/index' || normalizedPath === '/index.html';
+    if (isHomePath) return true;
+    if (table.querySelector('tbody#announces')) return true;
+    return false;
+  }
+
+  function ensureQuickSkipCellAt(tr, insertIndex) {
+    if (!tr || typeof insertIndex !== 'number' || Number.isNaN(insertIndex)) return null;
+    let targetIndex = insertIndex;
+    if (targetIndex < 0) targetIndex = 0;
+    if (targetIndex > tr.cells.length) targetIndex = tr.cells.length;
+    let cell = tr.cells[targetIndex];
+    if (!cell || !(cell.dataset && cell.dataset.bnQuickSkipCell === '1')) {
+      try {
+        cell = tr.insertCell(targetIndex);
+      } catch (e) {
+        cell = document.createElement('td');
+        const reference = tr.children[targetIndex] || null;
+        tr.insertBefore(cell, reference);
+      }
+    }
+    if (!cell) return null;
+    cell.dataset.bnQuickSkipCell = '1';
+    cell.classList.add('bn-quick-skip-cell');
+    return cell;
+  }
+
+  function computeQuickSkipInsertIndex(table, rows) {
+    if (!table || !rows || !rows.length) return null;
+    for (const tr of rows) {
+      const info = analyzeQuickSkipRow(tr);
+      if (info && info.qualifies && typeof info.insertIndex === 'number') return info.insertIndex;
+    }
+    return null;
+  }
+
+  function applyQuickSkip(enabled, scopeRoot) {
+    const roots = [];
+    if (scopeRoot && typeof scopeRoot.querySelectorAll === 'function') roots.push(scopeRoot);
+    if (scopeRoot && scopeRoot.matches && scopeRoot.matches(BN_TABLE_ROWS_SELECTOR)) roots.push(scopeRoot);
+    if (!roots.length) roots.push(document);
+
+    const tables = new Set();
+    roots.forEach(root => {
+      if (!root) return;
+      if (root.matches && root.matches('table.ui.very.basic.center.aligned.table')) tables.add(root);
+      if (root.matches && root.matches(BN_TABLE_ROWS_SELECTOR)) {
+        const tbl = root.closest('table.ui.very.basic.center.aligned.table');
+        if (tbl) tables.add(tbl);
+      }
+      if (root.querySelectorAll) {
+        root.querySelectorAll('table.ui.very.basic.center.aligned.table').forEach(tbl => tables.add(tbl));
+      }
+    });
+
+    tables.forEach(table => {
+      const rows = Array.from(table.querySelectorAll('tbody > tr'));
+      rows.forEach(removeQuickSkip);
+
+      if (!enabled || isQuickSkipProhibitedTable(table)) {
+        const header = table.querySelector('th[data-bn-quick-skip-header="1"]');
+        if (header) header.remove();
+        if (table.dataset) delete table.dataset.bnQuickSkipIndex;
+        return;
+      }
+
+      const insertIndex = computeQuickSkipInsertIndex(table, rows);
+      if (insertIndex === null) {
+        const header = table.querySelector('th[data-bn-quick-skip-header="1"]');
+        if (header) header.remove();
+        if (table.dataset) delete table.dataset.bnQuickSkipIndex;
+        return;
+      }
+
+      ensureQuickSkipHeaderCell(table, insertIndex);
+
+      rows.forEach(tr => {
+        const cell = ensureQuickSkipCellAt(tr, insertIndex);
+        if (!cell) return;
+        cell.innerHTML = '';
+        const info = analyzeQuickSkipRow(tr);
+        if (info && info.qualifies) {
+          const pid = getProblemIdFromRow(tr);
+          if (!pid) return;
+          const btn = createQuickSkipButton(pid);
+          cell.appendChild(btn);
+        } else {
+          cell.innerHTML = '&nbsp;';
+        }
+      });
+    });
+
+    if (!enabled) {
+      pruneQuickSkipHeaders();
+      return;
+    }
+
+    pruneQuickSkipHeaders();
+  }
+
   function __bn_shouldHideRow(tr) {
     try {
       const tds = tr.querySelectorAll('td');
@@ -1766,7 +2084,8 @@ window.getCurrentUserId = getCurrentUserId;
       const statusTd = tds[1];
       const evalTd = tds[0];
       const isPass = !!statusTd.querySelector('.status.accepted, .status .accepted, span.status.accepted, i.checkmark.icon, i.thumbs.up.icon, i.check.icon');
-      const isSkip = !!evalTd.querySelector('i.coffee.icon');
+      const skipIcon = evalTd.querySelector('i.coffee.icon');
+      const isSkip = !!(skipIcon && !skipIcon.closest('a[data-bn-quick-skip="1"]'));
       return isPass || isSkip;
     } catch (e) { return false; }
   }
@@ -1810,6 +2129,7 @@ window.getCurrentUserId = getCurrentUserId;
   // 初次遍历
   document.querySelectorAll('a[href^="/user/"]').forEach(processUserLink);
   document.querySelectorAll('#vueAppFuckSafari > tbody > tr > td:nth-child(2) > a > span').forEach(processProblemTitle)
+  applyQuickSkip(enableQuickSkip);
   applyHideDoneSkip(hideDoneSkip);
   ;
 
@@ -1819,12 +2139,18 @@ window.getCurrentUserId = getCurrentUserId;
   function flushMO() {
     moScheduled = false;
     const nodes = Array.from(moQueue); moQueue.clear();
+    let quickSkipSetting = enableQuickSkip;
+    try {
+      const quickChk = document.getElementById('bn-enable-quick-skip');
+      if (quickChk) quickSkipSetting = quickChk.checked;
+    } catch (e) { }
     for (const node of nodes) {
       if (node.nodeType !== 1) continue;
       if (node.matches?.('a[href^="/user/"]')) processUserLink(node);
       if (node.matches?.('#vueAppFuckSafari > tbody > tr > td:nth-child(2) > a > span')) processProblemTitle(node);
       node.querySelectorAll?.('a[href^="/user/"]').forEach(processUserLink);
       node.querySelectorAll?.('#vueAppFuckSafari > tbody > tr > td:nth-child(2) > a > span').forEach(processProblemTitle);
+      try { applyQuickSkip(quickSkipSetting, node); } catch (e) { }
     }
 
     try { const _c = document.getElementById('bn-hide-done-skip'); applyHideDoneSkip(_c ? _c.checked : hideDoneSkip); } catch (e) { }
