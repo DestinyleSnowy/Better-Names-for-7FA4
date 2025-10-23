@@ -248,7 +248,6 @@ window.getCurrentUserId = getCurrentUserId;
       --bn-panel-shadow: 0 8px 32px rgba(0,0,0,0.12);
       --bn-trigger-shadow: 0 4px 12px rgba(0,0,0,0.1);
       --bn-hover-bg:#f8f9fa;
-      --bn-savebar-h: 48px;
       --bn-version-h: 44px;
     }
     #bn-container.bn-dark {
@@ -369,7 +368,7 @@ window.getCurrentUserId = getCurrentUserId;
 
     .bn-panel-content {
       display: flex; transition: all .4s cubic-bezier(.4,0,.2,1);
-      padding-bottom: calc(var(--bn-savebar-h) + var(--bn-version-h));
+      padding-bottom: var(--bn-version-h);
     }
     .bn-main-content {
       display: grid;
@@ -402,6 +401,7 @@ window.getCurrentUserId = getCurrentUserId;
     .bn-section:hover { background: rgba(248, 249, 250, 0.04); }
 
     .bn-title { font-weight: 600; font-size: 14px; color: var(--bn-text-sub); margin: 0 0 10px 0; display: flex; align-items: center; gap: 8px; }
+    .bn-title svg { width: 20px; height: 20px; flex-shrink: 0; }
     .bn-icon { width: 16px; height: 16px; opacity: .75; flex-shrink: 0; }
     .bn-desc { font-size: 12px; color: var(--bn-text-muted); margin: 0 0 12px 0; line-height: 1.4; }
 
@@ -556,23 +556,6 @@ window.getCurrentUserId = getCurrentUserId;
     .bn-color-item input[type="text"]:focus { border-color: #007bff; background: var(--bn-bg); box-shadow: 0 0 0 2px rgba(0,123,255,0.14); outline: none; }
     .bn-color-actions { display: flex; gap: 8px; }
     .bn-color-actions .bn-btn { flex: 1; padding: 10px 16px; font-size: 12px; }
-    .bn-save-actions {
-      position: absolute;
-      left: 0; right: 0;
-      bottom: var(--bn-version-h);
-      height: var(--bn-savebar-h);
-      padding: 0 20px;
-      border-top: 1px solid var(--bn-border-subtle);
-      background: var(--bn-bg);
-      display: flex; gap: 8px; justify-content: flex-end; align-items: center;
-      opacity: 0; pointer-events: none; transform: translateY(12px);
-      transition: opacity .28s cubic-bezier(.4, 0, .2, 1), transform .28s cubic-bezier(.4, 0, .2, 1);
-      will-change: opacity, transform;
-    }
-    .bn-save-actions.bn-visible {
-      opacity: 1; pointer-events: auto; transform: translateY(0);
-    }
-
     #bn-plan-options {
       margin-left: 24px; display: ${enablePlanAdder ? 'block' : 'none'};
     }
@@ -690,16 +673,6 @@ window.getCurrentUserId = getCurrentUserId;
     .bn-quick-skip-head i.icon {
       margin: 0 !important;
       color: #7f3dcf;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .bn-save-actions {
-        transition: none;
-        transform: none;
-      }
-      .bn-save-actions.bn-visible {
-        transform: none;
-      }
     }
 
     @media (max-width: 600px) {
@@ -892,10 +865,6 @@ window.getCurrentUserId = getCurrentUserId;
           </div>
         </div>
       </div>
-      <div class="bn-save-actions" id="bn-save-actions">
-        <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
-        <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
-      </div>
       <div class="bn-version">
         <div class="bn-version-text">6.0.0 SP16 Developer</div>
       </div>
@@ -950,7 +919,6 @@ window.getCurrentUserId = getCurrentUserId;
   const themeSelect = document.getElementById('bn-theme-select');
 
   const colorSidebar = document.getElementById('bn-color-sidebar');
-  const saveActions = document.getElementById('bn-save-actions');
   const chkVj = document.getElementById('bn-enable-vj');
   const chkHideDoneSkip = document.getElementById('bn-hide-done-skip');
   const chkQuickSkip = document.getElementById('bn-enable-quick-skip');
@@ -1008,11 +976,11 @@ window.getCurrentUserId = getCurrentUserId;
   const colorPickers = {};
   const hexInputs = {};
 
-  const originalConfig = {
+  const configState = {
     titleTruncate: isFinite(maxTitleUnits),
     userTruncate: isFinite(maxUserUnits),
-    maxTitleUnits,
-    maxUserUnits,
+    maxTitleUnits: isFinite(maxTitleUnits) ? maxTitleUnits : DEFAULT_MAX_UNITS,
+    maxUserUnits: isFinite(maxUserUnits) ? maxUserUnits : DEFAULT_MAX_UNITS,
     hideAvatar,
     enableCopy,
     hideOrig,
@@ -1042,252 +1010,108 @@ window.getCurrentUserId = getCurrentUserId;
     container.style.pointerEvents = 'auto';
   }
 
-  titleOpts.style.display = originalConfig.titleTruncate ? 'block' : 'none';
-  userOpts.style.display = originalConfig.userTruncate ? 'block' : 'none';
-  planOpts.style.display = originalConfig.enablePlanAdder ? 'block' : 'none';
+  titleOpts.style.display = configState.titleTruncate ? 'block' : 'none';
+  userOpts.style.display = configState.userTruncate ? 'block' : 'none';
+  planOpts.style.display = configState.enablePlanAdder ? 'block' : 'none';
 
   COLOR_KEYS.forEach(k => {
     colorPickers[k] = document.getElementById(`bn-color-${k}`);
     hexInputs[k] = document.getElementById(`bn-color-${k}-hex`);
 
     if (colorPickers[k] && hexInputs[k]) {
-      colorPickers[k].value = palette[k];
-      hexInputs[k].value = palette[k];
+      const initial = configState.palette[k] || palette[k];
+      colorPickers[k].value = initial;
+      hexInputs[k].value = initial;
 
-      colorPickers[k].oninput = () => {
+      colorPickers[k].addEventListener('input', () => {
         hexInputs[k].value = colorPickers[k].value;
-        checkChanged();
-      };
-      hexInputs[k].oninput = () => {
+      });
+      colorPickers[k].addEventListener('change', () => {
+        const val = colorPickers[k].value;
+        hexInputs[k].value = val;
+        configState.palette[k] = val;
+        palette[k] = val;
+        if (!chkUseColor.checked) {
+          chkUseColor.checked = true;
+          configState.useCustomColors = true;
+          container.classList.add('bn-expanded');
+          panel.classList.add('bn-expanded');
+          colorSidebar.classList.add('bn-show');
+        }
+        commitChanges();
+      });
+      hexInputs[k].addEventListener('input', () => {
         const v = hexInputs[k].value.trim();
         if (/^#?[0-9a-fA-F]{6}$/.test(v)) {
           const val = v.startsWith('#') ? v : '#' + v;
           colorPickers[k].value = val;
         }
-        checkChanged();
-      };
+      });
+      hexInputs[k].addEventListener('change', () => {
+        const v = hexInputs[k].value.trim();
+        if (!/^#?[0-9a-fA-F]{6}$/.test(v)) {
+          hexInputs[k].value = configState.palette[k];
+          alert('请输入有效的 6 位十六进制颜色值');
+          return;
+        }
+        const val = v.startsWith('#') ? v : '#' + v;
+        colorPickers[k].value = val;
+        configState.palette[k] = val;
+        palette[k] = val;
+        if (!chkUseColor.checked) {
+          chkUseColor.checked = true;
+          configState.useCustomColors = true;
+          container.classList.add('bn-expanded');
+          panel.classList.add('bn-expanded');
+          colorSidebar.classList.add('bn-show');
+        }
+        commitChanges();
+      });
     }
   });
 
-  chkUseColor.onchange = () => {
-    const isChecked = chkUseColor.checked;
-    if (isChecked) {
-      container.classList.add('bn-expanded');
-      panel.classList.add('bn-expanded');
-      setTimeout(() => colorSidebar.classList.add('bn-show'), 200);
-    } else {
-      colorSidebar.classList.remove('bn-show');
-      setTimeout(() => { container.classList.remove('bn-expanded'); panel.classList.remove('bn-expanded'); }, 200);
-    }
-    checkChanged();
-  };
-
-  if (useCustomColors) {
-    container.classList.add('bn-expanded');
-    panel.classList.add('bn-expanded');
-    colorSidebar.classList.add('bn-show');
+  function parsePositiveInt(value) {
+    const v = parseInt(value, 10);
+    return Number.isFinite(v) && v > 0 ? v : null;
   }
 
-  themeSelect.onchange = () => {
-    const v = themeSelect.value;
-    if (v === 'dark') container.classList.add('bn-dark');
-    else if (v === 'light') container.classList.remove('bn-dark');
-    else { prefersDark ? container.classList.add('bn-dark') : container.classList.remove('bn-dark'); }
-    checkChanged();
-  };
-
-  let hideTimer = null;
-  const showPanel = () => {
-    if (isDragging || container.classList.contains('bn-dragging')) return;
-    clearTimeout(hideTimer);
-    panel.classList.add('bn-show');
-    container.style.pointerEvents = 'auto';
-  };
-  const hidePanel = () => {
-    if (pinned) return;
-    panel.classList.remove('bn-show');
-    container.style.pointerEvents = 'none';
-    if (panel.contains(document.activeElement)) document.activeElement.blur();
-  };
-  trigger.addEventListener('mouseenter', showPanel);
-  const maybeHidePanel = () => {
-    hideTimer = setTimeout(() => {
-      if (!pinned && !trigger.matches(':hover') && !panel.matches(':hover') && !container.matches(':hover')) {
-        hidePanel();
-      }
-    }, 300);
-  };
-  trigger.addEventListener('mouseleave', maybeHidePanel);
-  panel.addEventListener('mouseleave', maybeHidePanel);
-
-  const __bn_lagMs = 100;
-  const __bn_trailWindow = 400;
-  const __bn_now = () => (window.performance && performance.now) ? performance.now() : Date.now();
-
-  function __bn_pushTrail(e) {
-    const t = __bn_now();
-    __bn_trail.push({ t, x: e.clientX, y: e.clientY });
-    const cutoff = t - __bn_trailWindow;
-    while (__bn_trail.length && __bn_trail[0].t < cutoff) __bn_trail.shift();
-  }
-  function __bn_sampleAt(tgt) {
-    if (!__bn_trail.length) return null;
-    if (tgt <= __bn_trail[0].t) return __bn_trail[0];
-    const last = __bn_trail[__bn_trail.length - 1];
-    if (tgt >= last.t) return last;
-    let lo = 0, hi = __bn_trail.length - 1;
-    while (lo <= hi) { const mid = (lo + hi) >> 1; (__bn_trail[mid].t < tgt) ? (lo = mid + 1) : (hi = mid - 1); }
-    const a = __bn_trail[lo - 1], b = __bn_trail[lo];
-    const r = (tgt - a.t) / Math.max(1, b.t - a.t);
-    return { t: tgt, x: a.x + (b.x - a.x) * r, y: a.y + (b.y - a.y) * r };
-  }
-  function __bn_applyTransform(x, y) {
-    __bn_dragX = x; __bn_dragY = y;
-    trigger.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-  }
-  function __bn_tick() {
-    if (!isDragging) { __bn_raf = null; return; }
-    const s = __bn_sampleAt(__bn_now() - __bn_lagMs);
-    if (s) __bn_applyTransform(s.x - gearW / 2, s.y - gearH / 2);
-    __bn_raf = requestAnimationFrame(__bn_tick);
-  }
-  function __bn_onMove(e) {
-    if (!isDragging) return;
-    __bn_pushTrail(e);
-    if (!__bn_raf) __bn_raf = requestAnimationFrame(__bn_tick);
-  }
-  function __bn_onUp(e) {
-    if (!isDragging) return;
-    isDragging = false;
-    if (__bn_raf) cancelAnimationFrame(__bn_raf);
-    __bn_raf = null;
-
-    const cx = __bn_dragX + gearW / 2;
-    const cy = __bn_dragY + gearH / 2;
-    const W = window.innerWidth, H = window.innerHeight;
-    const corners = {
-      tl: { x: SNAP_MARGIN + gearW / 2, y: SNAP_MARGIN + gearH / 2 },
-      tr: { x: W - SNAP_MARGIN - gearW / 2, y: SNAP_MARGIN + gearH / 2 },
-      bl: { x: SNAP_MARGIN + gearW / 2, y: H - SNAP_MARGIN - gearH / 2 },
-      br: { x: W - SNAP_MARGIN - gearW / 2, y: H - SNAP_MARGIN - gearH / 2 },
-    };
-    let best = 'br', bestDist = Infinity;
-    for (const k in corners) {
-      const p = corners[k]; const dx = p.x - cx, dy = p.y - cy; const d2 = dx * dx + dy * dy;
-      if (d2 < bestDist) { bestDist = d2; best = k; }
-    }
-    const fx = corners[best].x - gearW / 2;
-    const fy = corners[best].y - gearH / 2;
-
-    trigger.style.transition = 'transform 0.24s ease-out';
-    __bn_applyTransform(fx, fy);
-
-    setTimeout(() => {
-      trigger.style.transition = '';
-      applyCorner(best);
-      trigger.style.position = '';
-      trigger.style.left = trigger.style.top = '';
-      trigger.style.bottom = trigger.style.right = '';
-      trigger.style.transform = '';
-      container.classList.remove('bn-dragging');
-      if (wasPinned) { panel.classList.add('bn-show'); container.style.pointerEvents = 'auto'; }
-
-      if (__bn_pointerId !== null && trigger.releasePointerCapture) { try { trigger.releasePointerCapture(__bn_pointerId); } catch (_) { } }
-      document.removeEventListener('pointermove', __bn_onMove);
-      document.removeEventListener('pointerup', __bn_onUp);
-      document.removeEventListener('mousemove', __bn_onMove);
-      document.removeEventListener('mouseup', __bn_onUp);
-      __bn_trail = []; __bn_pointerId = null;
-    }, 260);
-  }
-  const __bn_onDown = (e) => {
-    if (e.type === 'mousedown' && window.PointerEvent) return;
-    if ((e.type === 'mousedown' || e.type === 'pointerdown') && e.button !== 0) return;
-    e.preventDefault();
-
-    wasPinned = pinned;
-    panel.classList.remove('bn-show');
-    container.style.pointerEvents = 'none';
-
-    const rect = trigger.getBoundingClientRect();
-    gearW = rect.width; gearH = rect.height;
-    trigger.style.position = 'fixed';
-    trigger.style.left = '0px'; trigger.style.top = '0px';
-    trigger.style.bottom = 'auto'; trigger.style.right = 'auto';
-    trigger.style.transition = 'none';
-    trigger.style.willChange = 'transform';
-    trigger.style.touchAction = 'none';
-
-    isDragging = true;
-    container.classList.add('bn-dragging');
-
-    __bn_trail = [];
-    __bn_pushTrail(e);
-    __bn_applyTransform(e.clientX - gearW / 2, e.clientY - gearH / 2);
-
-    if (e.pointerId != null && trigger.setPointerCapture) {
-      __bn_pointerId = e.pointerId;
-      try { trigger.setPointerCapture(e.pointerId); } catch (_) { }
-      document.addEventListener('pointermove', __bn_onMove);
-      document.addEventListener('pointerup', __bn_onUp);
-    } else {
-      document.addEventListener('mousemove', __bn_onMove);
-      document.addEventListener('mouseup', __bn_onUp);
-    }
-    if (!__bn_raf) __bn_raf = requestAnimationFrame(__bn_tick);
-  };
-  if (window.PointerEvent) {
-    trigger.addEventListener('pointerdown', __bn_onDown, { passive: false });
-  } else {
-    trigger.addEventListener('mousedown', __bn_onDown, { passive: false });
+  const RELOAD_DELAY = 800;
+  let reloadTimer = null;
+  function scheduleReload() {
+    clearTimeout(reloadTimer);
+    reloadTimer = setTimeout(() => location.reload(), RELOAD_DELAY);
   }
 
-  pinBtn.addEventListener('click', () => {
-    pinned = !pinned;
-    GM_setValue('panelPinned', pinned);
-    pinBtn.classList.toggle('bn-pinned', pinned);
-    if (pinned) showPanel();
-    else if (!trigger.matches(':hover') && !panel.matches(':hover')) hidePanel();
-  });
-
-  function markOnce(el, key) {
-    const k = `bn${key}`;
-    if (!el || !el.dataset) return true;
-    if (el.dataset[k]) return false;
-    el.dataset[k] = '1';
-    return true;
-  }
-
-  function checkChanged() {
-    const ti = parseInt(titleInp.value, 10);
-    const ui = parseInt(userInp.value, 10);
-    const paletteChanged = COLOR_KEYS.some(k => {
-      return colorPickers[k] && colorPickers[k].value.toLowerCase() !== (originalConfig.palette[k] || '').toLowerCase();
+  function persistConfig() {
+    GM_setValue('maxTitleUnits', configState.titleTruncate ? configState.maxTitleUnits : 'none');
+    GM_setValue('maxUserUnits', configState.userTruncate ? configState.maxUserUnits : 'none');
+    GM_setValue(WIDTH_MODE_KEY, configState.widthMode);
+    GM_setValue('hideAvatar', configState.hideAvatar);
+    GM_setValue('enableCopy', configState.enableCopy);
+    GM_setValue('hideOrig', configState.hideOrig);
+    GM_setValue('hideDoneSkip', configState.hideDoneSkip);
+    GM_setValue('enableQuickSkip', configState.enableQuickSkip);
+    GM_setValue('enableUserMenu', configState.enableMenu);
+    GM_setValue('enableGuard', configState.enableGuard);
+    GM_setValue('enableVjLink', configState.enableVjLink);
+    GM_setValue('enablePlanAdder', configState.enablePlanAdder);
+    GM_setValue('enableAutoRenew', configState.enableAutoRenew);
+    GM_setValue('enableSubmitter', configState.enableSubmitter);
+    GM_setValue('rankingFilter.enabled', configState.enableRankingFilter);
+    GM_setValue('planAdder.autoExit', configState.autoExit);
+    autoExit = configState.autoExit;
+    GM_setValue(THEME_KEY, configState.themeMode);
+    const obj = {};
+    COLOR_KEYS.forEach(k => {
+      obj[k] = configState.palette[k] || palette[k];
     });
-    const changed =
-      (document.getElementById('bn-enable-title-truncate').checked !== originalConfig.titleTruncate) ||
-      (document.getElementById('bn-enable-user-truncate').checked !== originalConfig.userTruncate) ||
-      (document.getElementById('bn-enable-title-truncate').checked && ti !== originalConfig.maxTitleUnits) ||
-      (document.getElementById('bn-enable-user-truncate').checked && ui !== originalConfig.maxUserUnits) ||
-      (document.getElementById('bn-hide-avatar').checked !== originalConfig.hideAvatar) ||
-      (document.getElementById('bn-enable-copy').checked !== originalConfig.enableCopy) ||
-      (document.getElementById('bn-hide-orig').checked !== originalConfig.hideOrig) ||
-      (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) ||
-      (document.getElementById('bn-enable-guard').checked !== originalConfig.enableGuard) ||
-      (document.getElementById('bn-enable-plan').checked !== originalConfig.enablePlanAdder) ||
-      (document.getElementById('bn-enable-renew').checked !== originalConfig.enableAutoRenew) ||
-      (document.getElementById('bn-enable-ranking-filter').checked !== originalConfig.enableRankingFilter) ||
-      (document.getElementById('bn-enable-submitter').checked !== originalConfig.enableSubmitter) ||
-      (document.getElementById('bn-enable-vj').checked !== originalConfig.enableVjLink) ||
-      (document.getElementById('bn-hide-done-skip').checked !== originalConfig.hideDoneSkip) ||
-      (document.getElementById('bn-enable-quick-skip').checked !== originalConfig.enableQuickSkip) ||
-      (document.getElementById('bn-plan-auto').checked !== originalConfig.autoExit) ||
-      (document.getElementById('bn-use-custom-color').checked !== originalConfig.useCustomColors) ||
-      (document.getElementById('bn-width-mode').value !== originalConfig.widthMode) ||
-      (document.getElementById('bn-theme-select').value !== originalConfig.themeMode) ||
-      paletteChanged;
+    GM_setValue('userPalette', JSON.stringify(obj));
+    GM_setValue('useCustomColors', configState.useCustomColors);
+  }
 
-    saveActions.classList.toggle('bn-visible', changed);
+  function commitChanges() {
+    persistConfig();
+    scheduleReload();
   }
 
   function toggleOption(chk, el) {
@@ -1310,16 +1134,73 @@ window.getCurrentUserId = getCurrentUserId;
   const chkTitleTrEl = document.getElementById('bn-enable-title-truncate');
   const chkUserTrEl = document.getElementById('bn-enable-user-truncate');
 
-  chkTitleTrEl.onchange = () => { toggleOption(chkTitleTrEl, titleOpts); checkChanged(); };
-  chkUserTrEl.onchange = () => { toggleOption(chkUserTrEl, userOpts); checkChanged(); };
-  titleInp.oninput = checkChanged;
-  userInp.oninput = checkChanged;
+  chkTitleTrEl.addEventListener('change', () => {
+    toggleOption(chkTitleTrEl, titleOpts);
+    configState.titleTruncate = chkTitleTrEl.checked;
+    if (chkTitleTrEl.checked) {
+      const parsed = parsePositiveInt(titleInp.value);
+      if (parsed === null) {
+        titleInp.value = configState.maxTitleUnits;
+      } else {
+        configState.maxTitleUnits = parsed;
+      }
+    }
+    commitChanges();
+  });
+  chkUserTrEl.addEventListener('change', () => {
+    toggleOption(chkUserTrEl, userOpts);
+    configState.userTruncate = chkUserTrEl.checked;
+    if (chkUserTrEl.checked) {
+      const parsed = parsePositiveInt(userInp.value);
+      if (parsed === null) {
+        userInp.value = configState.maxUserUnits;
+      } else {
+        configState.maxUserUnits = parsed;
+      }
+    }
+    commitChanges();
+  });
+  titleInp.addEventListener('change', () => {
+    if (!chkTitleTrEl.checked) return;
+    const parsed = parsePositiveInt(titleInp.value);
+    if (parsed === null) {
+      alert('请输入大于 0 的正整数');
+      titleInp.value = configState.maxTitleUnits;
+      return;
+    }
+    configState.maxTitleUnits = parsed;
+    commitChanges();
+  });
+  userInp.addEventListener('change', () => {
+    if (!chkUserTrEl.checked) return;
+    const parsed = parsePositiveInt(userInp.value);
+    if (parsed === null) {
+      alert('请输入大于 0 的正整数');
+      userInp.value = configState.maxUserUnits;
+      return;
+    }
+    configState.maxUserUnits = parsed;
+    commitChanges();
+  });
 
-  chkAv.onchange = checkChanged;
-  chkCp.onchange = () => { checkChanged(); };
-  chkHo.onchange = checkChanged;
-  chkMenu.onchange = checkChanged;
-  chkGuard.onchange = () => {
+  chkAv.addEventListener('change', () => {
+    configState.hideAvatar = chkAv.checked;
+    commitChanges();
+  });
+  chkCp.addEventListener('change', () => {
+    configState.enableCopy = chkCp.checked;
+    commitChanges();
+  });
+  chkHo.addEventListener('change', () => {
+    configState.hideOrig = chkHo.checked;
+    commitChanges();
+  });
+  chkMenu.addEventListener('change', () => {
+    configState.enableMenu = chkMenu.checked;
+    commitChanges();
+  });
+  chkGuard.addEventListener('change', () => {
+    configState.enableGuard = chkGuard.checked;
     if (!chkGuard.checked) {
       disableNeedWarn();
     } else if (typeof window.__bnGuardOriginalNeedWarn === 'function') {
@@ -1331,17 +1212,78 @@ window.getCurrentUserId = getCurrentUserId;
         window.needWarn = undefined;
       }
     }
-    checkChanged();
+    commitChanges();
+  });
+  chkVj.addEventListener('change', () => {
+    configState.enableVjLink = chkVj.checked;
+    commitChanges();
+  });
+  chkHideDoneSkip.addEventListener('change', () => {
+    configState.hideDoneSkip = chkHideDoneSkip.checked;
+    applyHideDoneSkip(chkHideDoneSkip.checked);
+    commitChanges();
+  });
+  chkQuickSkip.addEventListener('change', () => {
+    configState.enableQuickSkip = chkQuickSkip.checked;
+    applyQuickSkip(chkQuickSkip.checked);
+    commitChanges();
+  });
+  chkPlan.addEventListener('change', () => {
+    toggleOption(chkPlan, planOpts);
+    configState.enablePlanAdder = chkPlan.checked;
+    commitChanges();
+  });
+  chkAutoRenew.addEventListener('change', () => {
+    configState.enableAutoRenew = chkAutoRenew.checked;
+    commitChanges();
+  });
+  chkRankingFilter.addEventListener('change', () => {
+    configState.enableRankingFilter = chkRankingFilter.checked;
+    commitChanges();
+  });
+  chkSubmitter.addEventListener('change', () => {
+    configState.enableSubmitter = chkSubmitter.checked;
+    syncSubmitterState(chkSubmitter.checked);
+    commitChanges();
+  });
+  chkPlanAuto.addEventListener('change', () => {
+    configState.autoExit = chkPlanAuto.checked;
+    autoExit = chkPlanAuto.checked;
+    commitChanges();
+  });
+  widthModeSel.addEventListener('change', () => {
+    configState.widthMode = widthModeSel.value;
+    commitChanges();
+  });
+
+  chkUseColor.onchange = () => {
+    const isChecked = chkUseColor.checked;
+    configState.useCustomColors = isChecked;
+    if (isChecked) {
+      container.classList.add('bn-expanded');
+      panel.classList.add('bn-expanded');
+      setTimeout(() => colorSidebar.classList.add('bn-show'), 200);
+    } else {
+      colorSidebar.classList.remove('bn-show');
+      setTimeout(() => { container.classList.remove('bn-expanded'); panel.classList.remove('bn-expanded'); }, 200);
+    }
+    commitChanges();
   };
-  chkVj.onchange = checkChanged;
-  chkHideDoneSkip.onchange = () => { applyHideDoneSkip(chkHideDoneSkip.checked); checkChanged(); };
-  chkQuickSkip.onchange = () => { applyQuickSkip(chkQuickSkip.checked); checkChanged(); };
-  chkPlan.onchange = () => { toggleOption(chkPlan, planOpts); checkChanged(); };
-  chkAutoRenew.onchange = checkChanged;
-  chkRankingFilter.onchange = checkChanged;
-  chkSubmitter.onchange = checkChanged;
-  chkPlanAuto.onchange = () => { autoExit = chkPlanAuto.checked; checkChanged(); };
-  widthModeSel.onchange = checkChanged;
+
+  if (configState.useCustomColors) {
+    container.classList.add('bn-expanded');
+    panel.classList.add('bn-expanded');
+    colorSidebar.classList.add('bn-show');
+  }
+
+  themeSelect.onchange = () => {
+    const v = themeSelect.value;
+    configState.themeMode = v;
+    if (v === 'dark') container.classList.add('bn-dark');
+    else if (v === 'light') container.classList.remove('bn-dark');
+    else { prefersDark ? container.classList.add('bn-dark') : container.classList.remove('bn-dark'); }
+    commitChanges();
+  };
 
   document.getElementById('bn-color-reset').onclick = () => {
     const base = palettes[(themeSelect.value === 'auto' ? (prefersDark ? 'dark' : 'light') : themeSelect.value)] || palettes.light;
@@ -1349,109 +1291,14 @@ window.getCurrentUserId = getCurrentUserId;
       if (colorPickers[k] && hexInputs[k]) {
         colorPickers[k].value = base[k];
         hexInputs[k].value = base[k];
+        configState.palette[k] = base[k];
+        palette[k] = base[k];
       }
     });
     chkUseColor.checked = true;
+    configState.useCustomColors = true;
     container.classList.add('bn-expanded'); panel.classList.add('bn-expanded'); colorSidebar.classList.add('bn-show');
-    checkChanged();
-  };
-
-  document.getElementById('bn-save-config').onclick = () => {
-    if (chkTitleTrEl.checked) {
-      const v = parseInt(titleInp.value, 10);
-      if (isNaN(v) || v <= 0) { alert('请输入大于 0 的正整数'); return; }
-      GM_setValue('maxTitleUnits', v);
-    } else {
-      GM_setValue('maxTitleUnits', 'none');
-    }
-    if (chkUserTrEl.checked) {
-      const v = parseInt(userInp.value, 10);
-      if (isNaN(v) || v <= 0) { alert('请输入大于 0 的正整数'); return; }
-      GM_setValue('maxUserUnits', v);
-    } else {
-      GM_setValue('maxUserUnits', 'none');
-    }
-    GM_setValue(WIDTH_MODE_KEY, widthModeSel.value);
-
-    GM_setValue('hideAvatar', chkAv.checked);
-    GM_setValue('enableCopy', chkCp.checked);
-    GM_setValue('hideOrig', chkHo.checked);
-    GM_setValue('hideDoneSkip', chkHideDoneSkip.checked);
-    GM_setValue('enableQuickSkip', chkQuickSkip.checked);
-    GM_setValue('enableUserMenu', chkMenu.checked);
-    GM_setValue('enableGuard', chkGuard.checked);
-    GM_setValue('enableVjLink', chkVj.checked);
-    GM_setValue('enablePlanAdder', chkPlan.checked);
-    GM_setValue('enableAutoRenew', chkAutoRenew.checked);
-    GM_setValue('enableSubmitter', chkSubmitter.checked);
-    GM_setValue('rankingFilter.enabled', chkRankingFilter.checked);
-    GM_setValue('planAdder.autoExit', chkPlanAuto.checked);
-    autoExit = chkPlanAuto.checked;
-
-    GM_setValue(THEME_KEY, themeSelect.value);
-
-    const obj = {};
-    COLOR_KEYS.forEach(k => { if (colorPickers[k]) obj[k] = colorPickers[k].value; });
-    GM_setValue('userPalette', JSON.stringify(obj));
-    GM_setValue('useCustomColors', chkUseColor.checked);
-
-    syncSubmitterState(chkSubmitter.checked);
-
-    setTimeout(() => location.reload(), 50);
-  };
-
-  document.getElementById('bn-cancel-changes').onclick = () => {
-    chkTitleTrEl.checked = originalConfig.titleTruncate;
-    chkUserTrEl.checked = originalConfig.userTruncate;
-    titleInp.value = isFinite(originalConfig.maxTitleUnits) ? originalConfig.maxTitleUnits : '';
-    userInp.value = isFinite(originalConfig.maxUserUnits) ? originalConfig.maxUserUnits : '';
-    widthModeSel.value = originalConfig.widthMode;
-
-    chkAv.checked = originalConfig.hideAvatar;
-    chkCp.checked = originalConfig.enableCopy;
-    chkHo.checked = originalConfig.hideOrig;
-    chkMenu.checked = originalConfig.enableMenu;
-    chkGuard.checked = originalConfig.enableGuard;
-    if (!originalConfig.enableGuard) {
-      disableNeedWarn();
-    } else if (typeof window.__bnGuardOriginalNeedWarn === 'function') {
-      window.needWarn = window.__bnGuardOriginalNeedWarn;
-    } else {
-      try {
-        delete window.needWarn;
-      } catch (e) {
-        window.needWarn = undefined;
-      }
-    }
-    chkVj.checked = originalConfig.enableVjLink;
-    chkHideDoneSkip.checked = originalConfig.hideDoneSkip;
-    applyHideDoneSkip(originalConfig.hideDoneSkip);
-    chkQuickSkip.checked = originalConfig.enableQuickSkip;
-    applyQuickSkip(originalConfig.enableQuickSkip);
-    chkPlan.checked = originalConfig.enablePlanAdder;
-    chkAutoRenew.checked = originalConfig.enableAutoRenew;
-    chkRankingFilter.checked = originalConfig.enableRankingFilter;
-    chkSubmitter.checked = originalConfig.enableSubmitter;
-    chkPlanAuto.checked = originalConfig.autoExit;
-    autoExit = originalConfig.autoExit;
-    chkUseColor.checked = originalConfig.useCustomColors;
-    themeSelect.value = originalConfig.themeMode;
-
-    titleOpts.style.display = chkTitleTrEl.checked ? 'block' : 'none';
-    userOpts.style.display = chkUserTrEl.checked ? 'block' : 'none';
-    planOpts.style.display = chkPlan.checked ? 'block' : 'none';
-
-    if (themeSelect.value === 'dark') container.classList.add('bn-dark');
-    else if (themeSelect.value === 'light') container.classList.remove('bn-dark');
-    else { prefersDark ? container.classList.add('bn-dark') : container.classList.remove('bn-dark'); }
-
-    COLOR_KEYS.forEach(k => {
-      if (colorPickers[k] && hexInputs[k]) {
-        colorPickers[k].value = originalConfig.palette[k];
-        hexInputs[k].value = originalConfig.palette[k];
-      }
-    });
-    checkChanged();
+    commitChanges();
   };
 
   if (enableAutoRenew) initAutoRenew();
