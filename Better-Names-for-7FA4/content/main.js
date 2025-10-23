@@ -1,5 +1,5 @@
 // Better Names for 7FA4
-// 6.0.0 SP15 Developer
+// 6.0.0 SP16 Developer
 
 function getCurrentUserId() {
   const ud = document.querySelector('#user-dropdown');
@@ -38,12 +38,14 @@ window.getCurrentUserId = getCurrentUserId;
   let autoExit = initialAutoExit;
   const enableVjLink = GM_getValue('enableVjLink', true);
   const hideDoneSkip = GM_getValue('hideDoneSkip', false);
+  const enableQuickSkip = GM_getValue('enableQuickSkip', true);
   const WIDTH_MODE_KEY = 'truncate.widthMode';
   const widthMode = GM_getValue(WIDTH_MODE_KEY, 'visual');
   const THEME_KEY = 'colorTheme';
   const themeMode = GM_getValue(THEME_KEY, 'auto');
   const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   const effectiveTheme = themeMode === 'auto' ? (prefersDark ? 'dark' : 'light') : themeMode;
+  const BN_TABLE_ROWS_SELECTOR = 'table.ui.very.basic.center.aligned.table tbody tr';
 
   const REPO_URLS = {
     github: 'https://github.com/DestinyleSnowy/Better-Names-for-7FA4',
@@ -636,6 +638,42 @@ window.getCurrentUserId = getCurrentUserId;
       text-align: center;
     }
 
+    .bn-quick-skip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: #f5e1c7;
+      color: #6b4c2a;
+      font-size: 12px;
+      line-height: 1;
+      text-decoration: none;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      white-space: nowrap;
+      transition: background .2s ease, color .2s ease, transform .2s ease;
+    }
+    .bn-quick-skip:hover {
+      background: #ecd2ab;
+      color: #5a3f21;
+      transform: translateY(-1px);
+    }
+    .bn-quick-skip:visited {
+      color: #6b4c2a;
+    }
+    .bn-quick-skip:active {
+      transform: translateY(0);
+    }
+    .bn-quick-skip i.icon {
+      margin: 0 !important;
+    }
+    .bn-quick-skip--after {
+      margin-left: 6px;
+    }
+    .bn-quick-skip--before {
+      margin-right: 6px;
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .bn-save-actions {
         transition: none;
@@ -748,6 +786,7 @@ window.getCurrentUserId = getCurrentUserId;
             <label><input type="checkbox" id="bn-enable-copy" ${enableCopy ? 'checked' : ''}/> 启用题面快捷复制</label>
             <label><input type="checkbox" id="bn-hide-orig" ${hideOrig ? 'checked' : ''}/> 隐藏题目源码按钮</label>
             <label><input type="checkbox" id="bn-hide-done-skip" ${hideDoneSkip ? 'checked' : ''}/> 隐藏已通过&已跳过题目</label>
+            <label><input type="checkbox" id="bn-enable-quick-skip" ${enableQuickSkip ? 'checked' : ''}/> 启用快捷跳过按钮</label>
           </div>
           <div class="bn-section">
           <div class="bn-title">
@@ -852,7 +891,7 @@ window.getCurrentUserId = getCurrentUserId;
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
       <div class="bn-version">
-        <div class="bn-version-text">6.0.0 SP15 Developer</div>
+        <div class="bn-version-text">6.0.0 SP16 Developer</div>
       </div>
     </div>`;
   document.body.appendChild(container);
@@ -908,6 +947,7 @@ window.getCurrentUserId = getCurrentUserId;
   const saveActions = document.getElementById('bn-save-actions');
   const chkVj = document.getElementById('bn-enable-vj');
   const chkHideDoneSkip = document.getElementById('bn-hide-done-skip');
+  const chkQuickSkip = document.getElementById('bn-enable-quick-skip');
 
   const disableNeedWarn = () => {
     if (typeof window.needWarn === 'function' && !window.__bnGuardOriginalNeedWarn) {
@@ -981,6 +1021,7 @@ window.getCurrentUserId = getCurrentUserId;
     palette: Object.assign({}, palette),
     enableVjLink,
     hideDoneSkip,
+    enableQuickSkip,
     widthMode,
     themeMode
   };
@@ -1233,6 +1274,7 @@ window.getCurrentUserId = getCurrentUserId;
       (document.getElementById('bn-enable-submitter').checked !== originalConfig.enableSubmitter) ||
       (document.getElementById('bn-enable-vj').checked !== originalConfig.enableVjLink) ||
       (document.getElementById('bn-hide-done-skip').checked !== originalConfig.hideDoneSkip) ||
+      (document.getElementById('bn-enable-quick-skip').checked !== originalConfig.enableQuickSkip) ||
       (document.getElementById('bn-plan-auto').checked !== originalConfig.autoExit) ||
       (document.getElementById('bn-use-custom-color').checked !== originalConfig.useCustomColors) ||
       (document.getElementById('bn-width-mode').value !== originalConfig.widthMode) ||
@@ -1287,6 +1329,7 @@ window.getCurrentUserId = getCurrentUserId;
   };
   chkVj.onchange = checkChanged;
   chkHideDoneSkip.onchange = () => { applyHideDoneSkip(chkHideDoneSkip.checked); checkChanged(); };
+  chkQuickSkip.onchange = () => { applyQuickSkip(chkQuickSkip.checked); checkChanged(); };
   chkPlan.onchange = () => { toggleOption(chkPlan, planOpts); checkChanged(); };
   chkAutoRenew.onchange = checkChanged;
   chkRankingFilter.onchange = checkChanged;
@@ -1328,6 +1371,7 @@ window.getCurrentUserId = getCurrentUserId;
     GM_setValue('enableCopy', chkCp.checked);
     GM_setValue('hideOrig', chkHo.checked);
     GM_setValue('hideDoneSkip', chkHideDoneSkip.checked);
+    GM_setValue('enableQuickSkip', chkQuickSkip.checked);
     GM_setValue('enableUserMenu', chkMenu.checked);
     GM_setValue('enableGuard', chkGuard.checked);
     GM_setValue('enableVjLink', chkVj.checked);
@@ -1376,6 +1420,8 @@ window.getCurrentUserId = getCurrentUserId;
     chkVj.checked = originalConfig.enableVjLink;
     chkHideDoneSkip.checked = originalConfig.hideDoneSkip;
     applyHideDoneSkip(originalConfig.hideDoneSkip);
+    chkQuickSkip.checked = originalConfig.enableQuickSkip;
+    applyQuickSkip(originalConfig.enableQuickSkip);
     chkPlan.checked = originalConfig.enablePlanAdder;
     chkAutoRenew.checked = originalConfig.enableAutoRenew;
     chkRankingFilter.checked = originalConfig.enableRankingFilter;
@@ -1756,6 +1802,110 @@ window.getCurrentUserId = getCurrentUserId;
 
   }
 
+  function getProblemIdFromRow(tr) {
+    if (!tr || typeof tr.querySelector !== 'function') return null;
+    const dataEl = tr.querySelector('[data-problem_id], [data-problem-id], [data-problemId]');
+    let pid = null;
+    if (dataEl) {
+      const ds = dataEl.dataset || {};
+      pid = ds.problemId || ds.problem_id || ds.problemid || ds.problemID || null;
+      if (!pid) {
+        pid = dataEl.getAttribute('data-problem_id') || dataEl.getAttribute('data-problem-id') || dataEl.getAttribute('data-problemId');
+      }
+    }
+    if (!pid) {
+      const anchors = tr.querySelectorAll('a[href^="/problem/"]');
+      for (const anchor of anchors) {
+        if (!anchor || anchor.getAttribute('data-bn-quick-skip') === '1') continue;
+        const href = anchor.getAttribute('href') || '';
+        const match = href.match(/^\/problem\/(\d+)(?:[\/?#]|$)/);
+        if (match) { pid = match[1]; break; }
+      }
+    }
+    if (!pid) return null;
+    return String(pid);
+  }
+
+  function removeQuickSkip(tr) {
+    if (!tr || typeof tr.querySelectorAll !== 'function') return;
+    tr.querySelectorAll('a[data-bn-quick-skip="1"]').forEach(el => {
+      try { el.remove(); } catch (e) { }
+    });
+  }
+
+  function determineQuickSkipContext(tr) {
+    if (!tr || !tr.cells) return null;
+    const cells = Array.from(tr.cells);
+    if (!cells.length) return null;
+
+    const firstCell = cells[0];
+    if (firstCell) {
+      const codeAnchor = firstCell.querySelector('a[href^="/problem/"]');
+      if (codeAnchor && codeAnchor.getAttribute('data-bn-quick-skip') !== '1') {
+        const text = (codeAnchor.textContent || '').trim();
+        if (text && /^[A-Za-z]/.test(text) && !/^L/i.test(text)) {
+          return { mode: 'after', cell: firstCell, anchor: codeAnchor };
+        }
+      }
+    }
+
+    const codeCell = cells.find(td => {
+      const bold = td.querySelector('b');
+      if (!bold) return false;
+      const text = (bold.textContent || '').trim();
+      if (!text) return false;
+      if (/^L/i.test(text)) return false;
+      return /^[A-Za-z]/.test(text);
+    });
+    if (codeCell) {
+      if (!firstCell || !firstCell.querySelector('i.question.icon')) return null;
+      const bold = codeCell.querySelector('b');
+      if (!bold) return null;
+      return { mode: 'before', cell: codeCell, anchor: bold };
+    }
+
+    return null;
+  }
+
+  function ensureQuickSkipButton(ctx, problemId) {
+    if (!ctx || !ctx.cell || !ctx.anchor || !problemId) return;
+    const btn = document.createElement('a');
+    btn.setAttribute('data-bn-quick-skip', '1');
+    btn.href = `/problem/${problemId}/skip`;
+    btn.dataset.problemId = String(problemId);
+    btn.className = `bn-quick-skip ${ctx.mode === 'before' ? 'bn-quick-skip--before' : 'bn-quick-skip--after'}`;
+    btn.innerHTML = '<i class="coffee icon" aria-hidden="true"></i><span>Skip</span>';
+    btn.setAttribute('title', '跳过该题目');
+    btn.setAttribute('aria-label', '跳过该题目');
+    if (ctx.mode === 'before') ctx.cell.insertBefore(btn, ctx.anchor);
+    else ctx.anchor.insertAdjacentElement('afterend', btn);
+  }
+
+  function applyQuickSkip(enabled, scopeRoot) {
+    const roots = [];
+    if (scopeRoot && typeof scopeRoot.querySelectorAll === 'function') roots.push(scopeRoot);
+    if (scopeRoot && scopeRoot.matches && scopeRoot.matches(BN_TABLE_ROWS_SELECTOR)) roots.push(scopeRoot);
+    if (!roots.length) roots.push(document);
+
+    const processed = new Set();
+    roots.forEach(root => {
+      let rows = [];
+      if (root.querySelectorAll) rows = rows.concat(Array.from(root.querySelectorAll(BN_TABLE_ROWS_SELECTOR)));
+      if (root.matches && root.matches(BN_TABLE_ROWS_SELECTOR)) rows.push(root);
+      rows.forEach(tr => {
+        if (!tr || processed.has(tr)) return;
+        processed.add(tr);
+        removeQuickSkip(tr);
+        if (!enabled) return;
+        const ctx = determineQuickSkipContext(tr);
+        if (!ctx) return;
+        const pid = getProblemIdFromRow(tr);
+        if (!pid) return;
+        ensureQuickSkipButton(ctx, pid);
+      });
+    });
+  }
+
   function __bn_shouldHideRow(tr) {
     try {
       const tds = tr.querySelectorAll('td');
@@ -1766,7 +1916,8 @@ window.getCurrentUserId = getCurrentUserId;
       const statusTd = tds[1];
       const evalTd = tds[0];
       const isPass = !!statusTd.querySelector('.status.accepted, .status .accepted, span.status.accepted, i.checkmark.icon, i.thumbs.up.icon, i.check.icon');
-      const isSkip = !!evalTd.querySelector('i.coffee.icon');
+      const skipIcon = evalTd.querySelector('i.coffee.icon');
+      const isSkip = !!(skipIcon && !skipIcon.closest('a[data-bn-quick-skip="1"]'));
       return isPass || isSkip;
     } catch (e) { return false; }
   }
@@ -1810,6 +1961,7 @@ window.getCurrentUserId = getCurrentUserId;
   // 初次遍历
   document.querySelectorAll('a[href^="/user/"]').forEach(processUserLink);
   document.querySelectorAll('#vueAppFuckSafari > tbody > tr > td:nth-child(2) > a > span').forEach(processProblemTitle)
+  applyQuickSkip(enableQuickSkip);
   applyHideDoneSkip(hideDoneSkip);
   ;
 
@@ -1819,12 +1971,18 @@ window.getCurrentUserId = getCurrentUserId;
   function flushMO() {
     moScheduled = false;
     const nodes = Array.from(moQueue); moQueue.clear();
+    let quickSkipSetting = enableQuickSkip;
+    try {
+      const quickChk = document.getElementById('bn-enable-quick-skip');
+      if (quickChk) quickSkipSetting = quickChk.checked;
+    } catch (e) { }
     for (const node of nodes) {
       if (node.nodeType !== 1) continue;
       if (node.matches?.('a[href^="/user/"]')) processUserLink(node);
       if (node.matches?.('#vueAppFuckSafari > tbody > tr > td:nth-child(2) > a > span')) processProblemTitle(node);
       node.querySelectorAll?.('a[href^="/user/"]').forEach(processUserLink);
       node.querySelectorAll?.('#vueAppFuckSafari > tbody > tr > td:nth-child(2) > a > span').forEach(processProblemTitle);
+      try { applyQuickSkip(quickSkipSetting, node); } catch (e) { }
     }
 
     try { const _c = document.getElementById('bn-hide-done-skip'); applyHideDoneSkip(_c ? _c.checked : hideDoneSkip); } catch (e) { }
