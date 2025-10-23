@@ -1285,6 +1285,194 @@ window.getCurrentUserId = getCurrentUserId;
     commitChanges();
   };
 
+  let hideTimer = null;
+  const showPanel = () => {
+    if (isDragging || container.classList.contains('bn-dragging')) return;
+    clearTimeout(hideTimer);
+    panel.classList.add('bn-show');
+    container.style.pointerEvents = 'auto';
+  };
+  const hidePanel = () => {
+    if (pinned) return;
+    panel.classList.remove('bn-show');
+    container.style.pointerEvents = 'none';
+    if (panel.contains(document.activeElement)) {
+      try { document.activeElement.blur(); } catch (e) { }
+    }
+  };
+  trigger.addEventListener('mouseenter', showPanel);
+  trigger.addEventListener('focus', showPanel);
+  const maybeHidePanel = () => {
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+      if (!pinned && !trigger.matches(':hover') && !panel.matches(':hover') && !container.matches(':hover')) {
+        hidePanel();
+      }
+    }, 300);
+  };
+  trigger.addEventListener('mouseleave', maybeHidePanel);
+  trigger.addEventListener('blur', maybeHidePanel);
+  panel.addEventListener('mouseleave', maybeHidePanel);
+  panel.addEventListener('mouseenter', () => clearTimeout(hideTimer));
+  panel.addEventListener('focusin', () => clearTimeout(hideTimer));
+
+  const __bn_lagMs = 100;
+  const __bn_trailWindow = 400;
+  const __bn_now = () => (window.performance && performance.now) ? performance.now() : Date.now();
+
+  function __bn_pushTrail(e) {
+    const t = __bn_now();
+    __bn_trail.push({ t, x: e.clientX, y: e.clientY });
+    const cutoff = t - __bn_trailWindow;
+    while (__bn_trail.length && __bn_trail[0].t < cutoff) __bn_trail.shift();
+  }
+  function __bn_sampleAt(tgt) {
+    if (!__bn_trail.length) return null;
+    if (tgt <= __bn_trail[0].t) return __bn_trail[0];
+    const last = __bn_trail[__bn_trail.length - 1];
+    if (tgt >= last.t) return last;
+    let lo = 0, hi = __bn_trail.length - 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (__bn_trail[mid].t < tgt) lo = mid + 1;
+      else hi = mid - 1;
+    }
+    const a = __bn_trail[lo - 1], b = __bn_trail[lo];
+    const r = (tgt - a.t) / Math.max(1, b.t - a.t);
+    return { t: tgt, x: a.x + (b.x - a.x) * r, y: a.y + (b.y - a.y) * r };
+  }
+  function __bn_applyTransform(x, y) {
+    __bn_dragX = x;
+    __bn_dragY = y;
+    trigger.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+  }
+  function __bn_tick() {
+    if (!isDragging) { __bn_raf = null; return; }
+    const sample = __bn_sampleAt(__bn_now() - __bn_lagMs);
+    if (sample) __bn_applyTransform(sample.x - gearW / 2, sample.y - gearH / 2);
+    __bn_raf = requestAnimationFrame(__bn_tick);
+  }
+  function __bn_onMove(e) {
+    if (!isDragging) return;
+    __bn_pushTrail(e);
+    if (!__bn_raf) __bn_raf = requestAnimationFrame(__bn_tick);
+  }
+  function __bn_onUp(e) {
+    if (!isDragging) return;
+    isDragging = false;
+    if (__bn_raf) cancelAnimationFrame(__bn_raf);
+    __bn_raf = null;
+
+    const cx = __bn_dragX + gearW / 2;
+    const cy = __bn_dragY + gearH / 2;
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const corners = {
+      tl: { x: SNAP_MARGIN + gearW / 2, y: SNAP_MARGIN + gearH / 2 },
+      tr: { x: W - SNAP_MARGIN - gearW / 2, y: SNAP_MARGIN + gearH / 2 },
+      bl: { x: SNAP_MARGIN + gearW / 2, y: H - SNAP_MARGIN - gearH / 2 },
+      br: { x: W - SNAP_MARGIN - gearW / 2, y: H - SNAP_MARGIN - gearH / 2 },
+    };
+    let best = 'br';
+    let bestDist = Infinity;
+    for (const key in corners) {
+      const point = corners[key];
+      const dx = point.x - cx;
+      const dy = point.y - cy;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bestDist) {
+        bestDist = d2;
+        best = key;
+      }
+    }
+    const finalX = corners[best].x - gearW / 2;
+    const finalY = corners[best].y - gearH / 2;
+
+    trigger.style.transition = 'transform 0.24s ease-out';
+    __bn_applyTransform(finalX, finalY);
+
+    setTimeout(() => {
+      trigger.style.transition = '';
+      applyCorner(best);
+      trigger.style.position = '';
+      trigger.style.left = trigger.style.top = '';
+      trigger.style.bottom = trigger.style.right = '';
+      trigger.style.transform = '';
+      container.classList.remove('bn-dragging');
+      if (wasPinned) showPanel();
+
+      if (__bn_pointerId !== null && trigger.releasePointerCapture) {
+        try { trigger.releasePointerCapture(__bn_pointerId); } catch (err) { }
+      }
+      document.removeEventListener('pointermove', __bn_onMove);
+      document.removeEventListener('pointerup', __bn_onUp);
+      document.removeEventListener('mousemove', __bn_onMove);
+      document.removeEventListener('mouseup', __bn_onUp);
+      __bn_trail = [];
+      __bn_pointerId = null;
+    }, 260);
+  }
+  const __bn_onDown = (e) => {
+    if (e.type === 'mousedown' && window.PointerEvent) return;
+    if ((e.type === 'mousedown' || e.type === 'pointerdown') && e.button !== 0) return;
+    e.preventDefault();
+
+    wasPinned = pinned;
+    panel.classList.remove('bn-show');
+    container.style.pointerEvents = 'none';
+
+    const rect = trigger.getBoundingClientRect();
+    gearW = rect.width;
+    gearH = rect.height;
+    trigger.style.position = 'fixed';
+    trigger.style.left = '0px';
+    trigger.style.top = '0px';
+    trigger.style.bottom = 'auto';
+    trigger.style.right = 'auto';
+    trigger.style.transition = 'none';
+    trigger.style.willChange = 'transform';
+    trigger.style.touchAction = 'none';
+
+    isDragging = true;
+    container.classList.add('bn-dragging');
+
+    __bn_trail = [];
+    __bn_pushTrail(e);
+    __bn_applyTransform(e.clientX - gearW / 2, e.clientY - gearH / 2);
+
+    if (e.pointerId != null && trigger.setPointerCapture) {
+      __bn_pointerId = e.pointerId;
+      try { trigger.setPointerCapture(e.pointerId); } catch (err) { }
+      document.addEventListener('pointermove', __bn_onMove);
+      document.addEventListener('pointerup', __bn_onUp);
+    } else {
+      document.addEventListener('mousemove', __bn_onMove);
+      document.addEventListener('mouseup', __bn_onUp);
+    }
+    if (!__bn_raf) __bn_raf = requestAnimationFrame(__bn_tick);
+  };
+  if (window.PointerEvent) {
+    trigger.addEventListener('pointerdown', __bn_onDown, { passive: false });
+  } else {
+    trigger.addEventListener('mousedown', __bn_onDown, { passive: false });
+  }
+
+  pinBtn.addEventListener('click', () => {
+    pinned = !pinned;
+    GM_setValue('panelPinned', pinned);
+    pinBtn.classList.toggle('bn-pinned', pinned);
+    if (pinned) showPanel();
+    else if (!trigger.matches(':hover') && !panel.matches(':hover')) hidePanel();
+  });
+
+  function markOnce(el, key) {
+    const dataKey = `bn${key}`;
+    if (!el || !el.dataset) return true;
+    if (el.dataset[dataKey]) return false;
+    el.dataset[dataKey] = '1';
+    return true;
+  }
+
   document.getElementById('bn-color-reset').onclick = () => {
     const base = palettes[(themeSelect.value === 'auto' ? (prefersDark ? 'dark' : 'light') : themeSelect.value)] || palettes.light;
     COLOR_KEYS.forEach(k => {
