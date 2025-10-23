@@ -1899,6 +1899,13 @@ window.getCurrentUserId = getCurrentUserId;
 
     const questionIconEl = Array.from(tr.querySelectorAll('i.question.icon')).find(icon => {
       if (!icon) return false;
+      const cs = getComputedStyle(icon || {});
+      const col = (cs && (cs.color || cs.fill || '') || '').toLowerCase();
+      if (
+        !icon.classList.contains('gold') &&
+        !icon.classList.contains('yellow') &&
+        !/gold|yellow|#ffd700|#ffb100|#ffc107|rgb\(\s*255\s*,\s*215\s*,\s*0\s*\)|rgb\(\s*255\s*,\s*193\s*,\s*7\s*\)/i.test(col)
+      ) return false;
       const skipCell = icon.closest('td[data-bn-quick-skip-cell="1"]');
       return !skipCell;
     });
