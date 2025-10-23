@@ -638,6 +638,7 @@ window.getCurrentUserId = getCurrentUserId;
       text-align: center;
     }
 
+    a[data-bn-quick-skip="1"],
     .bn-quick-skip {
       display: inline-flex;
       align-items: center;
@@ -654,19 +655,23 @@ window.getCurrentUserId = getCurrentUserId;
       white-space: nowrap;
       transition: background .2s ease, color .2s ease, transform .2s ease, box-shadow .2s ease;
     }
+    a[data-bn-quick-skip="1"]:hover,
     .bn-quick-skip:hover {
       background: #e4d4ff;
       color: #3d237e;
       box-shadow: 0 3px 8px rgba(79, 46, 138, 0.25);
       transform: translateY(-1px);
     }
+    a[data-bn-quick-skip="1"]:visited,
     .bn-quick-skip:visited {
       color: #4b2c92;
     }
+    a[data-bn-quick-skip="1"]:active,
     .bn-quick-skip:active {
       transform: translateY(0);
       box-shadow: none;
     }
+    a[data-bn-quick-skip="1"] i.icon,
     .bn-quick-skip i.icon {
       margin: 0 !important;
       color: #7f3dcf;
