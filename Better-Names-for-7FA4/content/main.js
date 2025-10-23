@@ -38,7 +38,7 @@ window.getCurrentUserId = getCurrentUserId;
   let autoExit = initialAutoExit;
   const enableVjLink = GM_getValue('enableVjLink', true);
   const hideDoneSkip = GM_getValue('hideDoneSkip', false);
-  const enableQuickSkip = GM_getValue('enableQuickSkip', true);
+  const enableQuickSkip = GM_getValue('enableQuickSkip', false);
   const WIDTH_MODE_KEY = 'truncate.widthMode';
   const widthMode = GM_getValue(WIDTH_MODE_KEY, 'visual');
   const THEME_KEY = 'colorTheme';
@@ -1892,21 +1892,24 @@ window.getCurrentUserId = getCurrentUserId;
     const cells = Array.from(tr.cells);
     if (!cells.length) return { qualifies: false, insertIndex: null, questionIcon: false };
 
-    const firstCell = cells[0];
-    const hasQuestionIcon = !!(firstCell && firstCell.querySelector('i.question.icon'));
-    if (!hasQuestionIcon) return { qualifies: false, insertIndex: null, questionIcon: false };
+    const questionIconEl = Array.from(tr.querySelectorAll('i.question.icon')).find(icon => {
+      if (!icon) return false;
+      const skipCell = icon.closest('td[data-bn-quick-skip-cell="1"]');
+      return !skipCell;
+    });
+    if (!questionIconEl) return { qualifies: false, insertIndex: null, questionIcon: false };
 
     let computedIndex = null;
 
-    if (firstCell) {
-      const codeAnchor = firstCell.querySelector('a[href^="/problem/"]');
-      if (codeAnchor && codeAnchor.getAttribute('data-bn-quick-skip') !== '1') {
-        const text = (codeAnchor.textContent || '').trim();
-        if (text && /^[A-Za-z]/.test(text) && !/^L/i.test(text)) {
-          computedIndex = 1;
-        }
-      }
-    }
+    const anchorIndex = cells.findIndex(td => {
+      const anchor = td.querySelector('a[href^="/problem/"]');
+      if (!anchor || anchor.getAttribute('data-bn-quick-skip') === '1') return false;
+      const text = (anchor.textContent || '').trim();
+      if (!text) return false;
+      if (/^L/i.test(text)) return false;
+      return /^[A-Za-z]/.test(text);
+    });
+    if (anchorIndex > -1) computedIndex = anchorIndex + 1;
 
     if (computedIndex === null) {
       const codeCellIndex = cells.findIndex(td => {
