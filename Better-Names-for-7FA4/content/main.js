@@ -1887,17 +1887,17 @@ window.getCurrentUserId = getCurrentUserId;
     });
   }
 
-  function determineQuickSkipContext(tr) {
-    if (!tr || !tr.cells) return null;
+  function analyzeQuickSkipRow(tr) {
+    if (!tr || !tr.cells) return { qualifies: false, insertIndex: null, questionIcon: false };
     const cells = Array.from(tr.cells);
-    if (!cells.length) return null;
-    if (cells.some(td => td?.dataset?.bnQuickSkipCell === '1')) return null;
+    if (!cells.length) return { qualifies: false, insertIndex: null, questionIcon: false };
 
-    const table = tr.closest('table.ui.very.basic.center.aligned.table');
-    if (!table) return null;
+    const firstCell = cells[0];
+    const hasQuestionIcon = !!(firstCell && firstCell.querySelector('i.question.icon'));
+    if (!hasQuestionIcon) return { qualifies: false, insertIndex: null, questionIcon: false };
 
     let computedIndex = null;
-    const firstCell = cells[0];
+
     if (firstCell) {
       const codeAnchor = firstCell.querySelector('a[href^="/problem/"]');
       if (codeAnchor && codeAnchor.getAttribute('data-bn-quick-skip') !== '1') {
@@ -1917,38 +1917,15 @@ window.getCurrentUserId = getCurrentUserId;
         if (/^L/i.test(text)) return false;
         return /^[A-Za-z]/.test(text);
       });
-      if (codeCellIndex > -1) {
-        if (!firstCell || !firstCell.querySelector('i.question.icon')) return null;
-        computedIndex = codeCellIndex;
-      }
+      if (codeCellIndex > -1) computedIndex = codeCellIndex;
     }
 
-    if (computedIndex === null) return null;
+    if (computedIndex === null) return { qualifies: false, insertIndex: null, questionIcon: true };
 
-    const storedIndex = table.dataset && table.dataset.bnQuickSkipIndex;
-    const insertIndex = storedIndex && !Number.isNaN(Number(storedIndex)) ? Number(storedIndex) : computedIndex;
-    return { insertIndex, table };
+    return { qualifies: true, insertIndex: computedIndex, questionIcon: true };
   }
 
-  function ensureQuickSkipButton(tr, ctx, problemId) {
-    if (!tr || !ctx || typeof ctx.insertIndex !== 'number' || !problemId) return;
-    const table = ctx.table;
-    const cellsLength = tr.cells.length;
-    let insertIndex = ctx.insertIndex;
-    if (insertIndex < 0) insertIndex = 0;
-    if (insertIndex > cellsLength) insertIndex = cellsLength;
-    let cell;
-    try {
-      cell = tr.insertCell(insertIndex);
-    } catch (e) {
-      cell = document.createElement('td');
-      const reference = tr.children[insertIndex] || null;
-      tr.insertBefore(cell, reference);
-    }
-    if (!cell) return;
-    cell.dataset.bnQuickSkipCell = '1';
-    cell.classList.add('bn-quick-skip-cell');
-
+  function createQuickSkipButton(problemId) {
     const btn = document.createElement('a');
     btn.setAttribute('data-bn-quick-skip', '1');
     btn.href = `/problem/${problemId}/skip`;
@@ -1957,9 +1934,37 @@ window.getCurrentUserId = getCurrentUserId;
     btn.innerHTML = '<i class="coffee icon" aria-hidden="true"></i><span>Skip</span>';
     btn.setAttribute('title', '跳过该题目');
     btn.setAttribute('aria-label', '跳过该题目');
-    cell.appendChild(btn);
+    return btn;
+  }
 
-    if (table) ensureQuickSkipHeaderCell(table, insertIndex);
+  function ensureQuickSkipCellAt(tr, insertIndex) {
+    if (!tr || typeof insertIndex !== 'number' || Number.isNaN(insertIndex)) return null;
+    let targetIndex = insertIndex;
+    if (targetIndex < 0) targetIndex = 0;
+    if (targetIndex > tr.cells.length) targetIndex = tr.cells.length;
+    let cell = tr.cells[targetIndex];
+    if (!cell || !(cell.dataset && cell.dataset.bnQuickSkipCell === '1')) {
+      try {
+        cell = tr.insertCell(targetIndex);
+      } catch (e) {
+        cell = document.createElement('td');
+        const reference = tr.children[targetIndex] || null;
+        tr.insertBefore(cell, reference);
+      }
+    }
+    if (!cell) return null;
+    cell.dataset.bnQuickSkipCell = '1';
+    cell.classList.add('bn-quick-skip-cell');
+    return cell;
+  }
+
+  function computeQuickSkipInsertIndex(table, rows) {
+    if (!table || !rows || !rows.length) return null;
+    for (const tr of rows) {
+      const info = analyzeQuickSkipRow(tr);
+      if (info && info.qualifies && typeof info.insertIndex === 'number') return info.insertIndex;
+    }
+    return null;
   }
 
   function applyQuickSkip(enabled, scopeRoot) {
@@ -1968,40 +1973,58 @@ window.getCurrentUserId = getCurrentUserId;
     if (scopeRoot && scopeRoot.matches && scopeRoot.matches(BN_TABLE_ROWS_SELECTOR)) roots.push(scopeRoot);
     if (!roots.length) roots.push(document);
 
-    const processed = new Set();
+    const tables = new Set();
     roots.forEach(root => {
-      let rows = [];
-      if (root.querySelectorAll) rows = rows.concat(Array.from(root.querySelectorAll(BN_TABLE_ROWS_SELECTOR)));
-      if (root.matches && root.matches(BN_TABLE_ROWS_SELECTOR)) rows.push(root);
+      if (!root) return;
+      if (root.matches && root.matches('table.ui.very.basic.center.aligned.table')) tables.add(root);
+      if (root.matches && root.matches(BN_TABLE_ROWS_SELECTOR)) {
+        const tbl = root.closest('table.ui.very.basic.center.aligned.table');
+        if (tbl) tables.add(tbl);
+      }
+      if (root.querySelectorAll) {
+        root.querySelectorAll('table.ui.very.basic.center.aligned.table').forEach(tbl => tables.add(tbl));
+      }
+    });
+
+    tables.forEach(table => {
+      const rows = Array.from(table.querySelectorAll('tbody > tr'));
+      rows.forEach(removeQuickSkip);
+
+      if (!enabled) {
+        const header = table.querySelector('th[data-bn-quick-skip-header="1"]');
+        if (header) header.remove();
+        if (table.dataset) delete table.dataset.bnQuickSkipIndex;
+        return;
+      }
+
+      const insertIndex = computeQuickSkipInsertIndex(table, rows);
+      if (insertIndex === null) {
+        const header = table.querySelector('th[data-bn-quick-skip-header="1"]');
+        if (header) header.remove();
+        if (table.dataset) delete table.dataset.bnQuickSkipIndex;
+        return;
+      }
+
+      ensureQuickSkipHeaderCell(table, insertIndex);
+
       rows.forEach(tr => {
-        if (!tr || processed.has(tr)) return;
-        processed.add(tr);
-        removeQuickSkip(tr);
-        if (!enabled) return;
-        const ctx = determineQuickSkipContext(tr);
-        if (!ctx) return;
-        const pid = getProblemIdFromRow(tr);
-        if (!pid) return;
-        ensureQuickSkipButton(tr, ctx, pid);
+        const cell = ensureQuickSkipCellAt(tr, insertIndex);
+        if (!cell) return;
+        cell.innerHTML = '';
+        const info = analyzeQuickSkipRow(tr);
+        if (info && info.qualifies) {
+          const pid = getProblemIdFromRow(tr);
+          if (!pid) return;
+          const btn = createQuickSkipButton(pid);
+          cell.appendChild(btn);
+        } else {
+          cell.innerHTML = '&nbsp;';
+        }
       });
     });
 
     if (!enabled) {
-      document.querySelectorAll('td[data-bn-quick-skip-cell="1"]').forEach(td => {
-        const tr = td.closest('tr');
-        if (tr && tr.cells) {
-          const index = Array.prototype.indexOf.call(tr.children, td);
-          if (index > -1) {
-            try { tr.deleteCell(index); return; } catch (e) { }
-          }
-        }
-        try { td.remove(); } catch (e) { }
-      });
-      document.querySelectorAll('th[data-bn-quick-skip-header="1"]').forEach(th => {
-        const table = th.closest('table');
-        if (table && table.dataset) delete table.dataset.bnQuickSkipIndex;
-        th.remove();
-      });
+      pruneQuickSkipHeaders();
       return;
     }
 
