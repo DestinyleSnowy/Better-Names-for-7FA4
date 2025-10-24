@@ -4054,6 +4054,7 @@ window.getCurrentUserId = getCurrentUserId;
   const RANKING_FILTER_ENABLED_KEY = 'rankingFilter.enabled';
   const RANKING_FILTER_SELECTED_KEY = 'rankingFilter.selected';
   const RANKING_FILTER_GRADE_KEY = 'rankingFilter.grade.selected';
+  const MAX_REMOTE_PAGES = 50;
 
   function injectCSS() {
     if (cssInjected) return;
@@ -4172,6 +4173,239 @@ window.getCurrentUserId = getCurrentUserId;
       rows.push(...Array.from(tbody.rows || []).filter(row => !isHeaderRow(row)));
     });
     return rows;
+  }
+
+  function parsePageNumber(value) {
+    if (value === undefined || value === null) return null;
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      const int = Math.floor(value);
+      return int >= 1 ? int : null;
+    }
+    if (typeof value === 'string') {
+      const match = value.match(/\d+/);
+      if (!match) return null;
+      const int = parseInt(match[0], 10);
+      return Number.isFinite(int) && int >= 1 ? int : null;
+    }
+    return null;
+  }
+
+  function detectTotalPagesFromDom(root = document) {
+    if (!root || typeof root.querySelectorAll !== 'function') return null;
+    const candidates = Array.from(root.querySelectorAll('.pagination a, .pagination .item, .ui.pagination.menu a, .ui.pagination.menu .item, [data-page], .page-item a, .page-link'));
+    const numbers = [];
+    candidates.forEach(el => {
+      if (!el) return;
+      const datasetPage = el.dataset && (el.dataset.page || el.dataset.p);
+      const attrPage = typeof el.getAttribute === 'function' ? (el.getAttribute('data-page') || el.getAttribute('data-page-number')) : null;
+      const textPage = typeof el.textContent === 'string' ? el.textContent.trim() : '';
+      const parsed = parsePageNumber(datasetPage || attrPage || textPage);
+      if (parsed) numbers.push(parsed);
+    });
+    const selectOptions = Array.from(root.querySelectorAll('select[name*="page"] option'));
+    selectOptions.forEach(option => {
+      if (!option) return;
+      const value = option.value || option.textContent;
+      const parsed = parsePageNumber(value);
+      if (parsed) numbers.push(parsed);
+    });
+    if (!numbers.length) return null;
+    return Math.max(...numbers);
+  }
+
+  function extractTotalPagesFromJson(data) {
+    if (!data) return null;
+    if (Array.isArray(data)) {
+      for (const item of data) {
+        const nested = extractTotalPagesFromJson(item);
+        if (nested) return nested;
+      }
+      return null;
+    }
+    if (typeof data !== 'object') return null;
+    const keys = Object.keys(data);
+    const prioritized = keys.filter(key => /page/i.test(key) && !/(?:size|per|limit)/i.test(key));
+    for (const key of prioritized) {
+      if (!/(?:total|max|last|count)/i.test(key) && !/^pages?$/i.test(key) && !/pagecount/i.test(key)) continue;
+      const value = data[key];
+      const parsed = parsePageNumber(value);
+      if (parsed) return parsed;
+    }
+    for (const key of prioritized) {
+      if (/(?:current|now)/i.test(key)) continue;
+      const value = data[key];
+      const parsed = parsePageNumber(value);
+      if (parsed) return parsed;
+    }
+    const nestedKeys = ['pagination', 'meta', 'data'];
+    for (const key of nestedKeys) {
+      if (Object.prototype.hasOwnProperty.call(data, key)) {
+        const nested = extractTotalPagesFromJson(data[key]);
+        if (nested) return nested;
+      }
+    }
+    for (const key of keys) {
+      const value = data[key];
+      if (value && typeof value === 'object') {
+        const nested = extractTotalPagesFromJson(value);
+        if (nested) return nested;
+      }
+    }
+    return null;
+  }
+
+  function extractTableHtmlFromJson(data) {
+    if (!data) return '';
+    if (typeof data === 'string') {
+      const trimmed = data.trim();
+      if (/<table[\s>]/i.test(trimmed)) return trimmed;
+      if (/<tbody[\s>]/i.test(trimmed)) return `<table>${trimmed}</table>`;
+      return '';
+    }
+    if (Array.isArray(data)) {
+      for (const item of data) {
+        const html = extractTableHtmlFromJson(item);
+        if (html) return html;
+      }
+      return '';
+    }
+    if (typeof data === 'object') {
+      const preferredKeys = ['table_html', 'table', 'html', 'content', 'data', 'body'];
+      for (const key of preferredKeys) {
+        if (Object.prototype.hasOwnProperty.call(data, key)) {
+          const html = extractTableHtmlFromJson(data[key]);
+          if (html) return html;
+        }
+      }
+      for (const key of Object.keys(data)) {
+        const html = extractTableHtmlFromJson(data[key]);
+        if (html) return html;
+      }
+    }
+    return '';
+  }
+
+  async function fetchContestTablePageHtml(page, baseSearchParams) {
+    const pageNumber = parsePageNumber(page);
+    if (!pageNumber) return { html: '', totalPages: null };
+    const params = baseSearchParams instanceof URLSearchParams
+      ? new URLSearchParams(baseSearchParams.toString())
+      : new URLSearchParams(baseSearchParams || '');
+    const tid = params.get('tid');
+    if (!tid) return { html: '', totalPages: null };
+    params.delete('page');
+    params.set('page', String(pageNumber));
+    if (!params.get('type')) params.set('type', 'contest');
+    if (!params.get('table_id')) params.set('table_id', '0');
+
+    const url = new URL('./progress/contest_table/json', location.href);
+    url.search = params.toString();
+
+    let text;
+    try {
+      const response = await fetch(url.toString(), {
+        credentials: 'same-origin',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'application/json, text/javascript, */*; q=0.01'
+        }
+      });
+      if (!response.ok) return { html: '', totalPages: null };
+      text = await response.text();
+    } catch (error) {
+      console.warn('[BN] Failed to fetch contest table page', pageNumber, error);
+      return { html: '', totalPages: null };
+    }
+    if (!text) return { html: '', totalPages: null };
+
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch (err) {
+      data = null;
+    }
+    if (data && typeof data === 'object') {
+      const html = extractTableHtmlFromJson(data);
+      const totalPages = extractTotalPagesFromJson(data);
+      return { html, totalPages: totalPages || null };
+    }
+    return { html: text, totalPages: null };
+  }
+
+  async function mergeAllPagesIfNeeded(table) {
+    if (!table || table.dataset.bnMergedPagination === '1') return false;
+    const baseParams = new URLSearchParams(location.search || '');
+    const tid = baseParams.get('tid');
+    if (!tid) return false;
+
+    const detectedTotal = detectTotalPagesFromDom(document);
+    let totalPages = detectedTotal && detectedTotal > 1 ? detectedTotal : null;
+    if (!totalPages) {
+      try {
+        const result = await fetchContestTablePageHtml(1, baseParams);
+        if (result && result.totalPages && result.totalPages > 1) {
+          totalPages = result.totalPages;
+        }
+      } catch (err) {
+        console.warn('[BN] Failed to detect total pages for contest table', err);
+      }
+    }
+    if (!totalPages || totalPages <= 1) return false;
+
+    const targetBodies = table.tBodies;
+    if (!targetBodies || !targetBodies.length) return false;
+    const targetBody = targetBodies[targetBodies.length - 1];
+    if (!targetBody) return false;
+
+    let appended = 0;
+    let remoteTotalPages = Math.min(totalPages, MAX_REMOTE_PAGES);
+
+    for (let page = 2; page <= remoteTotalPages; page += 1) {
+      const { html, totalPages: reportedTotal } = await fetchContestTablePageHtml(page, baseParams);
+      if (reportedTotal && reportedTotal > remoteTotalPages) {
+        remoteTotalPages = Math.min(reportedTotal, MAX_REMOTE_PAGES);
+      }
+      if (!html) {
+        if (!detectedTotal) break;
+        continue;
+      }
+      let doc;
+      try {
+        doc = new DOMParser().parseFromString(html, 'text/html');
+      } catch (err) {
+        console.warn('[BN] Failed to parse contest table html for page', page, err);
+        if (!detectedTotal) break;
+        continue;
+      }
+      const remoteTable = findTable(doc);
+      if (!remoteTable) {
+        if (!detectedTotal) break;
+        continue;
+      }
+      const rows = collectRows(remoteTable);
+      if (!rows.length) {
+        if (!detectedTotal) break;
+        continue;
+      }
+      rows.forEach(row => {
+        const clone = row.cloneNode(true);
+        clone.dataset.bnMergedPagination = '1';
+        targetBody.appendChild(clone);
+        appended += 1;
+      });
+    }
+
+    if (appended > 0) {
+      table.dataset.bnMergedPagination = '1';
+      const paginationElements = document.querySelectorAll('.pagination, .ui.pagination.menu, .table-footer .pagination, .paginations, .bn-pagination');
+      paginationElements.forEach(el => {
+        if (!el) return;
+        el.dataset.bnMergedHidden = '1';
+        el.style.display = 'none';
+      });
+    }
+
+    return appended > 0;
   }
 
   function detectSchoolColumn(table) {
@@ -4503,6 +4737,11 @@ window.getCurrentUserId = getCurrentUserId;
     injectCSS();
     const table = await waitForTable();
     if (!table) return;
+    try {
+      await mergeAllPagesIfNeeded(table);
+    } catch (err) {
+      console.warn('[BN] Failed to merge contest table pages', err);
+    }
     const schoolIndex = detectSchoolColumn(table);
     const gradeIndex = detectGradeColumn(table);
     const rows = collectRows(table);
