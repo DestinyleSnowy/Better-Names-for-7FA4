@@ -60,6 +60,7 @@ jobs:
         echo "Upload response: $UPLOAD_RESPONSE"
         
         # 提取上传文件的 markdown 链接和 URL
+        
         UPLOAD_MARKDOWN=$(echo "$UPLOAD_RESPONSE" | jq -r '.markdown')
         UPLOAD_URL=$(echo "$UPLOAD_RESPONSE" | jq -r '.url')
         
