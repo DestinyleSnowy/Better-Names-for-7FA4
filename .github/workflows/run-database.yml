@@ -1,0 +1,41 @@
+name: Run Database Script
+
+on:
+  workflow_dispatch:  # 手动触发
+  schedule:
+    - cron: '0 0 * * *'  # 每天运行一次
+  push:
+    branches: [ main ]
+    paths: 
+      - 'database/**'
+
+jobs:
+  run-database:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+        
+    - name: Install dependencies
+      run: |
+        cd database
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        
+    - name: Run main.py
+      run: |
+        cd database
+        JX_COOKIE='connect.sid=...; io=...; sidebar_collapsed=false; event_filter=all; login=%5B%22board%22%2C%2283393899d725503cb8beae5b%22%5D' python main.py
+        
+    - name: Commit and push if changed
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add ../Better-Names-for-7FA4/data/user.json
+        git diff --staged --quiet || git commit -m "Update user.json from database script"
+        git push
