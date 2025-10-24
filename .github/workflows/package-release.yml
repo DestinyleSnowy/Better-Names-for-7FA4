@@ -1,72 +1,76 @@
 name: Package and Release to GitHub and GitLab
 
 on:
-  workflow_dispatch:
   push:
     tags:
       - '*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   package-and-release:
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-      
-    - name: Create ZIP package
-      run: |
-        cd Better-Names-for-7FA4
-        zip -r ../Better-Names-for-7FA4-${{ github.ref_name }}.zip .
-        
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: Better-Names-for-7FA4-${{ github.ref_name }}.zip
-        name: Release ${{ github.ref_name }}
-        body: |
-          Automated release from GitHub Actions
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
-    - name: Push tag to GitLab
-      env:
-        GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
-      run: |
-        git config --global user.name "yx"
-        git config --global user.email "yx@7fa4.cn"
-        git remote add gitlab http://oauth2:$GITLAB_TOKEN@jx.7fa4.cn:9080/yx/better-names-for-7fa4.git
-        TAG_NAME=${GITHUB_REF#refs/tags/}
-        git push gitlab $TAG_NAME
-        
-    - name: Create GitLab Release
-      env:
-        GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
-        GITLAB_URL: "http://jx.7fa4.cn:9080"
-      run: |
-        TAG_NAME=${GITHUB_REF#refs/tags/}
-        ZIP_FILE="Better-Names-for-7FA4-$TAG_NAME.zip"
-        PROJECT_ID="wsh%2Ftest"
-        
-        # 上传文件到 GitLab
-        UPLOAD_RESPONSE=$(curl --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
-          --form "file=@$ZIP_FILE" \
-          "$GITLAB_URL/api/v4/projects/$PROJECT_ID/uploads" -s)
-        
-        UPLOAD_MARKDOWN=$(echo "$UPLOAD_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin)['markdown'])")
-        
-        # 创建 GitLab release
-        curl --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
-          --header "Content-Type: application/json" \
-          --data "{
-            \"tag_name\": \"$TAG_NAME\",
-            \"name\": \"Better Names for 7FA4 $TAG_NAME\",
-            \"description\": \"Automated release from GitHub Actions. Download: $UPLOAD_MARKDOWN\"
-          }" \
-          "$GITLAB_URL/api/v4/projects/$PROJECT_ID/releases"
-        
-        echo "GitLab release created successfully!"
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create ZIP package
+        run: |
+          cd Better-Names-for-7FA4
+          zip -r ../Better-Names-for-7FA4-${{ github.ref_name }}.zip .
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }} 
+          files: Better-Names-for-7FA4-${{ github.ref_name }}.zip
+          name: Release ${{ github.ref_name }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push tag to GitLab
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config --global user.name "yx"
+          git config --global user.email "yx@7fa4.cn"
+          git remote add gitlab http://oauth2:$GITLAB_TOKEN@jx.7fa4.cn:9080/yx/better-names-for-7fa4.git
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          git push gitlab "refs/tags/$TAG_NAME:refs/tags/$TAG_NAME"
+
+      - name: Create GitLab Release
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          GITLAB_URL: "http://jx.7fa4.cn:9080"
+        run: |
+          set -euo pipefail
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          ZIP_FILE="Better-Names-for-7FA4-$TAG_NAME.zip"
+          PROJECT_ID="yx%2Fbetter-names-for-7fa4"
+
+          UPLOAD_RESPONSE=$(curl -s --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+            --form "file=@$ZIP_FILE" \
+            "$GITLAB_URL/api/v4/projects/$PROJECT_ID/uploads")
+
+          UPLOAD_MARKDOWN=$(echo "$UPLOAD_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin)['markdown'])")
+
+          curl --fail -sS --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+            --header "Content-Type: application/json" \
+            --data "{
+              \"tag_name\": \"$TAG_NAME\",
+              \"name\": \"Better Names for 7FA4 $TAG_NAME\",
+              \"description\": \"Automated release from GitHub Actions. Download: $UPLOAD_MARKDOWN\"
+            }" \
+            "$GITLAB_URL/api/v4/projects/$PROJECT_ID/releases" >/dev/null
+
+          echo "GitLab release created successfully!"
