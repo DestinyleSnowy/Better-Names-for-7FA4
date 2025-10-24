@@ -1,5 +1,5 @@
 // Better Names for 7FA4
-// 6.0.0 SP16 Developer
+// 6.0.0 SP17 Developer
 
 function getCurrentUserId() {
   const ud = document.querySelector('#user-dropdown');
@@ -893,7 +893,7 @@ window.getCurrentUserId = getCurrentUserId;
         <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
       </div>
       <div class="bn-version">
-        <div class="bn-version-text">6.0.0 SP16 Developer</div>
+        <div class="bn-version-text">6.0.0 SP17 Developer</div>
       </div>
     </div>`;
   document.body.appendChild(container);
