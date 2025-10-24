@@ -1,0 +1,172 @@
+#bn-dynamic-island-root {
+  position: fixed;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3000;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#bn-dynamic-island-capsule {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: rgba(32, 32, 32, 0.85);
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1.2;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(15, 15, 15, 0.18), 0 2px 6px rgba(0, 0, 0, 0.12);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  font-family: "Exo 2", "Helvetica Neue", Arial, sans-serif;
+}
+
+#bn-dynamic-island-capsule:hover,
+#bn-dynamic-island-capsule:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(15, 15, 15, 0.2), 0 4px 12px rgba(0, 0, 0, 0.14);
+  outline: none;
+}
+
+#bn-dynamic-island-capsule:active {
+  transform: translateY(0);
+}
+
+#bn-dynamic-island-capsule .bn-di-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #30d158;
+  box-shadow: 0 0 0 3px rgba(48, 209, 88, 0.25);
+}
+
+#bn-dynamic-island-capsule .bn-di-label {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+#bn-dynamic-island-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.18);
+  z-index: 2998;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.24s ease;
+}
+
+#bn-dynamic-island-backdrop.bn-di-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#bn-dynamic-island-card {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.98);
+  min-width: 280px;
+  max-width: min(420px, calc(100vw - 48px));
+  padding: 24px 28px 28px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #1c1c1e;
+  box-shadow: 0 24px 48px rgba(15, 15, 15, 0.2), 0 8px 24px rgba(0, 0, 0, 0.18);
+  display: none;
+  flex-direction: column;
+  gap: 14px;
+  z-index: 2999;
+  pointer-events: auto;
+  transition: opacity 0.24s ease, transform 0.24s ease;
+  opacity: 0;
+}
+
+#bn-dynamic-island-card.bn-di-visible {
+  display: flex;
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+#bn-dynamic-island-card h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: inherit;
+}
+
+#bn-dynamic-island-card p {
+  margin: 0;
+  font-size: 14px;
+  color: rgba(28, 28, 30, 0.76);
+  line-height: 1.5;
+}
+
+#bn-dynamic-island-card .bn-di-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+#bn-dynamic-island-card button.bn-di-close {
+  align-self: flex-end;
+  background: rgba(0, 0, 0, 0.06);
+  color: inherit;
+  border: none;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+#bn-dynamic-island-card button.bn-di-close:hover,
+#bn-dynamic-island-card button.bn-di-close:focus-visible {
+  background: rgba(0, 0, 0, 0.12);
+  outline: none;
+}
+
+body.bn-di-card-open {
+  overflow: hidden;
+}
+
+@media (prefers-color-scheme: dark) {
+  #bn-dynamic-island-capsule {
+    background: rgba(245, 245, 247, 0.12);
+    color: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.36);
+  }
+
+  #bn-dynamic-island-capsule:hover,
+  #bn-dynamic-island-capsule:focus-visible {
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  #bn-dynamic-island-card {
+    background: rgba(28, 28, 30, 0.92);
+    color: rgba(244, 244, 245, 0.96);
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45), 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+
+  #bn-dynamic-island-card p {
+    color: rgba(235, 235, 245, 0.72);
+  }
+
+  #bn-dynamic-island-card button.bn-di-close {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  #bn-dynamic-island-card button.bn-di-close:hover,
+  #bn-dynamic-island-card button.bn-di-close:focus-visible {
+    background: rgba(255, 255, 255, 0.16);
+  }
+}
