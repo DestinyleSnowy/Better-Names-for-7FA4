@@ -25,17 +25,6 @@ jobs:
           cd Better-Names-for-7FA4
           zip -r ../Better-Names-for-7FA4-${{ github.ref_name }}.zip .
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ github.ref_name }} 
-          files: Better-Names-for-7FA4-${{ github.ref_name }}.zip
-          name: Release ${{ github.ref_name }}
-          generate_release_notes: true
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push tag to GitLab
         env:
@@ -74,3 +63,16 @@ jobs:
             "$GITLAB_URL/api/v4/projects/$PROJECT_ID/releases" >/dev/null
 
           echo "GitLab release created successfully!"
+
+          
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }} 
+          files: Better-Names-for-7FA4-${{ github.ref_name }}.zip
+          name: Release ${{ github.ref_name }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
