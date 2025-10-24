@@ -34,8 +34,6 @@ window.getCurrentUserId = getCurrentUserId;
   const enableAutoRenew = GM_getValue('enableAutoRenew', false);
   const enableSubmitter = GM_getValue('enableSubmitter', true);
   const enableRankingFilterSetting = GM_getValue('rankingFilter.enabled', false);
-  const initialAutoExit = GM_getValue('planAdder.autoExit', true);
-  let autoExit = initialAutoExit;
   const enableVjLink = GM_getValue('enableVjLink', true);
   const hideDoneSkip = GM_getValue('hideDoneSkip', false);
   const enableQuickSkip = GM_getValue('enableQuickSkip', false);
@@ -827,9 +825,7 @@ window.getCurrentUserId = getCurrentUserId;
                添加计划
             </div>
             <label><input type="checkbox" id="bn-enable-plan" ${enablePlanAdder ? 'checked' : ''}/> 启用添加计划</label>
-            <div id="bn-plan-options">
-              <label><input type="checkbox" id="bn-plan-auto" ${initialAutoExit ? 'checked' : ''}/> 完成后退出</label>
-            </div>
+            <div id="bn-plan-options">计划添加完成后将自动退出。</div>
           </div>
           <div class="bn-section">
             <div class="bn-title">
@@ -945,7 +941,6 @@ window.getCurrentUserId = getCurrentUserId;
   const chkRankingFilter = document.getElementById('bn-enable-ranking-filter');
   const chkSubmitter = document.getElementById('bn-enable-submitter');
   const planOpts = document.getElementById('bn-plan-options');
-  const chkPlanAuto = document.getElementById('bn-plan-auto');
   const chkUseColor = document.getElementById('bn-use-custom-color');
   const themeSelect = document.getElementById('bn-theme-select');
 
@@ -1022,7 +1017,6 @@ window.getCurrentUserId = getCurrentUserId;
     enableAutoRenew,
     enableRankingFilter: enableRankingFilterSetting,
     enableSubmitter,
-    autoExit: initialAutoExit,
     useCustomColors,
     palette: Object.assign({}, palette),
     enableVjLink,
@@ -1281,7 +1275,6 @@ window.getCurrentUserId = getCurrentUserId;
       (document.getElementById('bn-enable-vj').checked !== originalConfig.enableVjLink) ||
       (document.getElementById('bn-hide-done-skip').checked !== originalConfig.hideDoneSkip) ||
       (document.getElementById('bn-enable-quick-skip').checked !== originalConfig.enableQuickSkip) ||
-      (document.getElementById('bn-plan-auto').checked !== originalConfig.autoExit) ||
       (document.getElementById('bn-use-custom-color').checked !== originalConfig.useCustomColors) ||
       (document.getElementById('bn-width-mode').value !== originalConfig.widthMode) ||
       (document.getElementById('bn-theme-select').value !== originalConfig.themeMode) ||
@@ -1340,7 +1333,6 @@ window.getCurrentUserId = getCurrentUserId;
   chkAutoRenew.onchange = checkChanged;
   chkRankingFilter.onchange = checkChanged;
   chkSubmitter.onchange = checkChanged;
-  chkPlanAuto.onchange = () => { autoExit = chkPlanAuto.checked; checkChanged(); };
   widthModeSel.onchange = checkChanged;
 
   document.getElementById('bn-color-reset').onclick = () => {
@@ -1385,8 +1377,6 @@ window.getCurrentUserId = getCurrentUserId;
     GM_setValue('enableAutoRenew', chkAutoRenew.checked);
     GM_setValue('enableSubmitter', chkSubmitter.checked);
     GM_setValue('rankingFilter.enabled', chkRankingFilter.checked);
-    GM_setValue('planAdder.autoExit', chkPlanAuto.checked);
-    autoExit = chkPlanAuto.checked;
 
     GM_setValue(THEME_KEY, themeSelect.value);
 
@@ -1432,8 +1422,6 @@ window.getCurrentUserId = getCurrentUserId;
     chkAutoRenew.checked = originalConfig.enableAutoRenew;
     chkRankingFilter.checked = originalConfig.enableRankingFilter;
     chkSubmitter.checked = originalConfig.enableSubmitter;
-    chkPlanAuto.checked = originalConfig.autoExit;
-    autoExit = originalConfig.autoExit;
     chkUseColor.checked = originalConfig.useCustomColors;
     themeSelect.value = originalConfig.themeMode;
 
@@ -2257,7 +2245,8 @@ window.getCurrentUserId = getCurrentUserId;
   };
 
   let selected = new Map();
-  let autoExit = GM_getValue(KEY.autoExit, true);
+  GM_setValue(KEY.autoExit, true);
+  const autoExit = true;
   let observer = null;
   let currentDateIso = null;
   const planCache = new Map();
