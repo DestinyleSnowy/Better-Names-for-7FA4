@@ -1,10 +1,10 @@
-name: Package and Release
+name: Package and Release to GitLab
 
 on:
-  workflow_dispatch:  # 手动触发
+  workflow_dispatch:
   push:
     tags:
-      - 'v*'  # 当推送版本标签时触发
+      - 'v*'
 
 jobs:
   package-and-release:
@@ -17,12 +17,62 @@ jobs:
     - name: Create ZIP package
       run: |
         cd Better-Names-for-7FA4
-        zip -r ../Better-Names-for-7FA4-${{ github.sha }}.zip .
+        zip -r ../Better-Names-for-7FA4-${{ github.ref_name }}.zip .
         
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      if: startsWith(github.ref, 'refs/tags/')
-      with:
-        files: Better-Names-for-7FA4-${{ github.sha }}.zip
+    - name: Extract tag name
+      id: tag
+      run: |
+        # 从 github.ref 中提取标签名（去掉 refs/tags/ 前缀）
+        TAG_NAME=${GITHUB_REF#refs/tags/}
+        echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+        
+    - name: Create Release in GitLab
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+        GITLAB_URL: "http://jx.7fa4.cn:9080"
+      run: |
+        # 设置变量
+        TAG_NAME="${{ steps.tag.outputs.tag_name }}"
+        ZIP_FILE="Better-Names-for-7FA4-${{ steps.tag.outputs.tag_name }}.zip"
+        PROJECT_ID="wsh%2Ftest"  # URL 编码的 "wsh/test"
+        
+        echo "Creating release $TAG_NAME in GitLab..."
+        
+        # 1. 首先上传文件到 GitLab
+        UPLOAD_RESPONSE=$(curl --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+          --form "file=@$ZIP_FILE" \
+          "$GITLAB_URL/api/v4/projects/$PROJECT_ID/uploads" -s)
+        
+        echo "Upload response: $UPLOAD_RESPONSE"
+        
+        # 提取上传文件的 markdown 链接和 URL
+        UPLOAD_MARKDOWN=$(echo "$UPLOAD_RESPONSE" | jq -r '.markdown')
+        UPLOAD_URL=$(echo "$UPLOAD_RESPONSE" | jq -r '.url')
+        
+        # 2. 创建 release，包含上传的文件
+        RELEASE_DATA=$(jq -n \
+          --arg tag "$TAG_NAME" \
+          --arg name "Better Names for 7FA4 $TAG_NAME" \
+          --arg description "Automated release from GitHub Actions. Download: $UPLOAD_MARKDOWN" \
+          '{
+            name: $name,
+            tag_name: $tag,
+            description: $description,
+            assets: {
+              links: [
+                {
+                  name: "Better-Names-for-7FA4-\($tag).zip",
+                  url: "\($GITLAB_URL)\($UPLOAD_URL)",
+                  link_type: "package"
+                }
+              ]
+            }
+          }')
+        
+        # 创建 release
+        curl --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+          --header "Content-Type: application/json" \
+          --data "$RELEASE_DATA" \
+          "$GITLAB_URL/api/v4/projects/$PROJECT_ID/releases"
+        
+        echo "Release created successfully!"
