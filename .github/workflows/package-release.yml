@@ -13,18 +13,13 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # 获取所有历史记录和标签
       
     - name: Create ZIP package
       run: |
         cd Better-Names-for-7FA4
         zip -r ../Better-Names-for-7FA4-${{ github.ref_name }}.zip .
-        
-    - name: Extract tag name
-      id: tag
-      run: |
-        # 从 github.ref 中提取标签名（去掉 refs/tags/ 前缀）
-        TAG_NAME=${GITHUB_REF#refs/tags/}
-        echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
         
     - name: Create Release in GitLab
       env:
@@ -32,9 +27,9 @@ jobs:
         GITLAB_URL: "http://jx.7fa4.cn:9080"
       run: |
         # 设置变量
-        TAG_NAME="${{ steps.tag.outputs.tag_name }}"
-        ZIP_FILE="Better-Names-for-7FA4-${{ steps.tag.outputs.tag_name }}.zip"
-        PROJECT_ID="wsh%2Ftest"  # URL 编码的 "wsh/test"
+        TAG_NAME=${GITHUB_REF#refs/tags/}
+        ZIP_FILE="Better-Names-for-7FA4-$TAG_NAME.zip"
+        PROJECT_ID="wsh%2Ftest"
         
         echo "Creating release $TAG_NAME in GitLab..."
         
@@ -45,41 +40,32 @@ jobs:
         
         echo "Upload response: $UPLOAD_RESPONSE"
         
-        # 提取上传文件的 markdown 链接和 URL
-        UPLOAD_MARKDOWN=$(echo "$UPLOAD_RESPONSE" | jq -r '.markdown')
-        UPLOAD_URL=$(echo "$UPLOAD_RESPONSE" | jq -r '.url')
+        # 提取上传文件的 markdown 链接
+        UPLOAD_MARKDOWN=$(echo "$UPLOAD_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin)['markdown'])")
         
-        # 构建完整的文件 URL
-        FULL_FILE_URL="$GITLAB_URL$UPLOAD_URL"
-        echo "Full file URL: $FULL_FILE_URL"
+        # 2. 创建 release，确保包含 ref 参数
+        RELEASE_JSON='{
+          "name": "Better Names for 7FA4 '"$TAG_NAME"'",
+          "tag_name": "'"$TAG_NAME"'",
+          "ref": "'"$TAG_NAME"'",
+          "description": "Automated release from GitHub Actions. Download: '"$UPLOAD_MARKDOWN"'",
+          "assets": {
+            "links": [
+              {
+                "name": "Better-Names-for-7FA4-'"$TAG_NAME"'.zip",
+                "url": "'"$GITLAB_URL"'/uploads/'"$(echo "$UPLOAD_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin)['url'])"")"'",
+                "link_type": "package"
+              }
+            ]
+          }
+        }'
         
-        # 2. 创建 release，包含上传的文件
-        RELEASE_DATA=$(jq -n \
-          --arg tag "$TAG_NAME" \
-          --arg name "Better Names for 7FA4 $TAG_NAME" \
-          --arg description "Automated release from GitHub Actions. Download: $UPLOAD_MARKDOWN" \
-          --arg file_url "$FULL_FILE_URL" \
-          '{
-            name: $name,
-            tag_name: $tag,
-            description: $description,
-            assets: {
-              links: [
-                {
-                  name: "Better-Names-for-7FA4-\($tag).zip",
-                  url: $file_url,
-                  link_type: "package"
-                }
-              ]
-            }
-          }')
-        
-        echo "Release data: $RELEASE_DATA"
+        echo "Release JSON: $RELEASE_JSON"
         
         # 创建 release
         RELEASE_RESPONSE=$(curl --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
           --header "Content-Type: application/json" \
-          --data "$RELEASE_DATA" \
+          --data "$RELEASE_JSON" \
           "$GITLAB_URL/api/v4/projects/$PROJECT_ID/releases" -w "\n%{http_code}")
         
         HTTP_CODE=$(echo "$RELEASE_RESPONSE" | tail -n1)
