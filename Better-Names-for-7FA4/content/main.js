@@ -825,7 +825,7 @@ window.getCurrentUserId = getCurrentUserId;
                添加计划
             </div>
             <label><input type="checkbox" id="bn-enable-plan" ${enablePlanAdder ? 'checked' : ''}/> 启用添加计划</label>
-            <div id="bn-plan-options">计划添加完成后将自动退出。</div>
+            <div id="bn-plan-options"></div>
           </div>
           <div class="bn-section">
             <div class="bn-title">
