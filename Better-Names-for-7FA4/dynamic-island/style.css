@@ -1,5 +1,4 @@
 #bn-dynamic-island-root {
-  flex: 1 1 0%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -8,6 +7,7 @@
   min-width: 0;
   padding: 0 12px;
   box-sizing: border-box;
+  justify-self: center;
 }
 
 #bn-dynamic-island-root > * {
@@ -16,37 +16,57 @@
 
 .ui.fixed.borderless.menu > .ui.container {
   position: relative;
-  display: flex !important;
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 6px;
-  flex-wrap: nowrap;
+  column-gap: 12px;
 }
 
-.ui.fixed.borderless.menu > .ui.container > .item,
-.ui.fixed.borderless.menu > .ui.container > .header.item {
-  flex: 0 0 auto;
+.bn-di-zone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 100%;
 }
 
-.ui.fixed.borderless.menu > .ui.container > .right.menu {
-  margin-left: auto;
-  flex: 0 0 auto;
+.bn-di-zone-left {
+  justify-self: start;
+}
+
+.bn-di-zone-right {
+  justify-self: end;
+}
+
+.bn-di-zone-left > .item,
+.bn-di-zone-left > .header.item,
+.bn-di-zone-right > .item,
+.bn-di-zone-right > .header.item,
+.bn-di-zone-right > .menu {
+  margin: 0 !important;
+}
+
+.bn-di-zone-right > .right.menu {
+  margin-left: 0 !important;
 }
 
 #bn-dynamic-island-capsule {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 14px;
+  padding: 5px 16px;
   border-radius: 999px;
-  background: linear-gradient(135deg, rgba(32, 32, 32, 0.92), rgba(12, 12, 12, 0.92));
-  color: #f5f5f7;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.16));
+  color: rgba(17, 17, 20, 0.88);
   font-size: 13px;
   line-height: 1.2;
   border: none;
   cursor: pointer;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28), 0 2px 10px rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14), 0 4px 12px rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
   font-family: "Exo 2", "Helvetica Neue", Arial, sans-serif;
   min-height: 32px;
 }
@@ -54,7 +74,8 @@
 #bn-dynamic-island-capsule:hover,
 #bn-dynamic-island-capsule:focus-visible {
   transform: translateY(-1px);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.3), 0 6px 16px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.18), 0 6px 18px rgba(15, 23, 42, 0.12);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.2));
   outline: none;
 }
 
@@ -69,8 +90,8 @@
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  background: #30d158;
-  box-shadow: 0 0 0 2px rgba(48, 209, 88, 0.3);
+  background: linear-gradient(135deg, #3dd892, #3ac4ff);
+  box-shadow: 0 0 0 1px rgba(58, 196, 255, 0.2);
 }
 
 #bn-dynamic-island-capsule .bn-di-label {
@@ -101,10 +122,12 @@
   min-width: 280px;
   max-width: min(420px, calc(100vw - 48px));
   padding: 24px 28px 28px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.96);
-  color: #1c1c1e;
-  box-shadow: 0 24px 48px rgba(15, 15, 15, 0.2), 0 8px 24px rgba(0, 0, 0, 0.18);
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.64));
+  color: rgba(20, 20, 24, 0.92);
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.16), 0 6px 18px rgba(15, 23, 42, 0.12);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
   display: none;
   flex-direction: column;
   gap: 14px;
@@ -130,7 +153,7 @@
 #bn-dynamic-island-card p {
   margin: 0;
   font-size: 14px;
-  color: rgba(28, 28, 30, 0.76);
+  color: rgba(32, 32, 36, 0.72);
   line-height: 1.5;
 }
 
@@ -142,7 +165,7 @@
 
 #bn-dynamic-island-card button.bn-di-close {
   align-self: flex-end;
-  background: rgba(0, 0, 0, 0.06);
+  background: rgba(15, 23, 42, 0.06);
   color: inherit;
   border: none;
   border-radius: 999px;
@@ -154,7 +177,7 @@
 
 #bn-dynamic-island-card button.bn-di-close:hover,
 #bn-dynamic-island-card button.bn-di-close:focus-visible {
-  background: rgba(0, 0, 0, 0.12);
+  background: rgba(15, 23, 42, 0.12);
   outline: none;
 }
 
@@ -164,25 +187,25 @@ body.bn-di-card-open {
 
 @media (prefers-color-scheme: dark) {
   #bn-dynamic-island-capsule {
-    background: linear-gradient(135deg, rgba(245, 245, 247, 0.18), rgba(255, 255, 255, 0.08));
-    color: rgba(255, 255, 255, 0.95);
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.38);
-    border-color: rgba(255, 255, 255, 0.16);
+    background: linear-gradient(135deg, rgba(38, 38, 44, 0.68), rgba(28, 28, 34, 0.52));
+    color: rgba(244, 244, 245, 0.9);
+    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.4), 0 6px 18px rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.14);
   }
 
   #bn-dynamic-island-capsule:hover,
   #bn-dynamic-island-capsule:focus-visible {
-    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.5), 0 6px 16px rgba(0, 0, 0, 0.42);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.46), 0 8px 22px rgba(0, 0, 0, 0.32);
   }
 
   #bn-dynamic-island-card {
-    background: rgba(28, 28, 30, 0.92);
-    color: rgba(244, 244, 245, 0.96);
-    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45), 0 8px 24px rgba(0, 0, 0, 0.4);
+    background: linear-gradient(135deg, rgba(32, 32, 38, 0.82), rgba(26, 26, 32, 0.7));
+    color: rgba(244, 244, 245, 0.9);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.38), 0 8px 22px rgba(0, 0, 0, 0.32);
   }
 
   #bn-dynamic-island-card p {
-    color: rgba(235, 235, 245, 0.72);
+    color: rgba(235, 235, 245, 0.7);
   }
 
   #bn-dynamic-island-card button.bn-di-close {

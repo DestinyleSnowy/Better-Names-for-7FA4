@@ -6,6 +6,8 @@
   const BACKDROP_ID = 'bn-dynamic-island-backdrop';
   const CARD_ID = 'bn-dynamic-island-card';
   const CAPSULE_ID = 'bn-dynamic-island-capsule';
+  const LEFT_ID = 'bn-dynamic-island-left';
+  const RIGHT_ID = 'bn-dynamic-island-right';
 
   function qs(selector, root = document) {
     try {
@@ -149,6 +151,45 @@
     root.id = ROOT_ID;
     root.setAttribute('role', 'presentation');
 
+    let leftZone = qs(`#${LEFT_ID}`, container);
+    let rightZone = qs(`#${RIGHT_ID}`, container);
+
+    const elements = [];
+
+    function harvestChildren(source) {
+      if (!source) return;
+      let child = source.firstElementChild;
+      while (child) {
+        const next = child.nextElementSibling;
+        elements.push(child);
+        source.removeChild(child);
+        child = next;
+      }
+    }
+
+    harvestChildren(leftZone);
+    harvestChildren(rightZone);
+
+    if (leftZone && leftZone.parentNode === container) {
+      container.removeChild(leftZone);
+    }
+
+    if (rightZone && rightZone.parentNode === container) {
+      container.removeChild(rightZone);
+    }
+
+    if (!leftZone) {
+      leftZone = document.createElement('div');
+    }
+    leftZone.id = LEFT_ID;
+    leftZone.className = 'bn-di-zone bn-di-zone-left';
+
+    if (!rightZone) {
+      rightZone = document.createElement('div');
+    }
+    rightZone.id = RIGHT_ID;
+    rightZone.className = 'bn-di-zone bn-di-zone-right';
+
     const existingBackdrop = qs(`#${BACKDROP_ID}`);
     if (existingBackdrop && existingBackdrop.parentNode) {
       existingBackdrop.parentNode.removeChild(existingBackdrop);
@@ -171,16 +212,68 @@
     document.body.appendChild(cardElement);
 
     root.appendChild(capsuleElement);
-    const rightMenu = Array.from(container.children).find((child) => {
-      if (!child || !child.classList) return false;
-      return child.classList.contains('right') && child.classList.contains('menu');
+
+    const leftPaths = new Set(['/', '/problems/exercises', '/contests']);
+
+    Array.from(container.children).forEach((child) => {
+      if (!child || child === root || child === leftZone || child === rightZone) return;
+      if (child.nodeType !== Node.ELEMENT_NODE) return;
+      elements.push(child);
     });
 
-    if (rightMenu) {
-      container.insertBefore(root, rightMenu);
-    } else {
-      container.appendChild(root);
-    }
+    elements.forEach((element) => {
+      if (!element.parentNode) return;
+      element.parentNode.removeChild(element);
+    });
+
+    container.appendChild(leftZone);
+    container.appendChild(root);
+    container.appendChild(rightZone);
+
+    const leftElements = [];
+    const rightElements = [];
+
+    elements.forEach((element) => {
+      if (!element.classList) {
+        rightElements.push(element);
+        return;
+      }
+
+      if (element.classList.contains('header') && element.classList.contains('item')) {
+        leftElements.push(element);
+        return;
+      }
+
+      if (element.classList.contains('menu') && element.classList.contains('right')) {
+        rightElements.push(element);
+        return;
+      }
+
+      if (element.matches('a.item')) {
+        const rawHref = element.getAttribute('href') || '';
+        const normalizedHref = rawHref.replace(/^[^#?]*:\/\/[^/]+/i, '');
+        let path = normalizedHref.split('?')[0] || '';
+        if (path.length > 1 && path.endsWith('/')) {
+          path = path.slice(0, -1);
+        }
+        if (leftPaths.has(path)) {
+          leftElements.push(element);
+        } else {
+          rightElements.push(element);
+        }
+        return;
+      }
+
+      rightElements.push(element);
+    });
+
+    leftElements.forEach((element) => {
+      leftZone.appendChild(element);
+    });
+
+    rightElements.forEach((element) => {
+      rightZone.appendChild(element);
+    });
 
     // Move card focus target to first interactive element when shown.
     cardElement.addEventListener('transitionend', (event) => {
