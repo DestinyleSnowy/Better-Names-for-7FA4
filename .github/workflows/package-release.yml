@@ -14,18 +14,31 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0
+        fetch-depth: 0  # 获取所有历史记录和标签
       
     - name: Setup jq
-      run: |
-        # 确保 jq 已安装
-        sudo apt-get update
-        sudo apt-get install -y jq
+      run: sudo apt-get install -y jq
       
     - name: Create ZIP package
       run: |
         cd Better-Names-for-7FA4
         zip -r ../Better-Names-for-7FA4-${{ github.ref_name }}.zip .
+        
+    - name: Push tag to GitLab
+      env:
+        GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+      run: |
+        # 配置 Git
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        
+        # 添加 GitLab 远程仓库
+        git remote add gitlab http://oauth2:$GITLAB_TOKEN@jx.7fa4.cn:9080/wsh/test.git
+        
+        # 推送当前标签到 GitLab
+        TAG_NAME=${GITHUB_REF#refs/tags/}
+        echo "Pushing tag $TAG_NAME to GitLab..."
+        git push gitlab $TAG_NAME
         
     - name: Create Release in GitLab
       env:
@@ -53,16 +66,18 @@ jobs:
         # 构建完整的文件 URL
         FULL_FILE_URL="$GITLAB_URL$UPLOAD_URL"
         
-        # 2. 使用 jq 构建 JSON 数据
+        # 2. 使用 jq 构建 JSON 数据，明确指定 ref
         RELEASE_JSON=$(jq -n \
           --arg name "Better Names for 7FA4 $TAG_NAME" \
           --arg tag "$TAG_NAME" \
           --arg desc "Automated release from GitHub Actions. Download: $UPLOAD_MARKDOWN" \
           --arg url "$FULL_FILE_URL" \
           --arg file_name "Better-Names-for-7FA4-$TAG_NAME.zip" \
+          --arg ref "$TAG_NAME" \
           '{
             name: $name,
             tag_name: $tag,
+            ref: $ref,
             description: $desc,
             assets: {
               links: [
@@ -78,9 +93,20 @@ jobs:
         echo "Release JSON: $RELEASE_JSON"
         
         # 3. 创建 release
-        curl --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+        RELEASE_RESPONSE=$(curl --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
           --header "Content-Type: application/json" \
           --data "$RELEASE_JSON" \
-          "$GITLAB_URL/api/v4/projects/$PROJECT_ID/releases"
+          "$GITLAB_URL/api/v4/projects/$PROJECT_ID/releases" -w "\n%{http_code}")
         
-        echo "Release created successfully!"
+        HTTP_CODE=$(echo "$RELEASE_RESPONSE" | tail -n1)
+        RESPONSE_BODY=$(echo "$RELEASE_RESPONSE" | head -n -1)
+        
+        echo "Release response HTTP code: $HTTP_CODE"
+        echo "Release response body: $RESPONSE_BODY"
+        
+        if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+          echo "Release created successfully!"
+        else
+          echo "Failed to create release"
+          exit 1
+        fi
