@@ -1,0 +1,35 @@
+name: Upload to GitLab
+
+on:
+  workflow_dispatch:  # 手动触发
+  release:
+    types: [published]
+
+jobs:
+  upload-to-gitlab:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Create ZIP package
+      run: |
+        cd Better-Names-for-7FA4
+        zip -r ../Better-Names-for-7FA4-${{ github.sha }}.zip .
+        
+    - name: Upload to GitLab
+      env:
+        GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+        GITLAB_URL: ${{ secrets.GITLAB_URL }}  # 您的 GitLab 实例 URL
+      run: |
+        # 获取 release 信息
+        RELEASE_ASSET="Better-Names-for-7FA4-${{ github.sha }}.zip"
+        
+        # 使用 GitLab API 上传文件
+        # 这里假设您已经配置了 GitLab 项目信息
+        response=$(curl --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+                       --form "file=@$RELEASE_ASSET" \
+                       "$GITLAB_URL/api/v4/projects/${{ secrets.GITLAB_PROJECT_ID }}/uploads")
+        
+        echo "Upload response: $response"
