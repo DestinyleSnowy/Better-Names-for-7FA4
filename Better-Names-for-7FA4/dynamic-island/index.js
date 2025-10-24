@@ -135,76 +135,6 @@
     toggleCard(true);
   }
 
-  function restructureMenu(menu) {
-    const container = qs('.ui.container', menu);
-    if (!container) return null;
-
-    const existingLayout = qs('#bn-di-menu-layout', container);
-    if (existingLayout) {
-      const center = qs('#bn-di-menu-center', existingLayout) || null;
-      const leftWrapExisting = qs('#bn-di-menu-left', existingLayout);
-      const rightWrapExisting = qs('#bn-di-menu-right', existingLayout);
-      if (leftWrapExisting && rightWrapExisting) {
-        const strayElements = Array.from(container.children).filter((child) => child && child !== existingLayout);
-        strayElements.forEach((child) => {
-          const classList = child.classList || { contains: () => false };
-          if (classList.contains('right') && classList.contains('menu')) {
-            rightWrapExisting.appendChild(child);
-          } else {
-            leftWrapExisting.appendChild(child);
-          }
-        });
-        Array.from(container.childNodes).forEach((node) => {
-          if (node.nodeType === Node.TEXT_NODE && !node.textContent.trim()) {
-            container.removeChild(node);
-          }
-        });
-      }
-      return center;
-    }
-
-    const layout = document.createElement('div');
-    layout.id = 'bn-di-menu-layout';
-    layout.className = 'bn-di-menu-layout';
-
-    const leftWrap = document.createElement('div');
-    leftWrap.id = 'bn-di-menu-left';
-    leftWrap.className = 'bn-di-menu-left';
-
-    const centerWrap = document.createElement('div');
-    centerWrap.id = 'bn-di-menu-center';
-    centerWrap.className = 'bn-di-menu-center';
-
-    const rightWrap = document.createElement('div');
-    rightWrap.id = 'bn-di-menu-right';
-    rightWrap.className = 'bn-di-menu-right';
-
-    const childElements = Array.from(container.children);
-    childElements.forEach((child) => {
-      if (!child) return;
-      const classList = child.classList || { contains: () => false };
-      if (classList.contains('right') && classList.contains('menu')) {
-        rightWrap.appendChild(child);
-      } else {
-        leftWrap.appendChild(child);
-      }
-    });
-
-    layout.appendChild(leftWrap);
-    layout.appendChild(centerWrap);
-    layout.appendChild(rightWrap);
-
-    container.appendChild(layout);
-
-    Array.from(container.childNodes).forEach((node) => {
-      if (node.nodeType === Node.TEXT_NODE && !node.textContent.trim()) {
-        container.removeChild(node);
-      }
-    });
-
-    return centerWrap;
-  }
-
   function setupDynamicIsland() {
     if (qs(`#${ROOT_ID}`)) return true;
     const menu = qs(MENU_SELECTOR);
@@ -212,12 +142,22 @@
 
     appendStyle();
 
-    const centerWrap = restructureMenu(menu);
-    if (!centerWrap) return false;
+    const container = qs('.ui.container', menu);
+    if (!container) return false;
 
     const root = document.createElement('div');
     root.id = ROOT_ID;
     root.setAttribute('role', 'presentation');
+
+    const existingBackdrop = qs(`#${BACKDROP_ID}`);
+    if (existingBackdrop && existingBackdrop.parentNode) {
+      existingBackdrop.parentNode.removeChild(existingBackdrop);
+    }
+
+    const existingCard = qs(`#${CARD_ID}`);
+    if (existingCard && existingCard.parentNode) {
+      existingCard.parentNode.removeChild(existingCard);
+    }
 
     capsuleElement = createCapsule();
     capsuleElement.addEventListener('click', handleCapsuleClick);
@@ -231,7 +171,16 @@
     document.body.appendChild(cardElement);
 
     root.appendChild(capsuleElement);
-    centerWrap.appendChild(root);
+    const rightMenu = Array.from(container.children).find((child) => {
+      if (!child || !child.classList) return false;
+      return child.classList.contains('right') && child.classList.contains('menu');
+    });
+
+    if (rightMenu) {
+      container.insertBefore(root, rightMenu);
+    } else {
+      container.appendChild(root);
+    }
 
     // Move card focus target to first interactive element when shown.
     cardElement.addEventListener('transitionend', (event) => {
