@@ -486,13 +486,208 @@ window.getCurrentUserId = getCurrentUserId;
 
     #bn-panel input[type="checkbox"] { width: 16px; height: 16px; accent-color: #007bff; cursor: pointer; flex-shrink: 0; }
 
-    #bn-panel input[type="number"], #bn-panel select {
+    #bn-panel input[type="number"] {
       width: 100%; max-width: 180px; padding: 6px 8px; border: 1px solid var(--bn-border-subtle);
       border-radius: 8px; font-size: 13px; background: var(--bn-bg); margin-bottom: 8px; color: var(--bn-text);
       transition: all .2s ease;
     }
-    #bn-panel input[type="number"]:focus, #bn-panel select:focus {
+    #bn-panel input[type="number"]:focus {
       border-color: #007bff; outline: none; box-shadow: 0 0 0 3px rgba(0,123,255,0.1); transform: translateY(-1px);
+    }
+
+    #bn-panel label.bn-select-label {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      white-space: normal;
+      margin: 6px 0 4px;
+      padding: 0;
+      cursor: default;
+    }
+    #bn-panel label.bn-select-label:hover {
+      background: transparent;
+      color: var(--bn-text-sub);
+    }
+    .bn-select-wrapper {
+      position: relative;
+      width: 100%;
+    }
+    .bn-select-hidden {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+      width: 0;
+      height: 0;
+    }
+    .bn-select-trigger {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 16px;
+      border-radius: 16px;
+      background: var(--bn-bg);
+      color: var(--bn-text);
+      border: 1px solid rgba(148, 163, 184, 0.32);
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+    }
+    .bn-select-trigger:focus-visible {
+      outline: none;
+      border-color: #6366f1;
+      box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.18);
+    }
+    .bn-select-wrapper.bn-open .bn-select-trigger,
+    .bn-select-trigger:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 16px 32px rgba(15, 23, 42, 0.16);
+      border-color: rgba(99, 102, 241, 0.45);
+    }
+    .bn-select-value {
+      flex: 1;
+      text-align: left;
+      color: inherit;
+    }
+    .bn-select-arrow {
+      width: 12px;
+      height: 12px;
+      position: relative;
+      flex-shrink: 0;
+      color: inherit;
+    }
+    .bn-select-arrow::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 8px;
+      height: 8px;
+      border-left: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      transform: translate(-50%, -50%) rotate(-45deg);
+      transition: transform .2s ease;
+    }
+    .bn-select-wrapper.bn-open .bn-select-arrow::before {
+      transform: translate(-50%, -30%) rotate(135deg);
+    }
+    .bn-select-options {
+      list-style: none;
+      margin: 10px 0 0;
+      padding: 8px 0;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: var(--bn-bg);
+      border-radius: 18px;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      box-shadow: 0 22px 40px rgba(15, 23, 42, 0.18);
+      display: none;
+      z-index: 50;
+      max-height: 240px;
+      overflow-y: auto;
+      animation: bnSelectFade .2s ease;
+    }
+    .bn-select-wrapper.bn-open .bn-select-options {
+      display: block;
+    }
+    .bn-select-option {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 18px;
+      font-size: 14px;
+      color: var(--bn-text-sub);
+      cursor: pointer;
+      transition: background-color .2s ease, color .2s ease;
+    }
+    .bn-select-option:hover,
+    .bn-select-option:focus {
+      background: rgba(99, 102, 241, 0.08);
+      color: var(--bn-text);
+      outline: none;
+    }
+    .bn-select-option.bn-select-option-disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .bn-select-option.bn-select-option-disabled:hover,
+    .bn-select-option.bn-select-option-disabled:focus {
+      background: transparent;
+      color: var(--bn-text-sub);
+    }
+    .bn-select-option-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(99, 102, 241, 0.12);
+      color: #4c51bf;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .bn-select-option-text {
+      flex: 1;
+      min-width: 0;
+      color: inherit;
+    }
+    .bn-select-option-check {
+      margin-left: auto;
+      color: #4c51bf;
+      font-size: 14px;
+      opacity: 0;
+      transform: scale(0.8);
+      transition: opacity .2s ease, transform .2s ease;
+    }
+    .bn-select-option.bn-selected {
+      color: var(--bn-text);
+    }
+    .bn-select-option.bn-selected .bn-select-option-check {
+      opacity: 1;
+      transform: scale(1);
+    }
+    #bn-container.bn-dark .bn-select-trigger {
+      background: var(--bn-bg-subtle);
+      border-color: rgba(99, 102, 241, 0.32);
+      box-shadow: 0 16px 32px rgba(0, 0, 0, 0.45);
+      color: var(--bn-text);
+    }
+    #bn-container.bn-dark .bn-select-wrapper.bn-open .bn-select-trigger,
+    #bn-container.bn-dark .bn-select-trigger:hover {
+      border-color: rgba(129, 140, 248, 0.65);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.55);
+    }
+    #bn-container.bn-dark .bn-select-options {
+      background: var(--bn-bg-subtle);
+      border-color: rgba(99, 102, 241, 0.35);
+      box-shadow: 0 24px 40px rgba(0, 0, 0, 0.55);
+    }
+    #bn-container.bn-dark .bn-select-option-icon {
+      background: rgba(129, 140, 248, 0.16);
+      color: #a5b4fc;
+    }
+    #bn-container.bn-dark .bn-select-option-check {
+      color: #c7d2fe;
+    }
+    #bn-container.bn-dark .bn-select-option:hover,
+    #bn-container.bn-dark .bn-select-option:focus {
+      background: rgba(129, 140, 248, 0.18);
+    }
+    @keyframes bnSelectFade {
+      from {
+        opacity: 0;
+        transform: translateY(-6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     .bn-btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
@@ -782,7 +977,7 @@ window.getCurrentUserId = getCurrentUserId;
               </label>
             </div>
             <div>
-              <label>计数方式：
+              <label class="bn-select-label">计数方式：
                 <select id="bn-width-mode">
                   <option value="visual" ${widthMode === 'visual' ? 'selected' : ''}>视觉宽度（中文=2）</option>
                   <option value="char" ${widthMode === 'char' ? 'selected' : ''}>等宽字符数（每字=1）</option>
@@ -863,7 +1058,7 @@ window.getCurrentUserId = getCurrentUserId;
             </div>
             <label><input type="checkbox" id="bn-use-custom-color" ${useCustomColors ? 'checked' : ''}/> 启用自定义颜色</label>
             <div>
-              <label>主题：
+              <label class="bn-select-label">主题：
                 <select id="bn-theme-select">
                   <option value="auto" ${themeMode === 'auto' ? 'selected' : ''}>跟随系统</option>
                   <option value="light" ${themeMode === 'light' ? 'selected' : ''}>浅色</option>
@@ -943,6 +1138,241 @@ window.getCurrentUserId = getCurrentUserId;
   const planOpts = document.getElementById('bn-plan-options');
   const chkUseColor = document.getElementById('bn-use-custom-color');
   const themeSelect = document.getElementById('bn-theme-select');
+
+  const customSelectControls = [];
+
+  function closeCustomSelect(control) {
+    if (!control) return;
+    control.wrapper.classList.remove('bn-open');
+    control.trigger.setAttribute('aria-expanded', 'false');
+  }
+
+  function closeAllCustomSelects(except) {
+    customSelectControls.forEach(ctrl => {
+      if (ctrl !== except) closeCustomSelect(ctrl);
+    });
+  }
+
+  function getFocusableOptions(control) {
+    return control.optionItems.filter(item => !item.classList.contains('bn-select-option-disabled'));
+  }
+
+  function focusSelectedOption(control) {
+    const focusable = getFocusableOptions(control);
+    if (!focusable.length) return;
+    const selected = focusable.find(item => item.classList.contains('bn-selected'));
+    (selected || focusable[0]).focus();
+  }
+
+  function focusRelativeOption(control, delta) {
+    const focusable = getFocusableOptions(control);
+    if (!focusable.length) return;
+    const active = document.activeElement;
+    let index = focusable.indexOf(active);
+    if (index === -1) {
+      index = focusable.indexOf(focusable.find(item => item.classList.contains('bn-selected')));
+    }
+    if (index === -1) index = 0;
+    index = (index + delta + focusable.length) % focusable.length;
+    focusable[index].focus();
+  }
+
+  function openCustomSelect(control) {
+    if (!control) return;
+    closeAllCustomSelects(control);
+    control.wrapper.classList.add('bn-open');
+    control.trigger.setAttribute('aria-expanded', 'true');
+    focusSelectedOption(control);
+  }
+
+  function initCustomSelect(select) {
+    if (!select || select.dataset.bnSelectInit === '1') return;
+    select.dataset.bnSelectInit = '1';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'bn-select-wrapper';
+    const parent = select.parentNode;
+    if (!parent) return;
+    parent.insertBefore(wrapper, select);
+    wrapper.appendChild(select);
+    select.classList.add('bn-select-hidden');
+    select.tabIndex = -1;
+    select.setAttribute('aria-hidden', 'true');
+
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'bn-select-trigger';
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', 'false');
+    trigger.innerHTML = '<span class="bn-select-value"></span><span class="bn-select-arrow" aria-hidden="true"></span>';
+    wrapper.appendChild(trigger);
+
+    const list = document.createElement('ul');
+    list.className = 'bn-select-options';
+    list.setAttribute('role', 'listbox');
+    const listId = select.id ? `${select.id}-options` : `bn-select-options-${customSelectControls.length}`;
+    if (!document.getElementById(listId)) list.id = listId;
+    else list.id = `${listId}-${Date.now()}`;
+    wrapper.appendChild(list);
+    trigger.setAttribute('aria-controls', list.id);
+
+    const control = {
+      select,
+      wrapper,
+      trigger,
+      list,
+      optionItems: [],
+      updateSelected: () => {},
+    };
+
+    Array.from(select.options).forEach(option => {
+      const item = document.createElement('li');
+      item.className = 'bn-select-option';
+      item.dataset.value = option.value;
+      item.setAttribute('role', 'option');
+      item.tabIndex = -1;
+      const icon = document.createElement('span');
+      icon.className = 'bn-select-option-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = '★';
+      const text = document.createElement('span');
+      text.className = 'bn-select-option-text';
+      text.textContent = option.textContent || '';
+      const check = document.createElement('span');
+      check.className = 'bn-select-option-check';
+      check.setAttribute('aria-hidden', 'true');
+      check.textContent = '✔';
+      item.append(icon, text, check);
+      if (option.disabled) {
+        item.classList.add('bn-select-option-disabled');
+        item.setAttribute('aria-disabled', 'true');
+      }
+      list.appendChild(item);
+      item.addEventListener('click', event => {
+        event.preventDefault();
+        if (option.disabled) return;
+        const previousValue = select.value;
+        select.value = option.value;
+        if (select.value !== previousValue) {
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        control.updateSelected();
+        closeCustomSelect(control);
+        trigger.focus();
+      });
+      item.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          item.click();
+        } else if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          focusRelativeOption(control, 1);
+        } else if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          focusRelativeOption(control, -1);
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          closeCustomSelect(control);
+          trigger.focus();
+        }
+      });
+      control.optionItems.push(item);
+    });
+
+    const updateSelected = () => {
+      const selectedOption = select.options[select.selectedIndex];
+      const label = trigger.querySelector('.bn-select-value');
+      if (label) label.textContent = selectedOption ? selectedOption.textContent : '';
+      const value = selectedOption ? selectedOption.value : '';
+      control.optionItems.forEach(item => {
+        const isSelected = item.dataset.value === value;
+        item.classList.toggle('bn-selected', isSelected);
+        item.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+      });
+    };
+    control.updateSelected = updateSelected;
+    updateSelected();
+
+    select.addEventListener('change', updateSelected);
+
+    trigger.addEventListener('click', event => {
+      event.preventDefault();
+      if (wrapper.classList.contains('bn-open')) closeCustomSelect(control);
+      else openCustomSelect(control);
+    });
+
+    trigger.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        if (wrapper.classList.contains('bn-open')) closeCustomSelect(control);
+        else openCustomSelect(control);
+      } else if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        openCustomSelect(control);
+        focusRelativeOption(control, 1);
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        openCustomSelect(control);
+        focusRelativeOption(control, -1);
+      }
+    });
+
+    list.addEventListener('keydown', event => {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        focusRelativeOption(control, 1);
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        focusRelativeOption(control, -1);
+      } else if (event.key === 'Home') {
+        event.preventDefault();
+        const focusable = getFocusableOptions(control);
+        focusable[0]?.focus();
+      } else if (event.key === 'End') {
+        event.preventDefault();
+        const focusable = getFocusableOptions(control);
+        focusable[focusable.length - 1]?.focus();
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        closeCustomSelect(control);
+        trigger.focus();
+      } else if (event.key === 'Tab') {
+        closeCustomSelect(control);
+      }
+    });
+
+    customSelectControls.push(control);
+
+    const parentLabel = wrapper.closest('label');
+    if (parentLabel) {
+      parentLabel.addEventListener('click', event => {
+        if (wrapper.contains(event.target)) return;
+        event.preventDefault();
+        trigger.focus();
+        if (!wrapper.classList.contains('bn-open')) openCustomSelect(control);
+      });
+    }
+  }
+
+  document.addEventListener('pointerdown', event => {
+    customSelectControls.forEach(control => {
+      if (!control.wrapper.contains(event.target)) closeCustomSelect(control);
+    });
+  });
+
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      customSelectControls.forEach(control => {
+        if (control.wrapper.classList.contains('bn-open')) {
+          closeCustomSelect(control);
+          control.trigger.focus();
+        }
+      });
+    }
+  });
+
+  initCustomSelect(widthModeSel);
+  initCustomSelect(themeSelect);
 
   const colorSidebar = document.getElementById('bn-color-sidebar');
   const saveActions = document.getElementById('bn-save-actions');
@@ -1396,6 +1826,7 @@ window.getCurrentUserId = getCurrentUserId;
     titleInp.value = isFinite(originalConfig.maxTitleUnits) ? originalConfig.maxTitleUnits : '';
     userInp.value = isFinite(originalConfig.maxUserUnits) ? originalConfig.maxUserUnits : '';
     widthModeSel.value = originalConfig.widthMode;
+    widthModeSel.dispatchEvent(new Event('change', { bubbles: true }));
 
     chkAv.checked = originalConfig.hideAvatar;
     chkCp.checked = originalConfig.enableCopy;
@@ -1424,6 +1855,7 @@ window.getCurrentUserId = getCurrentUserId;
     chkSubmitter.checked = originalConfig.enableSubmitter;
     chkUseColor.checked = originalConfig.useCustomColors;
     themeSelect.value = originalConfig.themeMode;
+    themeSelect.dispatchEvent(new Event('change', { bubbles: true }));
 
     titleOpts.style.display = chkTitleTrEl.checked ? 'block' : 'none';
     userOpts.style.display = chkUserTrEl.checked ? 'block' : 'none';
