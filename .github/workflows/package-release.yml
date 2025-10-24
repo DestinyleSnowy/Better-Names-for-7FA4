@@ -14,7 +14,13 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0  # 获取所有历史记录和标签
+        fetch-depth: 0
+      
+    - name: Setup jq
+      run: |
+        # 确保 jq 已安装
+        sudo apt-get update
+        sudo apt-get install -y jq
       
     - name: Create ZIP package
       run: |
@@ -40,43 +46,41 @@ jobs:
         
         echo "Upload response: $UPLOAD_RESPONSE"
         
-        # 提取上传文件的 markdown 链接
-        UPLOAD_MARKDOWN=$(echo "$UPLOAD_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin)['markdown'])")
+        # 提取上传文件的 markdown 链接和 URL
+        UPLOAD_MARKDOWN=$(echo "$UPLOAD_RESPONSE" | jq -r '.markdown')
+        UPLOAD_URL=$(echo "$UPLOAD_RESPONSE" | jq -r '.url')
         
-        # 2. 创建 release，确保包含 ref 参数
-        RELEASE_JSON='{
-          "name": "Better Names for 7FA4 '"$TAG_NAME"'",
-          "tag_name": "'"$TAG_NAME"'",
-          "ref": "'"$TAG_NAME"'",
-          "description": "Automated release from GitHub Actions. Download: '"$UPLOAD_MARKDOWN"'",
-          "assets": {
-            "links": [
-              {
-                "name": "Better-Names-for-7FA4-'"$TAG_NAME"'.zip",
-                "url": "'"$GITLAB_URL"'/uploads/'"$(echo "$UPLOAD_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin)['url'])"")"'",
-                "link_type": "package"
-              }
-            ]
-          }
-        }'
+        # 构建完整的文件 URL
+        FULL_FILE_URL="$GITLAB_URL$UPLOAD_URL"
+        
+        # 2. 使用 jq 构建 JSON 数据
+        RELEASE_JSON=$(jq -n \
+          --arg name "Better Names for 7FA4 $TAG_NAME" \
+          --arg tag "$TAG_NAME" \
+          --arg desc "Automated release from GitHub Actions. Download: $UPLOAD_MARKDOWN" \
+          --arg url "$FULL_FILE_URL" \
+          --arg file_name "Better-Names-for-7FA4-$TAG_NAME.zip" \
+          '{
+            name: $name,
+            tag_name: $tag,
+            description: $desc,
+            assets: {
+              links: [
+                {
+                  name: $file_name,
+                  url: $url,
+                  link_type: "package"
+                }
+              ]
+            }
+          }')
         
         echo "Release JSON: $RELEASE_JSON"
         
-        # 创建 release
-        RELEASE_RESPONSE=$(curl --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+        # 3. 创建 release
+        curl --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
           --header "Content-Type: application/json" \
           --data "$RELEASE_JSON" \
-          "$GITLAB_URL/api/v4/projects/$PROJECT_ID/releases" -w "\n%{http_code}")
+          "$GITLAB_URL/api/v4/projects/$PROJECT_ID/releases"
         
-        HTTP_CODE=$(echo "$RELEASE_RESPONSE" | tail -n1)
-        RESPONSE_BODY=$(echo "$RELEASE_RESPONSE" | head -n -1)
-        
-        echo "Release response HTTP code: $HTTP_CODE"
-        echo "Release response body: $RESPONSE_BODY"
-        
-        if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
-          echo "Release created successfully!"
-        else
-          echo "Failed to create release"
-          exit 1
-        fi
+        echo "Release created successfully!"
