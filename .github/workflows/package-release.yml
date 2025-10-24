@@ -49,11 +49,16 @@ jobs:
         UPLOAD_MARKDOWN=$(echo "$UPLOAD_RESPONSE" | jq -r '.markdown')
         UPLOAD_URL=$(echo "$UPLOAD_RESPONSE" | jq -r '.url')
         
+        # 构建完整的文件 URL
+        FULL_FILE_URL="$GITLAB_URL$UPLOAD_URL"
+        echo "Full file URL: $FULL_FILE_URL"
+        
         # 2. 创建 release，包含上传的文件
         RELEASE_DATA=$(jq -n \
           --arg tag "$TAG_NAME" \
           --arg name "Better Names for 7FA4 $TAG_NAME" \
           --arg description "Automated release from GitHub Actions. Download: $UPLOAD_MARKDOWN" \
+          --arg file_url "$FULL_FILE_URL" \
           '{
             name: $name,
             tag_name: $tag,
@@ -62,17 +67,30 @@ jobs:
               links: [
                 {
                   name: "Better-Names-for-7FA4-\($tag).zip",
-                  url: "\($GITLAB_URL)\($UPLOAD_URL)",
+                  url: $file_url,
                   link_type: "package"
                 }
               ]
             }
           }')
         
+        echo "Release data: $RELEASE_DATA"
+        
         # 创建 release
-        curl --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+        RELEASE_RESPONSE=$(curl --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
           --header "Content-Type: application/json" \
           --data "$RELEASE_DATA" \
-          "$GITLAB_URL/api/v4/projects/$PROJECT_ID/releases"
+          "$GITLAB_URL/api/v4/projects/$PROJECT_ID/releases" -w "\n%{http_code}")
         
-        echo "Release created successfully!"
+        HTTP_CODE=$(echo "$RELEASE_RESPONSE" | tail -n1)
+        RESPONSE_BODY=$(echo "$RELEASE_RESPONSE" | head -n -1)
+        
+        echo "Release response HTTP code: $HTTP_CODE"
+        echo "Release response body: $RESPONSE_BODY"
+        
+        if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+          echo "Release created successfully!"
+        else
+          echo "Failed to create release"
+          exit 1
+        fi
