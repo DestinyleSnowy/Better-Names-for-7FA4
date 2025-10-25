@@ -1452,6 +1452,15 @@ window.getCurrentUserId = getCurrentUserId;
     if (codePoint <= 0xFFFF) return 3;
     return 4;
   }
+  function escapeHtml(text) {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   function truncateByUnits(str, maxU) {
     if (!isFinite(maxU)) return str;
     let used = 0, out = '';
@@ -1753,11 +1762,13 @@ window.getCurrentUserId = getCurrentUserId;
 
     let finalText = '';
     if (info) {
-      finalText = (img ? '\u00A0' : '') + info.name;
+      // If info.name could potentially contain unsafe chars, escape it as well:
+      finalText = (img ? '\u00A0' : '') + escapeHtml(info.name);
       const c = palette[info.colorKey];
       if (c) a.style.color = c;
     } else {
-      finalText = (img ? '\u00A0' : '') + truncateByUnits(baseText || a.textContent.trim(), maxUserUnits);
+      const safeTruncated = escapeHtml(truncateByUnits(baseText || a.textContent.trim(), maxUserUnits));
+      finalText = (img ? '\u00A0' : '') + safeTruncated;
     }
 
     Array.from(a.childNodes).forEach(n => { if (n.nodeType === Node.TEXT_NODE) n.remove(); });
