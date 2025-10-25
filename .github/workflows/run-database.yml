@@ -1,4 +1,6 @@
 name: Run Database Script
+permissions:
+  contents: write
 
 on:
   workflow_dispatch:  # 手动触发
