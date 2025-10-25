@@ -1817,6 +1817,8 @@ window.getCurrentUserId = getCurrentUserId;
       }
     }
     if (!pid) return null;
+    // Only allow problem IDs that are all-digits (positive integers)
+    if (!/^\d+$/.test(String(pid))) return null;
     return String(pid);
   }
 
