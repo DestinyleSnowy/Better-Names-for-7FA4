@@ -45,6 +45,10 @@
   transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 #bn-container.bn-expanded { width: 1120px; }
+#bn-container.bn-collapsed {
+  width: 48px;
+  height: 48px;
+}
 #bn-container * { pointer-events: auto; box-sizing: border-box; }
 #bn-container .bn-info-tooltip { pointer-events: none; }
 

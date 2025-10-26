@@ -421,7 +421,6 @@
     });
   }
   document.body.appendChild(container);
-  container.style.pointerEvents = 'none';
 
   const panel = document.getElementById('bn-panel');
   const pinBtn = document.getElementById('bn-pin');
@@ -442,6 +441,18 @@
   let __bn_dragX = 0, __bn_dragY = 0;
   let __bn_pointerId = null;
 
+  function updateContainerState() {
+    if (isDragging || container.classList.contains('bn-dragging')) {
+      container.classList.add('bn-collapsed');
+      return;
+    }
+    if (pinned || panel.classList.contains('bn-show')) {
+      container.classList.remove('bn-collapsed');
+    } else {
+      container.classList.add('bn-collapsed');
+    }
+  }
+
   function applyCorner(pos) {
     container.classList.remove('bn-pos-br', 'bn-pos-bl', 'bn-pos-tr', 'bn-pos-tl');
     container.classList.add('bn-pos-' + pos);
@@ -449,6 +460,7 @@
   }
 
   applyCorner(GM_getValue(CORNER_KEY, 'br'));
+  updateContainerState();
 
   const titleInp = document.getElementById('bn-title-input');
   const userInp = document.getElementById('bn-user-input');
@@ -590,8 +602,8 @@
   pinBtn.classList.toggle('bn-pinned', pinned);
   if (pinned) {
     panel.classList.add('bn-show');
-    container.style.pointerEvents = 'auto';
   }
+  updateContainerState();
 
   titleOpts.style.display = originalConfig.titleTruncate ? 'block' : 'none';
   userOpts.style.display = originalConfig.userTruncate ? 'block' : 'none';
@@ -652,13 +664,13 @@
     if (isDragging || container.classList.contains('bn-dragging')) return;
     clearTimeout(hideTimer);
     panel.classList.add('bn-show');
-    container.style.pointerEvents = 'auto';
+    updateContainerState();
   };
   const hidePanel = () => {
     if (pinned) return;
     panel.classList.remove('bn-show');
-    container.style.pointerEvents = 'none';
     if (panel.contains(document.activeElement)) document.activeElement.blur();
+    updateContainerState();
   };
   trigger.addEventListener('mouseenter', showPanel);
   const maybeHidePanel = () => {
@@ -741,7 +753,8 @@
       trigger.style.bottom = trigger.style.right = '';
       trigger.style.transform = '';
       container.classList.remove('bn-dragging');
-      if (wasPinned) { panel.classList.add('bn-show'); container.style.pointerEvents = 'auto'; }
+      if (wasPinned) { panel.classList.add('bn-show'); }
+      updateContainerState();
 
       if (__bn_pointerId !== null && trigger.releasePointerCapture) { try { trigger.releasePointerCapture(__bn_pointerId); } catch (_) { } }
       document.removeEventListener('pointermove', __bn_onMove);
@@ -758,7 +771,6 @@
 
     wasPinned = pinned;
     panel.classList.remove('bn-show');
-    container.style.pointerEvents = 'none';
 
     const rect = trigger.getBoundingClientRect();
     gearW = rect.width; gearH = rect.height;
@@ -771,6 +783,7 @@
 
     isDragging = true;
     container.classList.add('bn-dragging');
+    updateContainerState();
 
     __bn_trail = [];
     __bn_pushTrail(e);
@@ -799,6 +812,7 @@
     pinBtn.classList.toggle('bn-pinned', pinned);
     if (pinned) showPanel();
     else if (!trigger.matches(':hover') && !panel.matches(':hover')) hidePanel();
+    updateContainerState();
   });
 
   function markOnce(el, key) {
