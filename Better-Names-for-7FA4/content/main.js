@@ -2167,6 +2167,15 @@ window.getCurrentUserId = getCurrentUserId;
   }
 
   function applyFilter(table, state) {
+    if (allInOneState.active && allInOneState.renderStrategy === 'fallback' && table === allInOneState.fullTable) {
+      const result = applyAllInOneFilter(state);
+      return {
+        visible: result.visible,
+        total: result.total,
+        summary: result.summary,
+        active: result.active
+      };
+    }
     const rows = collectRows(table).filter(row => row.dataset?.bnHeaderRow !== '1');
     const total = rows.length;
     if (!total) return { visible: 0, total: 0, summary: '暂无数据', active: false };
@@ -2418,6 +2427,23 @@ window.getCurrentUserId = getCurrentUserId;
       font-size: .8em;
       color: rgba(0,0,0,.45);
     }
+    .bn-all-in-one-wrapper {
+      position: relative;
+      max-height: 70vh;
+      overflow: auto;
+      border: 1px solid rgba(34,36,38,.15);
+      border-radius: .4em;
+      background: #fff;
+    }
+    .bn-all-in-one-wrapper table {
+      margin: 0 !important;
+      border-radius: inherit;
+    }
+    .bn-all-in-one-wrapper .bn-virtual-spacer td {
+      padding: 0 !important;
+      border: 0 !important;
+      height: 0 !important;
+    }
     #${TOAST_ID} {
       position: fixed;
       z-index: 99999;
@@ -2444,6 +2470,10 @@ window.getCurrentUserId = getCurrentUserId;
       .bn-all-in-one-controls .bn-status.bn-error { color: #ff6b6b; }
       .bn-all-in-one-controls .bn-status.bn-loading { color: #74c0fc; }
       .bn-all-in-one-controls .bn-status.bn-success { color: #63e6be; }
+      .bn-all-in-one-wrapper {
+        border-color: rgba(255,255,255,.15);
+        background: rgba(32,32,32,.92);
+      }
       #${TOAST_ID} { background: rgba(10,10,10,.88); }
     }`;
     if (typeof GM_addStyle === 'function') GM_addStyle(css);
@@ -2564,7 +2594,7 @@ window.getCurrentUserId = getCurrentUserId;
   }
 
   async function fetchAllPages(options, onProgress) {
-    const concurrent = Math.max(1, Math.min(8, options.concurrent || 1));
+    const concurrent = Math.max(1, Math.min(8, options.concurrent ?? 4));
     const tracker = createProgressTracker();
     const pages = new Map();
     let nextPage = 1;
@@ -2789,6 +2819,7 @@ window.getCurrentUserId = getCurrentUserId;
     options: null,
     originalTable: null,
     fullTable: null,
+    fullTableWrapper: null,
     data: null,
     singleRequestMode: false,
     active: false,
@@ -2797,21 +2828,52 @@ window.getCurrentUserId = getCurrentUserId;
     sortKey: 'contest_score',
     sortOrder: 'desc',
     loading: false,
-    usingCache: false
+    usingCache: false,
+    renderStrategy: null,
+    displayUsers: [],
+    visibleUsers: [],
+    currentColumns: [],
+    currentTableMap: {},
+    nameField: null,
+    schoolField: null,
+    gradeField: null,
+    virtualization: null,
+    filterAttachedFor: null,
+    filterResult: { visible: 0, total: 0, summary: '', active: false }
   };
 
-  function ensureFullTable(options) {
-    if (allInOneState.fullTable && allInOneState.fullTable.isConnected) return allInOneState.fullTable;
-    if (!allInOneState.originalTable) return null;
-    const clone = allInOneState.originalTable.cloneNode(false);
-    clone.classList.add('bn-all-in-one-table');
-    clone.style.display = 'none';
-    const thead = document.createElement('thead');
-    const tbody = document.createElement('tbody');
-    clone.append(thead, tbody);
-    allInOneState.originalTable.parentElement.insertBefore(clone, allInOneState.originalTable.nextSibling);
-    allInOneState.fullTable = clone;
-    return clone;
+  function ensureFullTable() {
+    if (allInOneState.fullTable && allInOneState.fullTable.isConnected
+      && allInOneState.fullTableWrapper && allInOneState.fullTableWrapper.isConnected) {
+      return allInOneState.fullTable;
+    }
+    if (!allInOneState.originalTable || !allInOneState.originalTable.parentElement) return null;
+
+    let wrapper = allInOneState.fullTableWrapper;
+    if (!wrapper) {
+      wrapper = document.createElement('div');
+      wrapper.className = 'bn-all-in-one-wrapper';
+      wrapper.style.display = 'none';
+      allInOneState.fullTableWrapper = wrapper;
+    }
+
+    let table = allInOneState.fullTable;
+    if (!table) {
+      table = allInOneState.originalTable.cloneNode(false);
+      table.classList.add('bn-all-in-one-table');
+      allInOneState.fullTable = table;
+    }
+
+    if (!table.tHead) table.appendChild(document.createElement('thead'));
+    if (!table.tBodies || !table.tBodies[0]) table.appendChild(document.createElement('tbody'));
+    table.tHead.textContent = '';
+    table.tBodies[0].textContent = '';
+
+    wrapper.textContent = '';
+    wrapper.appendChild(table);
+    const parent = allInOneState.originalTable.parentElement;
+    if (parent) parent.insertBefore(wrapper, allInOneState.originalTable.nextSibling);
+    return table;
   }
 
   function updateStatus(text, type = 'info') {
@@ -2825,22 +2887,320 @@ window.getCurrentUserId = getCurrentUserId;
     else if (type === 'loading') status.classList.add('bn-loading');
   }
 
-  function renderAllInOneTable() {
-    if (!allInOneState.active) return;
-    const table = ensureFullTable(allInOneState.options);
-    if (!table || !allInOneState.data) return;
+  function createAllInOneRow(user, index, columns, tableMap) {
+    const row = document.createElement('tr');
+    const userId = user?.id ?? user?.user_id;
+    columns.forEach(col => {
+      const td = document.createElement('td');
+      if (col.type === 'rank') td.textContent = String(index + 1);
+      else if (col.type === 'id') td.textContent = String(userId ?? '');
+      else if (col.type === 'text') td.textContent = String(user?.[col.key] ?? '');
+      else if (col.type === 'school') {
+        td.textContent = String(user?.[col.key] ?? '');
+        row.dataset.bnSchool = td.textContent || FALLBACK_SCHOOL_NAME;
+      } else if (col.type === 'grade') {
+        td.textContent = String(user?.[col.key] ?? '');
+        row.dataset.bnGrade = td.textContent || FALLBACK_GRADE_NAME;
+      } else if (col.type === 'score') {
+        const value = Number(user?.[col.key]);
+        td.textContent = Number.isFinite(value) ? String(value) : String(user?.[col.key] ?? '');
+      } else if (col.type === 'problem') {
+        const cellKey = `${userId}:${col.problemId}`;
+        const cellValue = tableMap?.[cellKey];
+        const formatted = formatProblemCell(cellValue);
+        if (formatted.html) td.innerHTML = formatted.html;
+        else td.textContent = formatted.text;
+      }
+      row.appendChild(td);
+    });
+    if (!row.dataset.bnSchool) row.dataset.bnSchool = getSchoolKey(user);
+    if (!row.dataset.bnGrade) row.dataset.bnGrade = getGradeKey(user);
+    return row;
+  }
 
-    const { users = [], table: tableMap = {} } = allInOneState.data;
+  function getSchoolKey(user) {
+    const field = allInOneState.schoolField;
+    const value = field && user && user[field] != null ? String(user[field]).trim() : '';
+    return value || FALLBACK_SCHOOL_NAME;
+  }
+
+  function getGradeKey(user) {
+    const field = allInOneState.gradeField;
+    const value = field && user && user[field] != null ? String(user[field]).trim() : '';
+    return value || FALLBACK_GRADE_NAME;
+  }
+
+  function filterUsersByState(users, state) {
+    const list = Array.isArray(users) ? users : [];
+    const total = list.length;
+    const result = {
+      users: list,
+      total,
+      visible: total,
+      summary: total ? '未启用筛选' : '暂无数据',
+      active: false
+    };
+    if (!total) return result;
+    if (!state || !state.enabled) {
+      result.summary = '未启用筛选';
+      return result;
+    }
+    const hasSchoolFilter = state.schoolSelected && state.schoolSelected.size > 0;
+    const hasGradeFilter = state.gradeSelected && state.gradeSelected.size > 0;
+    if (!hasSchoolFilter && !hasGradeFilter) {
+      result.summary = '未选择筛选条件，显示全部';
+      return result;
+    }
+    const filtered = list.filter(user => {
+      const schoolKey = getSchoolKey(user);
+      const gradeKey = getGradeKey(user);
+      const matchSchool = !hasSchoolFilter || state.schoolSelected.has(schoolKey);
+      const matchGrade = !hasGradeFilter || state.gradeSelected.has(gradeKey);
+      return matchSchool && matchGrade;
+    });
+    result.users = filtered;
+    result.visible = filtered.length;
+    const parts = [];
+    if (hasSchoolFilter) parts.push(`学校：${Array.from(state.schoolSelected).join('、')}`);
+    if (hasGradeFilter) parts.push(`时年：${Array.from(state.gradeSelected).join('、')}`);
+    result.summary = parts.length ? `已选${parts.join('；')}` : '未选择筛选条件，显示全部';
+    result.active = true;
+    return result;
+  }
+
+  function ensureVirtualizationState(tbody, columnCount) {
+    let virtualization = allInOneState.virtualization;
+    if (!virtualization || virtualization.tbody !== tbody) {
+      if (virtualization && virtualization.scrollHandler && virtualization.container) {
+        virtualization.container.removeEventListener('scroll', virtualization.scrollHandler);
+      }
+      virtualization = {
+        tbody,
+        container: allInOneState.fullTableWrapper,
+        columnCount,
+        topSpacer: null,
+        bottomSpacer: null,
+        dataRows: [],
+        rowHeight: 44,
+        buffer: 12,
+        threshold: 600, // enable virtualization when the dataset is large enough
+        scrollHandler: null,
+        visibleStart: 0,
+        visibleEnd: 0,
+        enabled: false
+      };
+      allInOneState.virtualization = virtualization;
+    } else {
+      virtualization.tbody = tbody;
+      virtualization.container = allInOneState.fullTableWrapper;
+      virtualization.columnCount = columnCount;
+    }
+    return virtualization;
+  }
+
+  function teardownVirtualization(virtualization) {
+    if (!virtualization) return;
+    if (virtualization.scrollHandler && virtualization.container) {
+      virtualization.container.removeEventListener('scroll', virtualization.scrollHandler);
+      virtualization.scrollHandler = null;
+    }
+    virtualization.enabled = false;
+    virtualization.visibleStart = 0;
+    virtualization.visibleEnd = 0;
+    virtualization.dataRows.forEach(row => row.remove());
+    virtualization.dataRows = [];
+    if (virtualization.topSpacer && virtualization.topSpacer.parentElement) virtualization.topSpacer.parentElement.removeChild(virtualization.topSpacer);
+    if (virtualization.bottomSpacer && virtualization.bottomSpacer.parentElement) virtualization.bottomSpacer.parentElement.removeChild(virtualization.bottomSpacer);
+    virtualization.topSpacer = null;
+    virtualization.bottomSpacer = null;
+  }
+
+  function createSpacerRow(className, columnCount) {
+    const tr = document.createElement('tr');
+    tr.className = `bn-virtual-spacer ${className}`;
+    const td = document.createElement('td');
+    td.colSpan = Math.max(1, columnCount || 1);
+    td.style.padding = '0';
+    td.style.border = '0';
+    td.style.height = '0';
+    tr.appendChild(td);
+    return tr;
+  }
+
+  function measureVirtualRowHeight(virtualization, users, columns, tableMap) {
+    if (!virtualization || !virtualization.tbody || !users.length) return virtualization?.rowHeight || 44;
+    const sample = createAllInOneRow(users[0], 0, columns, tableMap);
+    sample.style.visibility = 'hidden';
+    sample.style.pointerEvents = 'none';
+    virtualization.tbody.insertBefore(sample, virtualization.bottomSpacer || null);
+    const height = sample.getBoundingClientRect().height || virtualization.rowHeight || 44;
+    sample.remove();
+    return Math.max(24, height);
+  }
+
+  function renderVirtualRange(virtualization, users, columns, tableMap, force) {
+    if (!virtualization || !virtualization.container) return;
+    const rowHeight = virtualization.rowHeight || 44;
+    const viewportHeight = virtualization.container.clientHeight || window.innerHeight;
+    const scrollTop = virtualization.container.scrollTop;
+    const buffer = virtualization.buffer;
+    const start = Math.max(0, Math.floor(scrollTop / rowHeight) - buffer);
+    const visibleCount = Math.ceil(viewportHeight / rowHeight) + buffer * 2;
+    const end = Math.min(users.length, start + visibleCount);
+    if (!force && start === virtualization.visibleStart && end === virtualization.visibleEnd) return;
+    virtualization.visibleStart = start;
+    virtualization.visibleEnd = end;
+    const fragment = document.createDocumentFragment();
+    const rows = [];
+    for (let i = start; i < end; i += 1) {
+      const row = createAllInOneRow(users[i], i, columns, tableMap);
+      rows.push(row);
+      fragment.appendChild(row);
+    }
+    virtualization.dataRows.forEach(row => row.remove());
+    virtualization.dataRows = rows;
+    if (virtualization.bottomSpacer) virtualization.bottomSpacer.before(fragment);
+    const topPad = Math.max(0, start * rowHeight);
+    const bottomPad = Math.max(0, (users.length - end) * rowHeight);
+    if (virtualization.topSpacer?.firstElementChild) virtualization.topSpacer.firstElementChild.style.height = `${topPad}px`;
+    if (virtualization.bottomSpacer?.firstElementChild) virtualization.bottomSpacer.firstElementChild.style.height = `${bottomPad}px`;
+  }
+
+  function updateAllInOneSummary() {
+    const total = allInOneState.displayUsers ? allInOneState.displayUsers.length : 0;
+    const visible = allInOneState.filterResult ? allInOneState.filterResult.visible : total;
+    if (!total) {
+      updateStatus('暂无数据', 'info');
+      return;
+    }
+    let text = `共 ${total} 人`;
+    if (visible !== total) text += `，当前显示 ${visible}`;
+    if (allInOneState.singleRequestMode) text += '（单请求模式）';
+    if (allInOneState.usingCache) text += '（缓存）';
+    updateStatus(text, 'success');
+  }
+
+  function computeDisplayUsers(stateOverride) {
+    const baseUsers = Array.isArray(allInOneState.data?.users) ? allInOneState.data.users.slice() : [];
+    const keyword = normalizeKeyword(allInOneState.keyword);
+    const nameField = allInOneState.nameField;
+    const filtered = keyword
+      ? baseUsers.filter(user => {
+        const idStr = String(user?.id ?? user?.user_id ?? '').toLowerCase();
+        const nameStr = nameField ? String(user?.[nameField] ?? '').toLowerCase() : '';
+        return idStr.includes(keyword) || nameStr.includes(keyword);
+      })
+      : baseUsers;
+    const sorter = allInOneState.sortKey === 'best_score'
+      ? user => Number(user?.best_score) || 0
+      : user => Number(user?.contest_score) || 0;
+    filtered.sort((a, b) => {
+      const diff = sorter(b) - sorter(a);
+      if (diff !== 0) return allInOneState.sortOrder === 'desc' ? diff : -diff;
+      return numericDesc(Number(a?.id) || 0, Number(b?.id) || 0);
+    });
+    const state = stateOverride || (filterPanelController && filterPanelController.state ? filterPanelController.state : null);
+    const result = filterUsersByState(filtered, state);
+    allInOneState.displayUsers = filtered;
+    allInOneState.visibleUsers = result.users;
+    allInOneState.filterResult = {
+      visible: result.visible,
+      total: result.total,
+      summary: result.summary,
+      active: result.active
+    };
+    return result;
+  }
+
+  function applyAllInOneFilter(state) {
+    const baseUsers = allInOneState.displayUsers || [];
+    const result = filterUsersByState(baseUsers, state);
+    allInOneState.visibleUsers = result.users;
+    allInOneState.filterResult = {
+      visible: result.visible,
+      total: result.total,
+      summary: result.summary,
+      active: result.active
+    };
+    renderAllInOneRows(true);
+    return result;
+  }
+
+  function renderAllInOneRows(force = false) {
+    if (allInOneState.renderStrategy !== 'fallback') return;
+    const table = allInOneState.fullTable;
+    if (!table || !table.tBodies || !table.tBodies[0]) return;
+    const tbody = table.tBodies[0];
+    const columns = allInOneState.currentColumns || [];
+    const tableMap = allInOneState.currentTableMap || {};
+    const users = Array.isArray(allInOneState.visibleUsers) ? allInOneState.visibleUsers : [];
+    const virtualization = ensureVirtualizationState(tbody, columns.length || 1);
+    const wrapper = allInOneState.fullTableWrapper;
+    virtualization.container = wrapper;
+
+    if (!users.length) {
+      teardownVirtualization(virtualization);
+      tbody.textContent = '';
+      updateAllInOneSummary();
+      return;
+    }
+
+    if (users.length > virtualization.threshold && wrapper) {
+      if (!virtualization.enabled) {
+        tbody.textContent = '';
+        virtualization.enabled = true;
+        virtualization.topSpacer = createSpacerRow('bn-virtual-top', columns.length || 1);
+        virtualization.bottomSpacer = createSpacerRow('bn-virtual-bottom', columns.length || 1);
+        tbody.appendChild(virtualization.topSpacer);
+        tbody.appendChild(virtualization.bottomSpacer);
+        virtualization.dataRows = [];
+        virtualization.visibleStart = -1;
+        virtualization.visibleEnd = -1;
+      }
+      if (!virtualization.rowHeight || force) {
+        virtualization.rowHeight = measureVirtualRowHeight(virtualization, users, columns, tableMap);
+      }
+      if (!virtualization.scrollHandler) {
+        virtualization.scrollHandler = () => renderVirtualRange(virtualization, users, columns, tableMap, false);
+        wrapper.addEventListener('scroll', virtualization.scrollHandler, { passive: true });
+      }
+      renderVirtualRange(virtualization, users, columns, tableMap, force);
+    } else {
+      if (virtualization.enabled) {
+        teardownVirtualization(virtualization);
+      }
+      tbody.textContent = '';
+      const fragment = document.createDocumentFragment();
+      users.forEach((user, index) => {
+        fragment.appendChild(createAllInOneRow(user, index, columns, tableMap));
+      });
+      tbody.appendChild(fragment);
+    }
+
+    updateAllInOneSummary();
+  }
+
+  function renderAllInOneTable() {
+    if (!allInOneState.active || allInOneState.renderStrategy !== 'fallback') return;
+    const table = ensureFullTable();
+    if (!table || !allInOneState.data) return;
+    const wrapper = allInOneState.fullTableWrapper;
+    if (wrapper) wrapper.style.display = '';
+    if (allInOneState.originalTable) allInOneState.originalTable.style.display = 'none';
+
     const thead = table.tHead || table.querySelector('thead');
     const tbody = table.tBodies && table.tBodies[0];
     if (!thead || !tbody) return;
-    thead.textContent = '';
-    tbody.textContent = '';
 
+    const tableMap = allInOneState.data.table || {};
+    const users = Array.isArray(allInOneState.data.users) ? allInOneState.data.users : [];
     const sampleUser = users.find(user => user && typeof user === 'object') || {};
     const nameField = detectField(sampleUser, ['nickname', 'name', 'real_name', 'realname', 'username', 'display_name']);
     const schoolField = detectField(sampleUser, ['school_name', 'school', 'organization', 'org', 'academy', 'team']);
     const gradeField = detectField(sampleUser, ['grade_name', 'grade', 'grade_text', 'class', 'class_name', 'year']);
+    allInOneState.nameField = nameField || null;
+    allInOneState.schoolField = schoolField || null;
+    allInOneState.gradeField = gradeField || null;
 
     const columns = [];
     columns.push({ key: '__rank__', label: '排名', type: 'rank' });
@@ -2856,6 +3216,7 @@ window.getCurrentUserId = getCurrentUserId;
       columns.push({ key: `problem:${problem.id}`, label: problem.title || `P${problem.id}`, type: 'problem', problemId: problem.id });
     });
 
+    thead.textContent = '';
     const headerRow = document.createElement('tr');
     columns.forEach(col => {
       const th = document.createElement('th');
@@ -2871,70 +3232,20 @@ window.getCurrentUserId = getCurrentUserId;
     });
     thead.appendChild(headerRow);
 
-    const keyword = normalizeKeyword(allInOneState.keyword);
-    const filtered = keyword
-      ? users.filter(user => {
-        const idStr = String(user.id ?? user.user_id ?? '').toLowerCase();
-        const nameStr = nameField ? String(user[nameField] || '').toLowerCase() : '';
-        return idStr.includes(keyword) || nameStr.includes(keyword);
-      })
-      : users.slice();
+    allInOneState.currentColumns = columns;
+    allInOneState.currentTableMap = tableMap;
+    allInOneState.virtualization = null;
 
-    const sorter = allInOneState.sortKey === 'best_score'
-      ? user => Number(user.best_score) || 0
-      : user => Number(user.contest_score) || 0;
+    computeDisplayUsers();
+    if (wrapper) wrapper.scrollTop = 0;
+    renderAllInOneRows(true);
 
-    filtered.sort((a, b) => {
-      const diff = sorter(b) - sorter(a);
-      if (diff !== 0) return allInOneState.sortOrder === 'desc' ? diff : -diff;
-      return numericDesc(Number(a.id) || 0, Number(b.id) || 0);
-    });
-
-    const schoolIndex = columns.findIndex(col => col.type === 'school');
-    const gradeIndex = columns.findIndex(col => col.type === 'grade');
-    const batchSize = 120;
-    let index = 0;
-
-    function renderBatch() {
-      const frag = document.createDocumentFragment();
-      let count = 0;
-      while (index < filtered.length && count < batchSize) {
-        const user = filtered[index];
-        const row = document.createElement('tr');
-        columns.forEach((col, colIndex) => {
-          const td = document.createElement('td');
-          if (col.type === 'rank') td.textContent = String(index + 1);
-          else if (col.type === 'id') td.textContent = String(user.id ?? user.user_id ?? '');
-          else if (col.type === 'text' || col.type === 'school' || col.type === 'grade') td.textContent = String(user[col.key] ?? '');
-          else if (col.type === 'score') {
-            const value = Number(user[col.key]);
-            td.textContent = Number.isFinite(value) ? String(value) : String(user[col.key] ?? '');
-          } else if (col.type === 'problem') {
-            const cellValue = tableMap[`${user.id ?? user.user_id}:${col.problemId}`];
-            const formatted = formatProblemCell(cellValue);
-            if (formatted.html) td.innerHTML = formatted.html;
-            else td.textContent = formatted.text;
-          }
-          if (col.type === 'school') row.dataset.bnSchool = td.textContent || FALLBACK_SCHOOL_NAME;
-          if (col.type === 'grade') row.dataset.bnGrade = td.textContent || FALLBACK_GRADE_NAME;
-          row.appendChild(td);
-        });
-        frag.appendChild(row);
-        index += 1;
-        count += 1;
-      }
-      tbody.appendChild(frag);
-      if (index < filtered.length) {
-        (window.requestAnimationFrame || window.setTimeout)(renderBatch);
-      } else {
-        rebuildFilterPanel(table);
-        const modeNote = allInOneState.singleRequestMode ? '（单请求模式）' : '';
-        const cacheNote = allInOneState.usingCache ? '（缓存）' : '';
-        updateStatus(`共 ${filtered.length} 人${modeNote}${cacheNote}`, 'success');
-      }
+    if (allInOneState.filterAttachedFor !== table) {
+      rebuildFilterPanel(table);
+      allInOneState.filterAttachedFor = table;
+    } else if (filterPanelController?.refresh) {
+      filterPanelController.refresh();
     }
-
-    renderBatch();
   }
 
   function toggleSort(sortKey) {
@@ -2949,12 +3260,24 @@ window.getCurrentUserId = getCurrentUserId;
       allInOneState.controls.sortSelect.value = allInOneState.sortKey;
       allInOneState.controls.sortOrderBtn.textContent = allInOneState.sortOrder === 'desc' ? '↓' : '↑';
     }
-    renderAllInOneTable();
+    if (allInOneState.active && allInOneState.renderStrategy === 'fallback') {
+      const state = filterPanelController?.state || null;
+      computeDisplayUsers(state);
+      if (allInOneState.fullTableWrapper) allInOneState.fullTableWrapper.scrollTop = 0;
+      renderAllInOneRows(true);
+      if (filterPanelController?.refresh) filterPanelController.refresh();
+    }
   }
 
   function applyKeyword(keyword) {
     allInOneState.keyword = keyword;
-    renderAllInOneTable();
+    if (allInOneState.active && allInOneState.renderStrategy === 'fallback') {
+      const state = filterPanelController?.state || null;
+      computeDisplayUsers(state);
+      if (allInOneState.fullTableWrapper) allInOneState.fullTableWrapper.scrollTop = 0;
+      renderAllInOneRows(true);
+      if (filterPanelController?.refresh) filterPanelController.refresh();
+    }
   }
 
   function applySortKey(key) {
@@ -2967,7 +3290,13 @@ window.getCurrentUserId = getCurrentUserId;
       allInOneState.controls.sortSelect.value = allInOneState.sortKey;
       allInOneState.controls.sortOrderBtn.textContent = allInOneState.sortOrder === 'desc' ? '↓' : '↑';
     }
-    renderAllInOneTable();
+    if (allInOneState.active && allInOneState.renderStrategy === 'fallback') {
+      const state = filterPanelController?.state || null;
+      computeDisplayUsers(state);
+      if (allInOneState.fullTableWrapper) allInOneState.fullTableWrapper.scrollTop = 0;
+      renderAllInOneRows(true);
+      if (filterPanelController?.refresh) filterPanelController.refresh();
+    }
   }
 
   function applySortOrder(order) {
@@ -2976,7 +3305,13 @@ window.getCurrentUserId = getCurrentUserId;
     if (allInOneState.controls) {
       allInOneState.controls.sortOrderBtn.textContent = allInOneState.sortOrder === 'desc' ? '↓' : '↑';
     }
-    renderAllInOneTable();
+    if (allInOneState.active && allInOneState.renderStrategy === 'fallback') {
+      const state = filterPanelController?.state || null;
+      computeDisplayUsers(state);
+      if (allInOneState.fullTableWrapper) allInOneState.fullTableWrapper.scrollTop = 0;
+      renderAllInOneRows(true);
+      if (filterPanelController?.refresh) filterPanelController.refresh();
+    }
   }
 
   function exportCsv(data) {
@@ -3081,12 +3416,77 @@ window.getCurrentUserId = getCurrentUserId;
 
   async function activatePagedMode() {
     if (!allInOneState.active) return;
+    const wasFallback = allInOneState.renderStrategy === 'fallback';
     allInOneState.active = false;
-    if (allInOneState.originalTable) allInOneState.originalTable.style.display = '';
-    if (allInOneState.fullTable) allInOneState.fullTable.style.display = 'none';
-    currentTable = allInOneState.originalTable;
-    rebuildFilterPanel(currentTable);
-    updateStatus('已恢复分页', 'info');
+    allInOneState.renderStrategy = null;
+    if (allInOneState.controls) {
+      allInOneState.controls.keywordInput.disabled = false;
+      allInOneState.controls.keywordInput.removeAttribute('disabled');
+      allInOneState.controls.sortSelect.disabled = false;
+      allInOneState.controls.sortSelect.removeAttribute('disabled');
+      allInOneState.controls.sortOrderBtn.disabled = false;
+      allInOneState.controls.sortOrderBtn.removeAttribute('disabled');
+      allInOneState.controls.refreshBtn.style.display = 'none';
+    }
+    if (wasFallback) {
+      teardownVirtualization(allInOneState.virtualization);
+      allInOneState.virtualization = null;
+      allInOneState.displayUsers = [];
+      allInOneState.visibleUsers = [];
+      allInOneState.filterResult = { visible: 0, total: 0, summary: '', active: false };
+      if (allInOneState.fullTableWrapper) allInOneState.fullTableWrapper.style.display = 'none';
+      if (allInOneState.originalTable) allInOneState.originalTable.style.display = '';
+      currentTable = allInOneState.originalTable;
+      allInOneState.filterAttachedFor = null;
+      if (currentTable) rebuildFilterPanel(currentTable);
+      updateStatus('已恢复分页', 'info');
+    } else {
+      if (allInOneState.fullTableWrapper) allInOneState.fullTableWrapper.style.display = 'none';
+      if (allInOneState.originalTable) allInOneState.originalTable.style.display = '';
+      currentTable = allInOneState.originalTable;
+      const detail = { handled: false };
+      try {
+        window.dispatchEvent(new CustomEvent('leaderboard:restorePaged', { detail }));
+      } catch (err) {
+        console.warn('[BN] restorePaged dispatch failed', err);
+      }
+      updateStatus(detail.handled ? '已恢复分页' : '已恢复分页（外部渲染）', 'info');
+      if (!detail.handled && currentTable) rebuildFilterPanel(currentTable);
+    }
+  }
+
+  function deliverFullData(data) {
+    if (!data) return 'fallback';
+    const forwarded = {
+      users: Array.isArray(data.users) ? data.users : [],
+      table: data.table || {},
+      table_id: data.table_id != null ? data.table_id : null
+    };
+    const options = allInOneState.options || {};
+    try {
+      if (typeof options.onRender === 'function') {
+        options.onRender(forwarded);
+        return 'external';
+      }
+    } catch (err) {
+      console.error('[BN] options.onRender failed', err);
+    }
+    if (typeof window.renderTable === 'function') {
+      try {
+        window.renderTable(forwarded);
+        return 'external';
+      } catch (err) {
+        console.error('[BN] window.renderTable failed', err);
+      }
+    }
+    const detail = { ...forwarded, handled: false };
+    try {
+      window.dispatchEvent(new CustomEvent('leaderboard:fullData', { detail }));
+    } catch (err) {
+      console.warn('[BN] dispatch leaderboard:fullData failed', err);
+    }
+    if (detail.handled) return 'external';
+    return 'fallback';
   }
 
   async function activateAllMode(forceRefresh = false) {
@@ -3137,17 +3537,53 @@ window.getCurrentUserId = getCurrentUserId;
       allInOneState.options.tableId = allInOneState.data.table_id;
     }
 
-    ensureFullTable(options);
-    if (allInOneState.originalTable) allInOneState.originalTable.style.display = 'none';
-    if (allInOneState.fullTable) allInOneState.fullTable.style.display = '';
-    currentTable = allInOneState.fullTable;
+    const strategy = deliverFullData(allInOneState.data);
+    allInOneState.renderStrategy = strategy;
     allInOneState.active = true;
-    renderAllInOneTable();
     if (allInOneState.controls) {
       allInOneState.controls.refreshBtn.style.display = 'inline-flex';
+      if (strategy === 'fallback') {
+        allInOneState.controls.keywordInput.disabled = false;
+        allInOneState.controls.keywordInput.removeAttribute('disabled');
+        allInOneState.controls.sortSelect.disabled = false;
+        allInOneState.controls.sortSelect.removeAttribute('disabled');
+        allInOneState.controls.sortOrderBtn.disabled = false;
+        allInOneState.controls.sortOrderBtn.removeAttribute('disabled');
+      } else {
+        allInOneState.controls.keywordInput.disabled = true;
+        allInOneState.controls.keywordInput.setAttribute('disabled', 'disabled');
+        allInOneState.controls.sortSelect.disabled = true;
+        allInOneState.controls.sortSelect.setAttribute('disabled', 'disabled');
+        allInOneState.controls.sortOrderBtn.disabled = true;
+        allInOneState.controls.sortOrderBtn.setAttribute('disabled', 'disabled');
+      }
+    }
+
+    if (strategy === 'fallback') {
+      ensureFullTable();
+      if (allInOneState.fullTableWrapper) allInOneState.fullTableWrapper.style.display = '';
+      if (allInOneState.originalTable) allInOneState.originalTable.style.display = 'none';
+      allInOneState.filterAttachedFor = null;
+      currentTable = allInOneState.fullTable;
+      renderAllInOneTable();
+      if (allInOneState.controls) {
+        allInOneState.controls.sortSelect.value = allInOneState.sortKey;
+        allInOneState.controls.sortOrderBtn.textContent = allInOneState.sortOrder === 'desc' ? '↓' : '↑';
+        allInOneState.controls.keywordInput.value = allInOneState.keyword;
+      }
+    } else {
+      if (allInOneState.fullTableWrapper) allInOneState.fullTableWrapper.style.display = 'none';
+      if (allInOneState.originalTable) allInOneState.originalTable.style.display = '';
+      currentTable = allInOneState.originalTable;
+      allInOneState.keyword = '';
+      updateStatus('已加载完整榜单（外部渲染）', 'success');
+      if (currentTable) rebuildFilterPanel(currentTable);
+    }
+
+    if (allInOneState.controls) {
       allInOneState.controls.sortSelect.value = allInOneState.sortKey;
       allInOneState.controls.sortOrderBtn.textContent = allInOneState.sortOrder === 'desc' ? '↓' : '↑';
-      allInOneState.controls.keywordInput.value = allInOneState.keyword;
+      if (strategy !== 'fallback') allInOneState.controls.keywordInput.value = '';
     }
     allInOneState.loading = false;
   }
@@ -3308,7 +3744,7 @@ window.getCurrentUserId = getCurrentUserId;
     refresh();
     syncVisibility();
 
-    return { panel, refresh, syncVisibility, syncCheckboxStates };
+    return { panel, refresh, syncVisibility, syncCheckboxStates, state };
   }
 
   async function init() {
