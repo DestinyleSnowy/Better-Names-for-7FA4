@@ -518,12 +518,20 @@
 
   let currentPosition = null;
 
-  function applyPosition(pos, { save = true } = {}) {
+  function applyPosition(pos, { save = true, clamp = false } = {}) {
     if (!pos) return;
-    const next = ensureWithinViewport({ x: pos.x, y: pos.y });
+    const base = {
+      x: typeof pos.x === 'number' ? pos.x : 0,
+      y: typeof pos.y === 'number' ? pos.y : 0,
+    };
+    const constrained = clamp ? ensureWithinViewport(base) : base;
+    const next = {
+      x: Math.round(constrained.x),
+      y: Math.round(constrained.y),
+    };
     currentPosition = next;
-    container.style.left = `${Math.round(next.x)}px`;
-    container.style.top = `${Math.round(next.y)}px`;
+    container.style.left = `${next.x}px`;
+    container.style.top = `${next.y}px`;
     container.style.right = 'auto';
     container.style.bottom = 'auto';
     if (save) writeStoredPosition(next);
@@ -534,7 +542,7 @@
     if (stored) {
       applyPosition(stored, { save: false });
     } else {
-      applyPosition(computeDefaultPosition(), { save: true });
+      applyPosition(computeDefaultPosition(), { save: true, clamp: true });
     }
   }
 
@@ -946,16 +954,14 @@
     if (__bn_raf) cancelAnimationFrame(__bn_raf);
     __bn_raf = null;
 
-    const target = ensureWithinViewport({ x: __bn_dragX, y: __bn_dragY });
-
-    const finalPos = target;
+    const finalPos = { x: __bn_dragX, y: __bn_dragY };
 
     trigger.style.transition = 'transform 0.24s ease-out';
     __bn_applyTransform(finalPos.x, finalPos.y);
 
     setTimeout(() => {
       trigger.style.transition = '';
-      applyPosition(finalPos);
+      applyPosition(finalPos, { clamp: false });
       layoutIfVisible();
       trigger.style.position = '';
       trigger.style.left = trigger.style.top = '';
