@@ -41,8 +41,12 @@
         "http://10.210.57.10:9080/",
         "http://211.137.101.118:9080/"
       ],
+      "css": [
+        "content/panel/panel.css"
+      ],
       "js": [
         "content/gm-shim.js",
+        "content/panel/panel.js",
         "content/main.js"
       ],
       "run_at": "document_end"
@@ -51,7 +55,8 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "data/users.json"
+        "data/users.json",
+        "content/panel/panel.html"
       ],
       "matches": [
         "http://7fa4.cn:8888/*",
