@@ -309,7 +309,10 @@ window.getCurrentUserId = getCurrentUserId;
       width: 600px; padding: 0; background: var(--bn-bg);
       box-shadow: var(--bn-panel-shadow);
       border: 1px solid var(--bn-border); border-radius: 12px;
-      max-height: calc(100vh - 80px); overflow-y: auto;
+      max-height: calc(100vh - 80px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
       transform: scale(.95) translateY(10px);
       transform-origin: bottom right; opacity: 0; visibility: hidden; pointer-events: none;
       transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -321,6 +324,7 @@ window.getCurrentUserId = getCurrentUserId;
       position: relative; padding: 16px 20px;
       background: linear-gradient(135deg, var(--bn-bg-grad-1) 0%, var(--bn-bg-grad-2) 100%);
       border-bottom: 1px solid var(--bn-border-subtle);
+      flex-shrink: 0;
     }
     #bn-pin {
       position: absolute; top: 12px; right: 12px; width: 20px; height: 20px;
@@ -367,7 +371,10 @@ window.getCurrentUserId = getCurrentUserId;
 
     .bn-panel-content {
       display: flex; transition: all .4s cubic-bezier(.4,0,.2,1);
-      padding-bottom: calc(var(--bn-savebar-h) + var(--bn-version-h));
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding-bottom: 24px;
     }
     .bn-main-content {
       display: grid;
@@ -555,12 +562,11 @@ window.getCurrentUserId = getCurrentUserId;
     .bn-color-actions { display: flex; gap: 8px; }
     .bn-color-actions .bn-btn { flex: 1; padding: 10px 16px; font-size: 12px; }
     .bn-footer {
-      position: sticky;
-      bottom: 0;
       display: flex;
       flex-direction: column;
       background: var(--bn-bg);
       z-index: 5;
+      flex-shrink: 0;
     }
     .bn-save-actions {
       height: var(--bn-savebar-h);
