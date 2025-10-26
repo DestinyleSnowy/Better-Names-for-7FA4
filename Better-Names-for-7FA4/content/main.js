@@ -1911,6 +1911,23 @@ window.getCurrentUserId = getCurrentUserId;
     'table.table'
   ];
 
+  const ALL_IN_ONE_DEFAULTS = {
+    apiBase: '/progress/contest_table/json',
+    maxPageSizeTryKeys: ['page_size', 'limit', 'per_page', 'size'],
+    concurrent: 4,
+    retry: 3,
+    pageSize: 50,
+    mountSelector: '.toolbar-right'
+  };
+
+  const CACHE_PREFIX = 'bnAllInOneLeaderboard';
+  const CACHE_VERSION = 'v1';
+  const TOAST_ID = 'bn-toast';
+
+  let currentTable = null;
+  let filterPanelController = null;
+  let allInOneCssInjected = false;
+
   const collator = (typeof Intl !== 'undefined' && typeof Intl.Collator === 'function')
     ? new Intl.Collator(['zh-Hans-CN', 'zh-CN', 'zh', 'zh-Hans'], { sensitivity: 'base', usage: 'sort' })
     : null;
@@ -2243,6 +2260,934 @@ window.getCurrentUserId = getCurrentUserId;
     return button;
   }
 
+  function prepareFilterContext(table) {
+    if (!table) return null;
+    const schoolIndex = detectSchoolColumn(table);
+    const gradeIndex = detectGradeColumn(table);
+    const rows = collectRows(table);
+
+    let schoolHeaderText = '';
+    if (schoolIndex >= 0) {
+      const headRow = table.tHead && table.tHead.rows && table.tHead.rows[0];
+      if (headRow && headRow.cells && headRow.cells[schoolIndex]) {
+        schoolHeaderText = getText(headRow.cells[schoolIndex]);
+      }
+      if (!schoolHeaderText && table.tBodies && table.tBodies.length) {
+        const maybeHeaderRow = table.tBodies[0].rows && table.tBodies[0].rows[0];
+        if (maybeHeaderRow && maybeHeaderRow.cells && maybeHeaderRow.cells[schoolIndex]) {
+          const candidateCell = maybeHeaderRow.cells[schoolIndex];
+          const candidateText = getText(candidateCell);
+          if ((candidateCell.tagName || '').toUpperCase() === 'TH' || /学校|院校|单位|School/i.test(candidateText)) {
+            schoolHeaderText = candidateText;
+          }
+        }
+      }
+    }
+
+    let gradeHeaderText = '';
+    if (gradeIndex >= 0) {
+      const headRow = table.tHead && table.tHead.rows && table.tHead.rows[0];
+      if (headRow && headRow.cells && headRow.cells[gradeIndex]) {
+        gradeHeaderText = getText(headRow.cells[gradeIndex]);
+      }
+      if (!gradeHeaderText && table.tBodies && table.tBodies.length) {
+        const maybeHeaderRow = table.tBodies[0].rows && table.tBodies[0].rows[0];
+        if (maybeHeaderRow && maybeHeaderRow.cells && maybeHeaderRow.cells[gradeIndex]) {
+          const candidateCell = maybeHeaderRow.cells[gradeIndex];
+          const candidateText = getText(candidateCell);
+          if ((candidateCell.tagName || '').toUpperCase() === 'TH' || /时年|年级|年紀|年級|Grade/i.test(candidateText)) {
+            gradeHeaderText = candidateText;
+          }
+        }
+      }
+    }
+
+    rows.forEach(row => annotateRow(row, schoolIndex, schoolHeaderText, gradeIndex, gradeHeaderText));
+    const schools = schoolIndex >= 0
+      ? uniqueSorted(rows
+        .filter(row => row.dataset?.bnHeaderRow !== '1')
+        .map(row => row.dataset?.bnSchool || FALLBACK_SCHOOL_NAME))
+      : [];
+    const grades = gradeIndex >= 0
+      ? sortGrades(rows
+        .filter(row => row.dataset?.bnHeaderRow !== '1')
+        .map(row => row.dataset?.bnGrade || FALLBACK_GRADE_NAME))
+      : [];
+
+    const savedSelectionRaw = GM_getValue(RANKING_FILTER_SELECTED_KEY, []);
+    const savedSelection = Array.isArray(savedSelectionRaw)
+      ? savedSelectionRaw
+        .map(name => (typeof name === 'string' ? name.trim() : ''))
+        .map(name => name || FALLBACK_SCHOOL_NAME)
+        .filter(Boolean)
+      : [];
+    const dedupedSelection = Array.from(new Set(savedSelection));
+    const validSelected = dedupedSelection.filter(name => schools.includes(name));
+    if (validSelected.length !== dedupedSelection.length) {
+      GM_setValue(RANKING_FILTER_SELECTED_KEY, validSelected);
+    }
+
+    const savedGradeRaw = GM_getValue(RANKING_FILTER_GRADE_KEY, []);
+    const savedGrades = Array.isArray(savedGradeRaw)
+      ? savedGradeRaw
+        .map(name => (typeof name === 'string' ? name.trim() : ''))
+        .map(name => name || FALLBACK_GRADE_NAME)
+        .filter(Boolean)
+      : [];
+    const dedupedGrades = Array.from(new Set(savedGrades));
+    const validGrades = dedupedGrades.filter(name => grades.includes(name));
+    if (validGrades.length !== dedupedGrades.length) {
+      GM_setValue(RANKING_FILTER_GRADE_KEY, validGrades);
+    }
+
+    const requestedEnabled = !!GM_getValue(RANKING_FILTER_ENABLED_KEY, false);
+    const state = {
+      enabled: requestedEnabled && (schools.length > 0 || grades.length > 0),
+      requested: requestedEnabled,
+      schoolSelected: new Set(validSelected),
+      gradeSelected: new Set(validGrades)
+    };
+
+    return {
+      state,
+      schools,
+      grades,
+      schoolIndex,
+      gradeIndex,
+      schoolHeaderText,
+      gradeHeaderText
+    };
+  }
+
+  function rebuildFilterPanel(table) {
+    const context = prepareFilterContext(table);
+    if (!context) return;
+    if (filterPanelController && filterPanelController.panel && filterPanelController.panel.parentElement) {
+      try {
+        filterPanelController.panel.parentElement.removeChild(filterPanelController.panel);
+      } catch (err) {
+        console.warn('[BN] Failed to remove old filter panel', err);
+      }
+      filterPanelController = null;
+    }
+    filterPanelController = setupFilterUI(table, context.state, context.schools, context.grades);
+  }
+
+  function injectAllInOneCSS() {
+    if (allInOneCssInjected) return;
+    const css = `
+    .bn-all-in-one-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5em;
+      align-items: center;
+      justify-content: flex-end;
+      margin-bottom: .75em;
+    }
+    .bn-all-in-one-controls .ui.buttons {
+      display: inline-flex;
+    }
+    .bn-all-in-one-controls .bn-status {
+      min-width: 160px;
+      text-align: right;
+      font-size: .85em;
+      color: rgba(0,0,0,.6);
+    }
+    .bn-all-in-one-controls .bn-status.bn-error {
+      color: #db2828;
+    }
+    .bn-all-in-one-controls .bn-status.bn-success {
+      color: #21ba45;
+    }
+    .bn-all-in-one-controls .bn-status.bn-loading {
+      color: #2185d0;
+    }
+    .bn-all-in-one-controls input.bn-keyword {
+      min-width: 180px;
+    }
+    .bn-all-in-one-controls .bn-sort-order {
+      cursor: pointer;
+    }
+    .bn-all-in-one-table thead th[data-sort-key] {
+      cursor: pointer;
+      user-select: none;
+    }
+    .bn-all-in-one-table thead th[data-sort-key]::after {
+      content: attr(data-sort-indicator);
+      margin-left: .35em;
+      font-size: .8em;
+      color: rgba(0,0,0,.45);
+    }
+    #${TOAST_ID} {
+      position: fixed;
+      z-index: 99999;
+      left: 50%;
+      top: 3.5em;
+      transform: translateX(-50%);
+      background: rgba(32,32,32,.9);
+      color: #fff;
+      padding: .75em 1.5em;
+      border-radius: .6em;
+      box-shadow: 0 10px 28px rgba(0,0,0,.25);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 240ms ease;
+    }
+    #${TOAST_ID}.bn-error { background: rgba(219,40,40,.92); }
+    #${TOAST_ID}.bn-success { background: rgba(33,186,69,.92); }
+    #${TOAST_ID}.bn-info { background: rgba(33,133,208,.92); }
+    #${TOAST_ID}.bn-show {
+      opacity: 1;
+    }
+    @media (prefers-color-scheme: dark) {
+      .bn-all-in-one-controls .bn-status { color: rgba(255,255,255,.6); }
+      .bn-all-in-one-controls .bn-status.bn-error { color: #ff6b6b; }
+      .bn-all-in-one-controls .bn-status.bn-loading { color: #74c0fc; }
+      .bn-all-in-one-controls .bn-status.bn-success { color: #63e6be; }
+      #${TOAST_ID} { background: rgba(10,10,10,.88); }
+    }`;
+    if (typeof GM_addStyle === 'function') GM_addStyle(css);
+    else {
+      const style = document.createElement('style');
+      style.textContent = css;
+      document.head.appendChild(style);
+    }
+    allInOneCssInjected = true;
+  }
+
+  function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  async function withRetry(fn, options = {}) {
+    const {
+      retries = 3,
+      baseDelay = 400,
+      factor = 2,
+      retryOn = status => status === 429 || (status >= 500 && status < 600)
+    } = options;
+    let attempt = 0;
+    let wait = baseDelay;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      try {
+        return await fn(attempt);
+      } catch (err) {
+        attempt += 1;
+        const status = err && (err.status || err.code);
+        const isAbort = status === 'abort' || status === 'timeout';
+        if (attempt > retries || (!isAbort && status != null && !retryOn(status))) throw err;
+        await delay(wait);
+        wait *= factor;
+      }
+    }
+  }
+
+  async function fetchJson(url, options = {}) {
+    const { timeout = 10000, signal } = options;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(new Error('timeout')), timeout);
+    if (signal) {
+      if (signal.aborted) {
+        clearTimeout(timer);
+        throw signal.reason || new Error('aborted');
+      }
+      signal.addEventListener('abort', () => controller.abort(signal.reason || new Error('aborted')));
+    }
+    try {
+      const response = await fetch(url, {
+        credentials: 'include',
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' }
+      });
+      if (!response.ok) {
+        const error = new Error(`HTTP ${response.status}`);
+        error.status = response.status;
+        throw error;
+      }
+      return await response.json();
+    } catch (err) {
+      if (err && err.name === 'AbortError') {
+        const abortErr = new Error('Request aborted');
+        abortErr.status = 'abort';
+        throw abortErr;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  function buildApiUrl(options, page, extra = {}) {
+    const params = new URLSearchParams();
+    if (options.tid != null) params.set('tid', options.tid);
+    if (options.type != null) params.set('type', options.type);
+    params.set('page', page);
+    if (options.tableId != null) params.set('table_id', options.tableId);
+    Object.entries(extra).forEach(([key, value]) => {
+      if (value != null) params.set(key, value);
+    });
+    return `${options.apiBase}?${params.toString()}`;
+  }
+
+  async function tryFetchLargePage(options, updateStatus) {
+    for (const key of options.maxPageSizeTryKeys || []) {
+      try {
+        updateStatus?.(`探测大页参数 ${key}=9999`);
+        const url = buildApiUrl(options, 1, { [key]: 9999 });
+        const data = await withRetry(attempt => fetchJson(url, { timeout: 10000 + attempt * 2000 }), { retries: options.retry });
+        if (data && Array.isArray(data.users) && data.users.length > options.pageSize) {
+          return { data, param: key };
+        }
+      } catch (err) {
+        console.warn('[BN] tryFetchLargePage failed', key, err);
+      }
+    }
+    return null;
+  }
+
+  function createProgressTracker() {
+    let total = 0;
+    let pages = 0;
+    return {
+      tick(count) {
+        pages += 1;
+        total += count;
+        return { pages, total };
+      }
+    };
+  }
+
+  async function fetchPage(options, page) {
+    const url = buildApiUrl(options, page);
+    return withRetry(attempt => fetchJson(url, { timeout: 10000 + attempt * 1500 }), { retries: options.retry });
+  }
+
+  async function fetchAllPages(options, onProgress) {
+    const concurrent = Math.max(1, Math.min(8, options.concurrent || 1));
+    const tracker = createProgressTracker();
+    const pages = new Map();
+    let nextPage = 1;
+    let stop = false;
+
+    async function worker() {
+      while (!stop) {
+        const pageNo = nextPage;
+        nextPage += 1;
+        try {
+          const pageData = await fetchPage(options, pageNo);
+          if (!pageData || !Array.isArray(pageData.users) || pageData.users.length === 0) {
+            stop = true;
+            break;
+          }
+          pages.set(pageNo, pageData);
+          const progress = tracker.tick(pageData.users.length);
+          onProgress?.(progress.pages, progress.total);
+          if (pageData.users.length < options.pageSize) {
+            stop = true;
+            break;
+          }
+        } catch (err) {
+          stop = true;
+          throw err;
+        }
+      }
+    }
+
+    const workers = Array.from({ length: concurrent }, () => worker());
+    await Promise.all(workers);
+    const sorted = Array.from(pages.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([, data]) => data);
+    const totalUsers = sorted.reduce((sum, item) => sum + (Array.isArray(item.users) ? item.users.length : 0), 0);
+    return { pages: sorted, totalUsers };
+  }
+
+  function mergeUsersAndTable(pagePayloads) {
+    const userMap = new Map();
+    const tableMerged = {};
+    let tableId = null;
+    const sourcePages = Array.isArray(pagePayloads) ? pagePayloads : [];
+    sourcePages.forEach(payload => {
+      if (!payload || typeof payload !== 'object') return;
+      if (payload.table_id != null) tableId = payload.table_id;
+      if (payload.table && typeof payload.table === 'object') {
+        Object.assign(tableMerged, payload.table);
+      }
+      if (!Array.isArray(payload.users)) return;
+      payload.users.forEach(user => {
+        if (!user || typeof user !== 'object') return;
+        const id = user.id != null ? user.id : user.user_id;
+        if (id == null) return;
+        const existing = userMap.get(id);
+        if (!existing) {
+          userMap.set(id, user);
+          return;
+        }
+        const existingContest = Number(existing.contest_score) || 0;
+        const existingBest = Number(existing.best_score) || 0;
+        const incomingContest = Number(user.contest_score) || 0;
+        const incomingBest = Number(user.best_score) || 0;
+        if (incomingContest > existingContest || (incomingContest === existingContest && incomingBest >= existingBest)) {
+          userMap.set(id, user);
+        }
+      });
+    });
+    return {
+      users: Array.from(userMap.values()),
+      table: tableMerged,
+      table_id: tableId
+    };
+  }
+
+  function showToast(message, type = 'info') {
+    if (!message) return;
+    let toast = document.getElementById(TOAST_ID);
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = TOAST_ID;
+      document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.classList.remove('bn-error', 'bn-info', 'bn-success');
+    toast.classList.add(`bn-${type}`);
+    toast.classList.add('bn-show');
+    const timer = Number(toast.dataset.timerId);
+    if (timer) clearTimeout(timer);
+    const nextTimer = window.setTimeout(() => {
+      toast.classList.remove('bn-show');
+      toast.dataset.timerId = '';
+    }, 3200);
+    toast.dataset.timerId = String(nextTimer);
+  }
+
+  function cacheKey(options, tableId) {
+    const tid = options.tid != null ? options.tid : 'default';
+    const type = options.type || 'contest';
+    const tidStr = tableId != null ? tableId : options.tableId != null ? options.tableId : '0';
+    return `${CACHE_PREFIX}:${tid}:${type}:${tidStr}:${CACHE_VERSION}`;
+  }
+
+  function cacheLoad(options) {
+    try {
+      const keys = [];
+      if (options.tableId != null) keys.push(cacheKey(options, options.tableId));
+      keys.push(cacheKey(options, '0'));
+      const prefix = `${CACHE_PREFIX}:${options.tid != null ? options.tid : 'default'}:${options.type || 'contest'}:`;
+      for (let i = 0; i < sessionStorage.length; i += 1) {
+        const key = sessionStorage.key(i);
+        if (key && key.startsWith(prefix)) keys.push(key);
+      }
+      const seen = new Set();
+      for (const key of keys) {
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        const raw = sessionStorage.getItem(key);
+        if (!raw) continue;
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
+      return null;
+    } catch (err) {
+      console.warn('[BN] cacheLoad failed', err);
+      return null;
+    }
+  }
+
+  function cacheSave(options, payload) {
+    try {
+      sessionStorage.setItem(cacheKey(options, payload?.table_id), JSON.stringify({
+        savedAt: Date.now(),
+        table_id: payload?.table_id,
+        singleRequest: !!payload?.singleRequest,
+        data: {
+          users: payload?.data?.users || [],
+          table: payload?.data?.table || {},
+          table_id: payload?.data?.table_id || payload?.table_id || null
+        }
+      }));
+    } catch (err) {
+      console.warn('[BN] cacheSave failed', err);
+    }
+  }
+
+  function cacheClear(options) {
+    try {
+      const prefix = `${CACHE_PREFIX}:${options.tid != null ? options.tid : 'default'}:${options.type || 'contest'}:`;
+      const targets = [];
+      for (let i = 0; i < sessionStorage.length; i += 1) {
+        const key = sessionStorage.key(i);
+        if (key && key.startsWith(prefix)) targets.push(key);
+      }
+      targets.forEach(key => sessionStorage.removeItem(key));
+    } catch (err) {
+      console.warn('[BN] cacheClear failed', err);
+    }
+  }
+
+  function detectField(user, candidates) {
+    if (!user || typeof user !== 'object') return null;
+    for (const key of candidates) {
+      if (key in user && user[key] != null && String(user[key]).trim() !== '') return key;
+    }
+    return null;
+  }
+
+  function collectProblemMeta(tableMap) {
+    const map = new Map();
+    if (!tableMap || typeof tableMap !== 'object') return [];
+    Object.entries(tableMap).forEach(([key, value]) => {
+      if (!key) return;
+      const parts = key.split(':');
+      if (parts.length < 2) return;
+      const problemId = parts[1];
+      if (!problemId || map.has(problemId)) return;
+      const title = value?.problem_title || value?.title || value?.name || value?.label || `P${problemId}`;
+      map.set(problemId, { id: problemId, title });
+    });
+    return Array.from(map.values()).sort((a, b) => {
+      const ia = Number(a.id);
+      const ib = Number(b.id);
+      if (!Number.isNaN(ia) && !Number.isNaN(ib)) return ia - ib;
+      return String(a.title || a.id).localeCompare(String(b.title || b.id));
+    });
+  }
+
+  function formatProblemCell(value) {
+    if (value == null) return { text: '' };
+    if (typeof value === 'string') return { html: value };
+    if (typeof value === 'number') return { text: String(value) };
+    if (Array.isArray(value)) return { text: value.join(', ') };
+    if (value && typeof value === 'object') {
+      if (value.html) return { html: value.html };
+      if (value.result_html) return { html: value.result_html };
+      if (value.content) return { html: value.content };
+      const fields = ['score', 'points', 'result', 'status', 'best_score'];
+      for (const field of fields) {
+        if (value[field] != null && value[field] !== '') {
+          return { text: String(value[field]) };
+        }
+      }
+      if (value.time != null) return { text: String(value.time) };
+    }
+    try {
+      return { text: JSON.stringify(value) };
+    } catch (err) {
+      return { text: '' };
+    }
+  }
+
+  function numericDesc(a, b) {
+    return (b || 0) - (a || 0);
+  }
+
+  function normalizeKeyword(value) {
+    return (value || '').trim().toLowerCase();
+  }
+
+  const allInOneState = {
+    options: null,
+    originalTable: null,
+    fullTable: null,
+    data: null,
+    singleRequestMode: false,
+    active: false,
+    controls: null,
+    keyword: '',
+    sortKey: 'contest_score',
+    sortOrder: 'desc',
+    loading: false,
+    usingCache: false
+  };
+
+  function ensureFullTable(options) {
+    if (allInOneState.fullTable && allInOneState.fullTable.isConnected) return allInOneState.fullTable;
+    if (!allInOneState.originalTable) return null;
+    const clone = allInOneState.originalTable.cloneNode(false);
+    clone.classList.add('bn-all-in-one-table');
+    clone.style.display = 'none';
+    const thead = document.createElement('thead');
+    const tbody = document.createElement('tbody');
+    clone.append(thead, tbody);
+    allInOneState.originalTable.parentElement.insertBefore(clone, allInOneState.originalTable.nextSibling);
+    allInOneState.fullTable = clone;
+    return clone;
+  }
+
+  function updateStatus(text, type = 'info') {
+    if (!allInOneState.controls) return;
+    const status = allInOneState.controls.status;
+    if (!status) return;
+    status.textContent = text || '';
+    status.classList.remove('bn-error', 'bn-success', 'bn-loading');
+    if (type === 'error') status.classList.add('bn-error');
+    else if (type === 'success') status.classList.add('bn-success');
+    else if (type === 'loading') status.classList.add('bn-loading');
+  }
+
+  function renderAllInOneTable() {
+    if (!allInOneState.active) return;
+    const table = ensureFullTable(allInOneState.options);
+    if (!table || !allInOneState.data) return;
+
+    const { users = [], table: tableMap = {} } = allInOneState.data;
+    const thead = table.tHead || table.querySelector('thead');
+    const tbody = table.tBodies && table.tBodies[0];
+    if (!thead || !tbody) return;
+    thead.textContent = '';
+    tbody.textContent = '';
+
+    const sampleUser = users.find(user => user && typeof user === 'object') || {};
+    const nameField = detectField(sampleUser, ['nickname', 'name', 'real_name', 'realname', 'username', 'display_name']);
+    const schoolField = detectField(sampleUser, ['school_name', 'school', 'organization', 'org', 'academy', 'team']);
+    const gradeField = detectField(sampleUser, ['grade_name', 'grade', 'grade_text', 'class', 'class_name', 'year']);
+
+    const columns = [];
+    columns.push({ key: '__rank__', label: '排名', type: 'rank' });
+    columns.push({ key: 'id', label: 'ID', type: 'id' });
+    if (nameField) columns.push({ key: nameField, label: '姓名', type: 'text' });
+    if (schoolField) columns.push({ key: schoolField, label: '学校', type: 'school' });
+    if (gradeField) columns.push({ key: gradeField, label: '时年', type: 'grade' });
+    columns.push({ key: 'contest_score', label: 'Contest Score', type: 'score', sortKey: 'contest_score' });
+    columns.push({ key: 'best_score', label: 'Best Score', type: 'score', sortKey: 'best_score' });
+
+    const problems = collectProblemMeta(tableMap);
+    problems.forEach(problem => {
+      columns.push({ key: `problem:${problem.id}`, label: problem.title || `P${problem.id}`, type: 'problem', problemId: problem.id });
+    });
+
+    const headerRow = document.createElement('tr');
+    columns.forEach(col => {
+      const th = document.createElement('th');
+      th.textContent = col.label;
+      if (col.sortKey) {
+        th.dataset.sortKey = col.sortKey;
+        th.dataset.sortIndicator = allInOneState.sortKey === col.sortKey
+          ? (allInOneState.sortOrder === 'desc' ? '↓' : '↑')
+          : '';
+        th.addEventListener('click', () => toggleSort(col.sortKey));
+      }
+      headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+
+    const keyword = normalizeKeyword(allInOneState.keyword);
+    const filtered = keyword
+      ? users.filter(user => {
+        const idStr = String(user.id ?? user.user_id ?? '').toLowerCase();
+        const nameStr = nameField ? String(user[nameField] || '').toLowerCase() : '';
+        return idStr.includes(keyword) || nameStr.includes(keyword);
+      })
+      : users.slice();
+
+    const sorter = allInOneState.sortKey === 'best_score'
+      ? user => Number(user.best_score) || 0
+      : user => Number(user.contest_score) || 0;
+
+    filtered.sort((a, b) => {
+      const diff = sorter(b) - sorter(a);
+      if (diff !== 0) return allInOneState.sortOrder === 'desc' ? diff : -diff;
+      return numericDesc(Number(a.id) || 0, Number(b.id) || 0);
+    });
+
+    const schoolIndex = columns.findIndex(col => col.type === 'school');
+    const gradeIndex = columns.findIndex(col => col.type === 'grade');
+    const batchSize = 120;
+    let index = 0;
+
+    function renderBatch() {
+      const frag = document.createDocumentFragment();
+      let count = 0;
+      while (index < filtered.length && count < batchSize) {
+        const user = filtered[index];
+        const row = document.createElement('tr');
+        columns.forEach((col, colIndex) => {
+          const td = document.createElement('td');
+          if (col.type === 'rank') td.textContent = String(index + 1);
+          else if (col.type === 'id') td.textContent = String(user.id ?? user.user_id ?? '');
+          else if (col.type === 'text' || col.type === 'school' || col.type === 'grade') td.textContent = String(user[col.key] ?? '');
+          else if (col.type === 'score') {
+            const value = Number(user[col.key]);
+            td.textContent = Number.isFinite(value) ? String(value) : String(user[col.key] ?? '');
+          } else if (col.type === 'problem') {
+            const cellValue = tableMap[`${user.id ?? user.user_id}:${col.problemId}`];
+            const formatted = formatProblemCell(cellValue);
+            if (formatted.html) td.innerHTML = formatted.html;
+            else td.textContent = formatted.text;
+          }
+          if (col.type === 'school') row.dataset.bnSchool = td.textContent || FALLBACK_SCHOOL_NAME;
+          if (col.type === 'grade') row.dataset.bnGrade = td.textContent || FALLBACK_GRADE_NAME;
+          row.appendChild(td);
+        });
+        frag.appendChild(row);
+        index += 1;
+        count += 1;
+      }
+      tbody.appendChild(frag);
+      if (index < filtered.length) {
+        (window.requestAnimationFrame || window.setTimeout)(renderBatch);
+      } else {
+        rebuildFilterPanel(table);
+        const modeNote = allInOneState.singleRequestMode ? '（单请求模式）' : '';
+        const cacheNote = allInOneState.usingCache ? '（缓存）' : '';
+        updateStatus(`共 ${filtered.length} 人${modeNote}${cacheNote}`, 'success');
+      }
+    }
+
+    renderBatch();
+  }
+
+  function toggleSort(sortKey) {
+    if (!sortKey) return;
+    if (allInOneState.sortKey === sortKey) {
+      allInOneState.sortOrder = allInOneState.sortOrder === 'desc' ? 'asc' : 'desc';
+    } else {
+      allInOneState.sortKey = sortKey;
+      allInOneState.sortOrder = 'desc';
+    }
+    if (allInOneState.controls) {
+      allInOneState.controls.sortSelect.value = allInOneState.sortKey;
+      allInOneState.controls.sortOrderBtn.textContent = allInOneState.sortOrder === 'desc' ? '↓' : '↑';
+    }
+    renderAllInOneTable();
+  }
+
+  function applyKeyword(keyword) {
+    allInOneState.keyword = keyword;
+    renderAllInOneTable();
+  }
+
+  function applySortKey(key) {
+    if (!key) return;
+    if (allInOneState.sortKey !== key) {
+      allInOneState.sortKey = key;
+      allInOneState.sortOrder = 'desc';
+    }
+    if (allInOneState.controls) {
+      allInOneState.controls.sortSelect.value = allInOneState.sortKey;
+      allInOneState.controls.sortOrderBtn.textContent = allInOneState.sortOrder === 'desc' ? '↓' : '↑';
+    }
+    renderAllInOneTable();
+  }
+
+  function applySortOrder(order) {
+    if (!order) return;
+    allInOneState.sortOrder = order === 'asc' ? 'asc' : 'desc';
+    if (allInOneState.controls) {
+      allInOneState.controls.sortOrderBtn.textContent = allInOneState.sortOrder === 'desc' ? '↓' : '↑';
+    }
+    renderAllInOneTable();
+  }
+
+  function exportCsv(data) {
+    if (!data || !Array.isArray(data.users) || !data.users.length) {
+      showToast('暂无可导出的用户数据', 'error');
+      return;
+    }
+    const headers = ['id', 'contest_score', 'best_score'];
+    const lines = [headers.join(',')];
+    data.users.forEach(user => {
+      const id = user.id ?? user.user_id ?? '';
+      const contest = user.contest_score ?? '';
+      const best = user.best_score ?? '';
+      lines.push([id, contest, best].map(csvEscape).join(','));
+    });
+    const content = '\ufeff' + lines.join('\r\n');
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const now = new Date();
+    const iso = now.toISOString().slice(0, 10).replace(/-/g, '');
+    link.download = `contest-leaderboard-${iso}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, 0);
+  }
+
+  function createControls(options) {
+    injectAllInOneCSS();
+    const mount = document.querySelector(options.mountSelector) || document.querySelector('.bn-ranking-filter') || document.body;
+    const container = document.createElement('div');
+    container.className = 'bn-all-in-one-controls';
+
+    const buttons = document.createElement('div');
+    buttons.className = 'ui buttons';
+    const showAllBtn = document.createElement('button');
+    showAllBtn.className = 'ui button';
+    showAllBtn.textContent = '显示全部';
+    const pagedBtn = document.createElement('button');
+    pagedBtn.className = 'ui button';
+    pagedBtn.textContent = '分页显示';
+    buttons.append(showAllBtn, pagedBtn);
+    container.appendChild(buttons);
+
+    const refreshBtn = document.createElement('button');
+    refreshBtn.className = 'ui button';
+    refreshBtn.textContent = '刷新数据';
+    refreshBtn.style.display = 'none';
+    container.appendChild(refreshBtn);
+
+    const exportBtn = document.createElement('button');
+    exportBtn.className = 'ui button';
+    exportBtn.textContent = '导出 CSV';
+    container.appendChild(exportBtn);
+
+    const keywordInput = document.createElement('input');
+    keywordInput.type = 'search';
+    keywordInput.placeholder = '按 ID / 姓名过滤';
+    keywordInput.className = 'bn-keyword';
+    container.appendChild(keywordInput);
+
+    const sortSelect = document.createElement('select');
+    sortSelect.className = 'ui dropdown';
+    const optionContest = document.createElement('option');
+    optionContest.value = 'contest_score';
+    optionContest.textContent = '按 Contest Score';
+    const optionBest = document.createElement('option');
+    optionBest.value = 'best_score';
+    optionBest.textContent = '按 Best Score';
+    sortSelect.append(optionContest, optionBest);
+    sortSelect.value = allInOneState.sortKey;
+    container.appendChild(sortSelect);
+
+    const sortOrderBtn = document.createElement('button');
+    sortOrderBtn.className = 'ui button bn-sort-order';
+    sortOrderBtn.textContent = '↓';
+    container.appendChild(sortOrderBtn);
+
+    const status = document.createElement('div');
+    status.className = 'bn-status';
+    container.appendChild(status);
+
+    if (mount === document.body) document.body.insertBefore(container, document.body.firstChild);
+    else mount.appendChild(container);
+
+    return {
+      container,
+      showAllBtn,
+      pagedBtn,
+      refreshBtn,
+      exportBtn,
+      keywordInput,
+      sortSelect,
+      sortOrderBtn,
+      status
+    };
+  }
+
+  async function activatePagedMode() {
+    if (!allInOneState.active) return;
+    allInOneState.active = false;
+    if (allInOneState.originalTable) allInOneState.originalTable.style.display = '';
+    if (allInOneState.fullTable) allInOneState.fullTable.style.display = 'none';
+    currentTable = allInOneState.originalTable;
+    rebuildFilterPanel(currentTable);
+    updateStatus('已恢复分页', 'info');
+  }
+
+  async function activateAllMode(forceRefresh = false) {
+    if (allInOneState.loading) return;
+    allInOneState.loading = true;
+    updateStatus('加载中…', 'loading');
+    const options = allInOneState.options;
+    let payload = null;
+    if (!forceRefresh) {
+      const cached = cacheLoad(options);
+      if (cached && cached.data) {
+        allInOneState.data = cached.data;
+        allInOneState.singleRequestMode = !!cached.singleRequest;
+        allInOneState.usingCache = true;
+        payload = cached;
+      }
+    }
+
+    if (!payload) {
+      allInOneState.usingCache = false;
+      const probe = await tryFetchLargePage(options, text => updateStatus(text, 'loading'));
+      if (probe && probe.data) {
+        allInOneState.data = {
+          users: Array.isArray(probe.data.users) ? probe.data.users : [],
+          table: probe.data.table || {},
+          table_id: probe.data.table_id || null
+        };
+        allInOneState.singleRequestMode = true;
+        cacheSave(options, { data: allInOneState.data, table_id: allInOneState.data.table_id, singleRequest: true });
+      } else {
+        try {
+          const result = await fetchAllPages(options, (pages, total) => updateStatus(`已加载 ${pages} 页，${total} 条`, 'loading'));
+          const merged = mergeUsersAndTable(result.pages);
+          allInOneState.data = merged;
+          allInOneState.singleRequestMode = false;
+          cacheSave(options, { data: merged, table_id: merged.table_id, singleRequest: false });
+        } catch (err) {
+          console.error('[BN] fetchAllPages failed', err);
+          updateStatus('加载失败', 'error');
+          showToast('榜单加载失败，请稍后重试', 'error');
+          allInOneState.loading = false;
+          return;
+        }
+      }
+    }
+
+    if (allInOneState.data && allInOneState.data.table_id != null) {
+      allInOneState.options.tableId = allInOneState.data.table_id;
+    }
+
+    ensureFullTable(options);
+    if (allInOneState.originalTable) allInOneState.originalTable.style.display = 'none';
+    if (allInOneState.fullTable) allInOneState.fullTable.style.display = '';
+    currentTable = allInOneState.fullTable;
+    allInOneState.active = true;
+    renderAllInOneTable();
+    if (allInOneState.controls) {
+      allInOneState.controls.refreshBtn.style.display = 'inline-flex';
+      allInOneState.controls.sortSelect.value = allInOneState.sortKey;
+      allInOneState.controls.sortOrderBtn.textContent = allInOneState.sortOrder === 'desc' ? '↓' : '↑';
+      allInOneState.controls.keywordInput.value = allInOneState.keyword;
+    }
+    allInOneState.loading = false;
+  }
+
+  function bindControls(controls) {
+    controls.showAllBtn.addEventListener('click', () => activateAllMode(false));
+    controls.pagedBtn.addEventListener('click', () => activatePagedMode());
+    controls.refreshBtn.addEventListener('click', () => {
+      cacheClear(allInOneState.options);
+      activateAllMode(true);
+    });
+    controls.exportBtn.addEventListener('click', () => exportCsv(allInOneState.data));
+    controls.keywordInput.addEventListener('input', event => applyKeyword(event.target.value));
+    controls.sortSelect.addEventListener('change', event => applySortKey(event.target.value));
+    controls.sortOrderBtn.addEventListener('click', () => {
+      const next = allInOneState.sortOrder === 'desc' ? 'asc' : 'desc';
+      controls.sortOrderBtn.textContent = next === 'desc' ? '↓' : '↑';
+      applySortOrder(next);
+    });
+  }
+
+  async function enableAllInOneLeaderboard(userOptions = {}) {
+    const options = { ...ALL_IN_ONE_DEFAULTS, ...userOptions };
+    const table = currentTable || await waitForTable();
+    if (!table) return;
+    currentTable = table;
+    allInOneState.originalTable = table;
+    allInOneState.options = options;
+    if (!allInOneState.controls) {
+      allInOneState.controls = createControls(options);
+      bindControls(allInOneState.controls);
+    }
+    updateStatus('已就绪', 'info');
+    return {
+      activateAll: () => activateAllMode(false),
+      restorePaged: () => activatePagedMode(),
+      refresh: () => activateAllMode(true)
+    };
+  }
+
   function setupFilterUI(table, state, schools, grades) {
     injectCSS();
     const parent = table.parentElement || table;
@@ -2370,95 +3315,33 @@ window.getCurrentUserId = getCurrentUserId;
     injectCSS();
     const table = await waitForTable();
     if (!table) return;
-    const schoolIndex = detectSchoolColumn(table);
-    const gradeIndex = detectGradeColumn(table);
-    const rows = collectRows(table);
-    let schoolHeaderText = '';
-    if (schoolIndex >= 0) {
-      const headRow = table.tHead && table.tHead.rows && table.tHead.rows[0];
-      if (headRow && headRow.cells && headRow.cells[schoolIndex]) {
-        schoolHeaderText = getText(headRow.cells[schoolIndex]);
-      }
-      if (!schoolHeaderText && table.tBodies && table.tBodies.length) {
-        const maybeHeaderRow = table.tBodies[0].rows && table.tBodies[0].rows[0];
-        if (maybeHeaderRow && maybeHeaderRow.cells && maybeHeaderRow.cells[schoolIndex]) {
-          const candidateCell = maybeHeaderRow.cells[schoolIndex];
-          const candidateText = getText(candidateCell);
-          if ((candidateCell.tagName || '').toUpperCase() === 'TH' || /学校|院校|单位|School/i.test(candidateText)) {
-            schoolHeaderText = candidateText;
-          }
-        }
-      }
-    }
-
-    let gradeHeaderText = '';
-    if (gradeIndex >= 0) {
-      const headRow = table.tHead && table.tHead.rows && table.tHead.rows[0];
-      if (headRow && headRow.cells && headRow.cells[gradeIndex]) {
-        gradeHeaderText = getText(headRow.cells[gradeIndex]);
-      }
-      if (!gradeHeaderText && table.tBodies && table.tBodies.length) {
-        const maybeHeaderRow = table.tBodies[0].rows && table.tBodies[0].rows[0];
-        if (maybeHeaderRow && maybeHeaderRow.cells && maybeHeaderRow.cells[gradeIndex]) {
-          const candidateCell = maybeHeaderRow.cells[gradeIndex];
-          const candidateText = getText(candidateCell);
-          if ((candidateCell.tagName || '').toUpperCase() === 'TH' || /时年|年级|年紀|年級|Grade/i.test(candidateText)) {
-            gradeHeaderText = candidateText;
-          } 
-        }
-      }
-    }
-
-    rows.forEach(row => annotateRow(row, schoolIndex, schoolHeaderText, gradeIndex, gradeHeaderText));
-    const schools = schoolIndex >= 0
-      ? uniqueSorted(rows
-        .filter(row => row.dataset?.bnHeaderRow !== '1')
-        .map(row => row.dataset?.bnSchool || FALLBACK_SCHOOL_NAME))
-      : [];
-    const grades = gradeIndex >= 0
-      ? sortGrades(rows
-        .filter(row => row.dataset?.bnHeaderRow !== '1')
-        .map(row => row.dataset?.bnGrade || FALLBACK_GRADE_NAME))
-      : [];
-
-    const savedSelectionRaw = GM_getValue(RANKING_FILTER_SELECTED_KEY, []);
-    const savedSelection = Array.isArray(savedSelectionRaw)
-      ? savedSelectionRaw
-        .map(name => (typeof name === 'string' ? name.trim() : ''))
-        .map(name => name || FALLBACK_SCHOOL_NAME)
-        .filter(Boolean)
-      : [];
-    const dedupedSelection = Array.from(new Set(savedSelection));
-    const validSelected = dedupedSelection.filter(name => schools.includes(name));
-    if (validSelected.length !== dedupedSelection.length) {
-      GM_setValue(RANKING_FILTER_SELECTED_KEY, validSelected);
-    }
-
-    const savedGradeRaw = GM_getValue(RANKING_FILTER_GRADE_KEY, []);
-    const savedGrades = Array.isArray(savedGradeRaw)
-      ? savedGradeRaw
-        .map(name => (typeof name === 'string' ? name.trim() : ''))
-        .map(name => name || FALLBACK_GRADE_NAME)
-        .filter(Boolean)
-      : [];
-    const dedupedGrades = Array.from(new Set(savedGrades));
-    const validGrades = dedupedGrades.filter(name => grades.includes(name));
-    if (validGrades.length !== dedupedGrades.length) {
-      GM_setValue(RANKING_FILTER_GRADE_KEY, validGrades);
-    }
-
-    const requestedEnabled = !!GM_getValue(RANKING_FILTER_ENABLED_KEY, false);
-    const state = {
-      enabled: requestedEnabled && (schools.length > 0 || grades.length > 0),
-      requested: requestedEnabled,
-      schoolSelected: new Set(validSelected),
-      gradeSelected: new Set(validGrades)
-    };
-
-    setupFilterUI(table, state, schools, grades);
+    currentTable = table;
+    rebuildFilterPanel(table);
   }
 
   init().catch(err => console.error('[BN] Ranking enhancement failed', err));
+
+  window.enableAllInOneLeaderboard = enableAllInOneLeaderboard;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const tablesRaw = params.get('tables');
+      if (!tablesRaw) return;
+      const parsed = JSON.parse(tablesRaw);
+      if (!Array.isArray(parsed) || !parsed.length) return;
+      const first = parsed[0] || {};
+      if (!first.tid) return;
+      enableAllInOneLeaderboard({
+        tid: first.tid,
+        type: first.type || 'contest',
+        tableId: first.table_id != null ? first.table_id : first.tableId,
+        mountSelector: ALL_IN_ONE_DEFAULTS.mountSelector
+      }).catch(err => console.error('[BN] enableAllInOneLeaderboard failed', err));
+    } catch (err) {
+      console.warn('[BN] Failed to auto init all-in-one leaderboard', err);
+    }
+  });
 })();
 
 /* === BN PATCH 2: user menu pure fade-in (no size change) + shadow fade === */
