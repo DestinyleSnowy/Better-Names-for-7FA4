@@ -431,8 +431,12 @@
     return;
   }
   let pinned = !!GM_getValue('panelPinned', false);
-  const CORNER_KEY = 'bn.corner';
-  const SNAP_MARGIN = 20;
+  const POSITION_KEY = 'bn.trigger.position.v2';
+  const POSITION_MARGIN = 20;
+  const EDGE_SNAP_THRESHOLD = 64;
+  const CORNER_SNAP_THRESHOLD = 96;
+  const PANEL_GAP = 10;
+  const PANEL_MARGIN = 16;
   let isDragging = false;
   let wasPinned = false;
   let gearW = 48, gearH = 48;
@@ -440,6 +444,101 @@
   let __bn_raf = null;
   let __bn_dragX = 0, __bn_dragY = 0;
   let __bn_pointerId = null;
+
+  const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+  function parsePosition(raw) {
+    if (!raw) return null;
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+          return { x: parsed.x, y: parsed.y };
+        }
+      } catch (_) {
+        return null;
+      }
+      return null;
+    }
+    if (typeof raw === 'object' && raw) {
+      const x = Number(raw.x);
+      const y = Number(raw.y);
+      if (Number.isFinite(x) && Number.isFinite(y)) return { x, y };
+    }
+    return null;
+  }
+
+  function readStoredPosition() {
+    try {
+      return parsePosition(GM_getValue(POSITION_KEY, null));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function writeStoredPosition(pos) {
+    try {
+      GM_setValue(POSITION_KEY, JSON.stringify({
+        x: Math.round(pos.x),
+        y: Math.round(pos.y),
+      }));
+    } catch (_) {}
+  }
+
+  function clampWithMargin(value, viewportSize, elementSize) {
+    if (!viewportSize || viewportSize <= 0) return value;
+    const maxAvailable = Math.max(0, viewportSize - elementSize);
+    if (maxAvailable <= 0) return 0;
+    let min = POSITION_MARGIN;
+    let max = maxAvailable - POSITION_MARGIN;
+    if (max < min) {
+      min = 0;
+      max = maxAvailable;
+    }
+    return clamp(value, min, max);
+  }
+
+  function ensureWithinViewport(pos) {
+    const viewportWidth = window.innerWidth || (document.documentElement ? document.documentElement.clientWidth : 0) || 0;
+    const viewportHeight = window.innerHeight || (document.documentElement ? document.documentElement.clientHeight : 0) || 0;
+    if (!viewportWidth || !viewportHeight) return { x: pos.x, y: pos.y };
+    return {
+      x: clampWithMargin(pos.x, viewportWidth, gearW),
+      y: clampWithMargin(pos.y, viewportHeight, gearH),
+    };
+  }
+
+  function computeDefaultPosition() {
+    const viewportWidth = window.innerWidth || (document.documentElement ? document.documentElement.clientWidth : 0) || 0;
+    const viewportHeight = window.innerHeight || (document.documentElement ? document.documentElement.clientHeight : 0) || 0;
+    const base = {
+      x: viewportWidth ? viewportWidth - POSITION_MARGIN - gearW : POSITION_MARGIN,
+      y: viewportHeight ? viewportHeight - POSITION_MARGIN - gearH : POSITION_MARGIN,
+    };
+    return ensureWithinViewport(base);
+  }
+
+  let currentPosition = null;
+
+  function applyPosition(pos, { save = true } = {}) {
+    if (!pos) return;
+    const next = ensureWithinViewport({ x: pos.x, y: pos.y });
+    currentPosition = next;
+    container.style.left = `${Math.round(next.x)}px`;
+    container.style.top = `${Math.round(next.y)}px`;
+    container.style.right = 'auto';
+    container.style.bottom = 'auto';
+    if (save) writeStoredPosition(next);
+  }
+
+  function initPosition() {
+    const stored = readStoredPosition();
+    if (stored) {
+      applyPosition(stored, { save: false });
+    } else {
+      applyPosition(computeDefaultPosition(), { save: true });
+    }
+  }
 
   function updateContainerState() {
     if (isDragging || container.classList.contains('bn-dragging')) {
@@ -453,13 +552,13 @@
     }
   }
 
-  function applyCorner(pos) {
-    container.classList.remove('bn-pos-br', 'bn-pos-bl', 'bn-pos-tr', 'bn-pos-tl');
-    container.classList.add('bn-pos-' + pos);
-    GM_setValue(CORNER_KEY, pos);
+  const initialRect = trigger.getBoundingClientRect();
+  if (initialRect) {
+    if (initialRect.width) gearW = initialRect.width;
+    if (initialRect.height) gearH = initialRect.height;
   }
 
-  applyCorner(GM_getValue(CORNER_KEY, 'br'));
+  initPosition();
   updateContainerState();
 
   const titleInp = document.getElementById('bn-title-input');
@@ -601,6 +700,7 @@
 
   pinBtn.classList.toggle('bn-pinned', pinned);
   if (pinned) {
+    layoutPanel();
     panel.classList.add('bn-show');
   }
   updateContainerState();
@@ -637,10 +737,12 @@
     if (isChecked) {
       container.classList.add('bn-expanded');
       panel.classList.add('bn-expanded');
-      setTimeout(() => colorSidebar.classList.add('bn-show'), 200);
+      layoutIfVisible();
+      setTimeout(() => { colorSidebar.classList.add('bn-show'); layoutIfVisible(); }, 200);
     } else {
       colorSidebar.classList.remove('bn-show');
-      setTimeout(() => { container.classList.remove('bn-expanded'); panel.classList.remove('bn-expanded'); }, 200);
+      layoutIfVisible();
+      setTimeout(() => { container.classList.remove('bn-expanded'); panel.classList.remove('bn-expanded'); layoutIfVisible(); }, 200);
     }
     checkChanged();
   };
@@ -649,6 +751,7 @@
     container.classList.add('bn-expanded');
     panel.classList.add('bn-expanded');
     colorSidebar.classList.add('bn-show');
+    layoutIfVisible();
   }
 
   themeSelect.onchange = () => {
@@ -663,6 +766,7 @@
   const showPanel = () => {
     if (isDragging || container.classList.contains('bn-dragging')) return;
     clearTimeout(hideTimer);
+    layoutPanel();
     panel.classList.add('bn-show');
     updateContainerState();
   };
@@ -682,6 +786,74 @@
   };
   trigger.addEventListener('mouseleave', maybeHidePanel);
   panel.addEventListener('mouseleave', maybeHidePanel);
+
+  function layoutPanel() {
+    const triggerRect = trigger.getBoundingClientRect();
+    if (!triggerRect) return;
+    const rawPanelWidth = panel.offsetWidth || panel.scrollWidth || 0;
+    const rawPanelHeight = panel.offsetHeight || panel.scrollHeight || 0;
+    if (!rawPanelWidth || !rawPanelHeight) return;
+
+    const viewportWidth = window.innerWidth || (document.documentElement ? document.documentElement.clientWidth : rawPanelWidth) || rawPanelWidth;
+    const viewportHeight = window.innerHeight || (document.documentElement ? document.documentElement.clientHeight : rawPanelHeight) || rawPanelHeight;
+    const margin = PANEL_MARGIN;
+
+    const computePlacement = (vertical, horizontal) => {
+      let left = horizontal === 'left' ? triggerRect.left : triggerRect.right - rawPanelWidth;
+      let top = vertical === 'below' ? triggerRect.bottom + PANEL_GAP : triggerRect.top - rawPanelHeight - PANEL_GAP;
+
+      const overflowLeft = Math.max(0, margin - left);
+      const overflowRight = Math.max(0, (left + rawPanelWidth) - (viewportWidth - margin));
+      const overflowTop = Math.max(0, margin - top);
+      const overflowBottom = Math.max(0, (top + rawPanelHeight) - (viewportHeight - margin));
+      const overflow = overflowLeft + overflowRight + overflowTop + overflowBottom;
+
+      const minLeft = margin;
+      const maxLeft = viewportWidth - margin - rawPanelWidth;
+      const minTop = margin;
+      const maxTop = viewportHeight - margin - rawPanelHeight;
+
+      if (maxLeft < minLeft) {
+        left = clamp(left, 0, Math.max(0, viewportWidth - rawPanelWidth));
+      } else {
+        left = clamp(left, minLeft, maxLeft);
+      }
+
+      if (maxTop < minTop) {
+        top = clamp(top, 0, Math.max(0, viewportHeight - rawPanelHeight));
+      } else {
+        top = clamp(top, minTop, maxTop);
+      }
+
+      const adjustment = Math.abs(left - (horizontal === 'left' ? triggerRect.left : triggerRect.right - rawPanelWidth)) +
+        Math.abs(top - (vertical === 'below' ? triggerRect.bottom + PANEL_GAP : triggerRect.top - rawPanelHeight - PANEL_GAP));
+
+      return { left, top, vertical, horizontal, overflow, adjustment };
+    };
+
+    const placements = [
+      computePlacement('above', 'right'),
+      computePlacement('above', 'left'),
+      computePlacement('below', 'right'),
+      computePlacement('below', 'left'),
+    ];
+
+    placements.sort((a, b) => (a.overflow - b.overflow) || (a.adjustment - b.adjustment));
+    const chosen = placements[0];
+    if (!chosen) return;
+
+    panel.style.left = `${Math.round(chosen.left)}px`;
+    panel.style.top = `${Math.round(chosen.top)}px`;
+    panel.style.right = '';
+    panel.style.bottom = '';
+    panel.style.setProperty('--bn-panel-translate-x', '0px');
+    panel.style.setProperty('--bn-panel-translate-y', chosen.vertical === 'below' ? '-12px' : '12px');
+    panel.style.transformOrigin = `${chosen.vertical === 'below' ? 'top' : 'bottom'} ${chosen.horizontal === 'left' ? 'left' : 'right'}`;
+  }
+
+  function layoutIfVisible() {
+    if (panel.classList.contains('bn-show')) layoutPanel();
+  }
 
   const __bn_lagMs = 100;
   const __bn_trailWindow = 400;
@@ -725,35 +897,69 @@
     if (__bn_raf) cancelAnimationFrame(__bn_raf);
     __bn_raf = null;
 
-    const cx = __bn_dragX + gearW / 2;
-    const cy = __bn_dragY + gearH / 2;
-    const W = window.innerWidth, H = window.innerHeight;
-    const corners = {
-      tl: { x: SNAP_MARGIN + gearW / 2, y: SNAP_MARGIN + gearH / 2 },
-      tr: { x: W - SNAP_MARGIN - gearW / 2, y: SNAP_MARGIN + gearH / 2 },
-      bl: { x: SNAP_MARGIN + gearW / 2, y: H - SNAP_MARGIN - gearH / 2 },
-      br: { x: W - SNAP_MARGIN - gearW / 2, y: H - SNAP_MARGIN - gearH / 2 },
-    };
-    let best = 'br', bestDist = Infinity;
-    for (const k in corners) {
-      const p = corners[k]; const dx = p.x - cx, dy = p.y - cy; const d2 = dx * dx + dy * dy;
-      if (d2 < bestDist) { bestDist = d2; best = k; }
+    const viewportWidth = window.innerWidth || (document.documentElement ? document.documentElement.clientWidth : 0) || 0;
+    const viewportHeight = window.innerHeight || (document.documentElement ? document.documentElement.clientHeight : 0) || 0;
+
+    let target = { x: __bn_dragX, y: __bn_dragY };
+    const cx = target.x + gearW / 2;
+    const cy = target.y + gearH / 2;
+
+    if (viewportWidth && viewportHeight) {
+      const margin = POSITION_MARGIN;
+      const corners = {
+        tl: { x: margin + gearW / 2, y: margin + gearH / 2 },
+        tr: { x: viewportWidth - margin - gearW / 2, y: margin + gearH / 2 },
+        bl: { x: margin + gearW / 2, y: viewportHeight - margin - gearH / 2 },
+        br: { x: viewportWidth - margin - gearW / 2, y: viewportHeight - margin - gearH / 2 },
+      };
+      let bestCorner = null;
+      let bestDist = Infinity;
+      for (const key of Object.keys(corners)) {
+        const point = corners[key];
+        const dx = point.x - cx;
+        const dy = point.y - cy;
+        const dist = Math.hypot(dx, dy);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestCorner = key;
+        }
+      }
+
+      if (bestCorner && bestDist <= CORNER_SNAP_THRESHOLD) {
+        const point = corners[bestCorner];
+        target.x = point.x - gearW / 2;
+        target.y = point.y - gearH / 2;
+      } else {
+        if (cx <= margin + EDGE_SNAP_THRESHOLD) {
+          target.x = margin;
+        } else if (viewportWidth - cx <= EDGE_SNAP_THRESHOLD + margin) {
+          target.x = viewportWidth - margin - gearW;
+        }
+        if (cy <= margin + EDGE_SNAP_THRESHOLD) {
+          target.y = margin;
+        } else if (viewportHeight - cy <= EDGE_SNAP_THRESHOLD + margin) {
+          target.y = viewportHeight - margin - gearH;
+        }
+      }
     }
-    const fx = corners[best].x - gearW / 2;
-    const fy = corners[best].y - gearH / 2;
+
+    const finalPos = ensureWithinViewport(target);
 
     trigger.style.transition = 'transform 0.24s ease-out';
-    __bn_applyTransform(fx, fy);
+    __bn_applyTransform(finalPos.x, finalPos.y);
 
     setTimeout(() => {
       trigger.style.transition = '';
-      applyCorner(best);
+      applyPosition(finalPos);
+      layoutIfVisible();
       trigger.style.position = '';
       trigger.style.left = trigger.style.top = '';
       trigger.style.bottom = trigger.style.right = '';
       trigger.style.transform = '';
+      trigger.style.willChange = '';
+      trigger.style.touchAction = '';
       container.classList.remove('bn-dragging');
-      if (wasPinned) { panel.classList.add('bn-show'); }
+      if (wasPinned) { layoutPanel(); panel.classList.add('bn-show'); }
       updateContainerState();
 
       if (__bn_pointerId !== null && trigger.releasePointerCapture) { try { trigger.releasePointerCapture(__bn_pointerId); } catch (_) { } }
@@ -813,6 +1019,18 @@
     if (pinned) showPanel();
     else if (!trigger.matches(':hover') && !panel.matches(':hover')) hidePanel();
     updateContainerState();
+  });
+
+  window.addEventListener('resize', () => {
+    if (isDragging) return;
+    const rect = trigger.getBoundingClientRect();
+    if (rect) {
+      if (rect.width) gearW = rect.width;
+      if (rect.height) gearH = rect.height;
+    }
+    if (currentPosition) applyPosition(currentPosition, { save: true });
+    else initPosition();
+    layoutIfVisible();
   });
 
   function markOnce(el, key) {
@@ -916,6 +1134,7 @@
     });
     chkUseColor.checked = true;
     container.classList.add('bn-expanded'); panel.classList.add('bn-expanded'); colorSidebar.classList.add('bn-show');
+    layoutIfVisible();
     checkChanged();
   };
 
