@@ -1,5 +1,5 @@
 // Better Names for 7FA4
-// 6.0.0 SP17 Developer
+// 6.0.0 SP18 Developer
 
 function getCurrentUserId() {
   const ud = document.querySelector('#user-dropdown');
