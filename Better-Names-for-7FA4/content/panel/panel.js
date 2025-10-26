@@ -257,6 +257,12 @@
 
   const panel = document.getElementById('bn-panel');
   const pinBtn = document.getElementById('bn-pin');
+  const trigger = document.getElementById('bn-trigger');
+  if (!panel || !pinBtn || !trigger) {
+    console.error('[BN] 面板初始化失败：缺少必要的 DOM 元素');
+    container.remove();
+    return;
+  }
   let pinned = !!GM_getValue('panelPinned', false);
   const CORNER_KEY = 'bn.corner';
   const SNAP_MARGIN = 20;
