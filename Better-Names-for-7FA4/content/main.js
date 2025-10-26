@@ -554,9 +554,15 @@ window.getCurrentUserId = getCurrentUserId;
     .bn-color-item input[type="text"]:focus { border-color: #007bff; background: var(--bn-bg); box-shadow: 0 0 0 2px rgba(0,123,255,0.14); outline: none; }
     .bn-color-actions { display: flex; gap: 8px; }
     .bn-color-actions .bn-btn { flex: 1; padding: 10px 16px; font-size: 12px; }
-    .bn-save-actions {
+    .bn-footer {
       position: sticky;
-      bottom: var(--bn-version-h);
+      bottom: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--bn-bg);
+      z-index: 5;
+    }
+    .bn-save-actions {
       height: var(--bn-savebar-h);
       padding: 0 20px;
       border-top: 1px solid var(--bn-border-subtle);
@@ -565,7 +571,6 @@ window.getCurrentUserId = getCurrentUserId;
       opacity: 0; pointer-events: none; transform: translateY(12px);
       transition: opacity .28s cubic-bezier(.4, 0, .2, 1), transform .28s cubic-bezier(.4, 0, .2, 1);
       will-change: opacity, transform;
-      z-index: 5;
     }
     .bn-save-actions.bn-visible {
       opacity: 1; pointer-events: auto; transform: translateY(0);
@@ -888,12 +893,14 @@ window.getCurrentUserId = getCurrentUserId;
           </div>
         </div>
       </div>
-      <div class="bn-save-actions" id="bn-save-actions">
-        <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
-        <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
-      </div>
-      <div class="bn-version">
-        <div class="bn-version-text">6.0.0 SP17 Developer</div>
+      <div class="bn-footer">
+        <div class="bn-save-actions" id="bn-save-actions">
+          <button class="bn-btn bn-btn-primary" id="bn-save-config">保存配置</button>
+          <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
+        </div>
+        <div class="bn-version">
+          <div class="bn-version-text">6.0.0 SP17 Developer</div>
+        </div>
       </div>
     </div>`;
   document.body.appendChild(container);
