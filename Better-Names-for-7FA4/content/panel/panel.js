@@ -433,8 +433,6 @@
   let pinned = !!GM_getValue('panelPinned', false);
   const POSITION_KEY = 'bn.trigger.position.v2';
   const POSITION_MARGIN = 20;
-  const EDGE_SNAP_THRESHOLD = 64;
-  const CORNER_SNAP_THRESHOLD = 96;
   const PANEL_GAP = 10;
   const PANEL_MARGIN = 16;
   let isDragging = false;
@@ -797,58 +795,109 @@
     const viewportWidth = window.innerWidth || (document.documentElement ? document.documentElement.clientWidth : rawPanelWidth) || rawPanelWidth;
     const viewportHeight = window.innerHeight || (document.documentElement ? document.documentElement.clientHeight : rawPanelHeight) || rawPanelHeight;
     const margin = PANEL_MARGIN;
+    const minGap = Math.max(PANEL_GAP, 8);
 
-    const computePlacement = (vertical, horizontal) => {
-      let left = horizontal === 'left' ? triggerRect.left : triggerRect.right - rawPanelWidth;
-      let top = vertical === 'below' ? triggerRect.bottom + PANEL_GAP : triggerRect.top - rawPanelHeight - PANEL_GAP;
-
-      const overflowLeft = Math.max(0, margin - left);
-      const overflowRight = Math.max(0, (left + rawPanelWidth) - (viewportWidth - margin));
-      const overflowTop = Math.max(0, margin - top);
-      const overflowBottom = Math.max(0, (top + rawPanelHeight) - (viewportHeight - margin));
-      const overflow = overflowLeft + overflowRight + overflowTop + overflowBottom;
-
-      const minLeft = margin;
-      const maxLeft = viewportWidth - margin - rawPanelWidth;
-      const minTop = margin;
-      const maxTop = viewportHeight - margin - rawPanelHeight;
-
-      if (maxLeft < minLeft) {
-        left = clamp(left, 0, Math.max(0, viewportWidth - rawPanelWidth));
-      } else {
-        left = clamp(left, minLeft, maxLeft);
+    const clampAxis = (value, axis) => {
+      const viewportSize = axis === 'x' ? viewportWidth : viewportHeight;
+      const elementSize = axis === 'x' ? rawPanelWidth : rawPanelHeight;
+      if (!viewportSize || viewportSize <= 0) return value;
+      const min = margin;
+      const max = viewportSize - margin - elementSize;
+      if (max < min) {
+        return clamp(value, 0, Math.max(0, viewportSize - elementSize));
       }
-
-      if (maxTop < minTop) {
-        top = clamp(top, 0, Math.max(0, viewportHeight - rawPanelHeight));
-      } else {
-        top = clamp(top, minTop, maxTop);
-      }
-
-      const adjustment = Math.abs(left - (horizontal === 'left' ? triggerRect.left : triggerRect.right - rawPanelWidth)) +
-        Math.abs(top - (vertical === 'below' ? triggerRect.bottom + PANEL_GAP : triggerRect.top - rawPanelHeight - PANEL_GAP));
-
-      return { left, top, vertical, horizontal, overflow, adjustment };
+      return clamp(value, min, max);
     };
 
-    const placements = [
-      computePlacement('above', 'right'),
-      computePlacement('above', 'left'),
-      computePlacement('below', 'right'),
-      computePlacement('below', 'left'),
+    const clampPlacement = (baseLeft, baseTop) => {
+      const clampedLeft = clampAxis(baseLeft, 'x');
+      const clampedTop = clampAxis(baseTop, 'y');
+      return {
+        left: clampedLeft,
+        top: clampedTop,
+        adjustment: Math.abs(clampedLeft - baseLeft) + Math.abs(clampedTop - baseTop),
+      };
+    };
+
+    const scorePlacement = (placement) => {
+      const { baseLeft, baseTop } = placement;
+      const overflowLeft = Math.max(0, margin - baseLeft);
+      const overflowRight = Math.max(0, (baseLeft + rawPanelWidth) - (viewportWidth - margin));
+      const overflowTop = Math.max(0, margin - baseTop);
+      const overflowBottom = Math.max(0, (baseTop + rawPanelHeight) - (viewportHeight - margin));
+      const overflow = overflowLeft + overflowRight + overflowTop + overflowBottom;
+
+      const clamped = clampPlacement(baseLeft, baseTop);
+      const panelLeft = clamped.left;
+      const panelTop = clamped.top;
+      const panelRight = panelLeft + rawPanelWidth;
+      const panelBottom = panelTop + rawPanelHeight;
+
+      const expandedTrigger = {
+        left: triggerRect.left - minGap,
+        right: triggerRect.right + minGap,
+        top: triggerRect.top - minGap,
+        bottom: triggerRect.bottom + minGap,
+      };
+
+      const overlapX = Math.max(0, Math.min(panelRight, expandedTrigger.right) - Math.max(panelLeft, expandedTrigger.left));
+      const overlapY = Math.max(0, Math.min(panelBottom, expandedTrigger.bottom) - Math.max(panelTop, expandedTrigger.top));
+      const overlapArea = overlapX * overlapY;
+
+      return {
+        ...placement,
+        left: panelLeft,
+        top: panelTop,
+        overflow,
+        adjustment: clamped.adjustment,
+        overlapArea,
+      };
+    };
+
+    const centerX = triggerRect.left + triggerRect.width / 2;
+    const centerY = triggerRect.top + triggerRect.height / 2;
+
+    const candidates = [
+      { baseLeft: centerX - rawPanelWidth / 2, baseTop: triggerRect.bottom + PANEL_GAP, hint: 'below-center', preference: 0 },
+      { baseLeft: centerX - rawPanelWidth / 2, baseTop: triggerRect.top - rawPanelHeight - PANEL_GAP, hint: 'above-center', preference: 1 },
+      { baseLeft: triggerRect.right + PANEL_GAP, baseTop: centerY - rawPanelHeight / 2, hint: 'right-center', preference: 2 },
+      { baseLeft: triggerRect.left - rawPanelWidth - PANEL_GAP, baseTop: centerY - rawPanelHeight / 2, hint: 'left-center', preference: 3 },
+      { baseLeft: triggerRect.right + PANEL_GAP, baseTop: triggerRect.bottom + PANEL_GAP, hint: 'below-right', preference: 4 },
+      { baseLeft: triggerRect.left - rawPanelWidth - PANEL_GAP, baseTop: triggerRect.bottom + PANEL_GAP, hint: 'below-left', preference: 5 },
+      { baseLeft: triggerRect.right + PANEL_GAP, baseTop: triggerRect.top - rawPanelHeight - PANEL_GAP, hint: 'above-right', preference: 6 },
+      { baseLeft: triggerRect.left - rawPanelWidth - PANEL_GAP, baseTop: triggerRect.top - rawPanelHeight - PANEL_GAP, hint: 'above-left', preference: 7 },
     ];
 
-    placements.sort((a, b) => (a.overflow - b.overflow) || (a.adjustment - b.adjustment));
+    const placements = candidates.map(scorePlacement);
+    placements.sort((a, b) => (a.overlapArea - b.overlapArea) || (a.overflow - b.overflow) || (a.adjustment - b.adjustment) || (a.preference - b.preference));
     const chosen = placements[0];
     if (!chosen) return;
+
+    const panelCenterX = chosen.left + rawPanelWidth / 2;
+    const panelCenterY = chosen.top + rawPanelHeight / 2;
+    const deltaX = panelCenterX - centerX;
+    const deltaY = panelCenterY - centerY;
+
+    let translateX = '0px';
+    let translateY = '0px';
+    let originVertical = 'center';
+    let originHorizontal = 'center';
+
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      translateX = deltaX > 0 ? '-12px' : '12px';
+      originHorizontal = deltaX > 0 ? 'left' : 'right';
+    } else {
+      translateY = deltaY > 0 ? '-12px' : '12px';
+      originVertical = deltaY > 0 ? 'top' : 'bottom';
+    }
 
     panel.style.left = `${Math.round(chosen.left)}px`;
     panel.style.top = `${Math.round(chosen.top)}px`;
     panel.style.right = '';
     panel.style.bottom = '';
-    panel.style.setProperty('--bn-panel-translate-x', '0px');
-    panel.style.setProperty('--bn-panel-translate-y', chosen.vertical === 'below' ? '-12px' : '12px');
-    panel.style.transformOrigin = `${chosen.vertical === 'below' ? 'top' : 'bottom'} ${chosen.horizontal === 'left' ? 'left' : 'right'}`;
+    panel.style.setProperty('--bn-panel-translate-x', translateX);
+    panel.style.setProperty('--bn-panel-translate-y', translateY);
+    panel.style.transformOrigin = `${originVertical} ${originHorizontal}`;
   }
 
   function layoutIfVisible() {
@@ -897,53 +946,9 @@
     if (__bn_raf) cancelAnimationFrame(__bn_raf);
     __bn_raf = null;
 
-    const viewportWidth = window.innerWidth || (document.documentElement ? document.documentElement.clientWidth : 0) || 0;
-    const viewportHeight = window.innerHeight || (document.documentElement ? document.documentElement.clientHeight : 0) || 0;
+    const target = ensureWithinViewport({ x: __bn_dragX, y: __bn_dragY });
 
-    let target = { x: __bn_dragX, y: __bn_dragY };
-    const cx = target.x + gearW / 2;
-    const cy = target.y + gearH / 2;
-
-    if (viewportWidth && viewportHeight) {
-      const margin = POSITION_MARGIN;
-      const corners = {
-        tl: { x: margin + gearW / 2, y: margin + gearH / 2 },
-        tr: { x: viewportWidth - margin - gearW / 2, y: margin + gearH / 2 },
-        bl: { x: margin + gearW / 2, y: viewportHeight - margin - gearH / 2 },
-        br: { x: viewportWidth - margin - gearW / 2, y: viewportHeight - margin - gearH / 2 },
-      };
-      let bestCorner = null;
-      let bestDist = Infinity;
-      for (const key of Object.keys(corners)) {
-        const point = corners[key];
-        const dx = point.x - cx;
-        const dy = point.y - cy;
-        const dist = Math.hypot(dx, dy);
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestCorner = key;
-        }
-      }
-
-      if (bestCorner && bestDist <= CORNER_SNAP_THRESHOLD) {
-        const point = corners[bestCorner];
-        target.x = point.x - gearW / 2;
-        target.y = point.y - gearH / 2;
-      } else {
-        if (cx <= margin + EDGE_SNAP_THRESHOLD) {
-          target.x = margin;
-        } else if (viewportWidth - cx <= EDGE_SNAP_THRESHOLD + margin) {
-          target.x = viewportWidth - margin - gearW;
-        }
-        if (cy <= margin + EDGE_SNAP_THRESHOLD) {
-          target.y = margin;
-        } else if (viewportHeight - cy <= EDGE_SNAP_THRESHOLD + margin) {
-          target.y = viewportHeight - margin - gearH;
-        }
-      }
-    }
-
-    const finalPos = ensureWithinViewport(target);
+    const finalPos = target;
 
     trigger.style.transition = 'transform 0.24s ease-out';
     __bn_applyTransform(finalPos.x, finalPos.y);
