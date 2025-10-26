@@ -800,10 +800,13 @@
     }
     if (!__bn_raf) __bn_raf = requestAnimationFrame(__bn_tick);
   };
-  if (window.PointerEvent) {
-    trigger.addEventListener('pointerdown', __bn_onDown, { passive: false });
-  } else {
-    trigger.addEventListener('mousedown', __bn_onDown, { passive: false });
+  const enableTriggerDragging = false;
+  if (enableTriggerDragging) {
+    if (window.PointerEvent) {
+      trigger.addEventListener('pointerdown', __bn_onDown, { passive: false });
+    } else {
+      trigger.addEventListener('mousedown', __bn_onDown, { passive: false });
+    }
   }
 
   pinBtn.addEventListener('click', () => {
