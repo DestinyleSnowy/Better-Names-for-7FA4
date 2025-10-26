@@ -960,7 +960,7 @@
     __bn_applyTransform(finalPos.x, finalPos.y);
 
     setTimeout(() => {
-      trigger.style.transition = '';
+      trigger.style.transition = 'none';
       applyPosition(finalPos, { clamp: false });
       layoutIfVisible();
       trigger.style.position = '';
@@ -979,6 +979,10 @@
       document.removeEventListener('mousemove', __bn_onMove);
       document.removeEventListener('mouseup', __bn_onUp);
       __bn_trail = []; __bn_pointerId = null;
+
+      const restoreTransition = () => { trigger.style.transition = ''; };
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(restoreTransition);
+      else setTimeout(restoreTransition, 0);
     }, 260);
   }
   const __bn_onDown = (e) => {
