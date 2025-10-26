@@ -555,7 +555,8 @@ window.getCurrentUserId = getCurrentUserId;
     .bn-color-actions { display: flex; gap: 8px; }
     .bn-color-actions .bn-btn { flex: 1; padding: 10px 16px; font-size: 12px; }
     .bn-save-actions {
-      position: sticky;
+      position: absolute;
+      left: 0; right: 0;
       bottom: var(--bn-version-h);
       height: var(--bn-savebar-h);
       padding: 0 20px;
@@ -565,7 +566,6 @@ window.getCurrentUserId = getCurrentUserId;
       opacity: 0; pointer-events: none; transform: translateY(12px);
       transition: opacity .28s cubic-bezier(.4, 0, .2, 1), transform .28s cubic-bezier(.4, 0, .2, 1);
       will-change: opacity, transform;
-      z-index: 5;
     }
     .bn-save-actions.bn-visible {
       opacity: 1; pointer-events: auto; transform: translateY(0);
