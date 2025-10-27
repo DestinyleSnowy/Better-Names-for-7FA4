@@ -1,6 +1,11 @@
 ## CHANGELOG
 
-### 6.0.1 Preview
+### 6.0.1 SP1 Developer Beta
+- 终止了对面板深色模式的支持
+- 优化面板的排列。
+- 修复存在的部分问题。
+
+### 6.0.1 Developer Beta
 - 添加 CHANGELOG。
 - 添加自动抢厕所功能。
 - 添加背景图片功能。

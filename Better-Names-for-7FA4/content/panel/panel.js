@@ -26,10 +26,6 @@
   const enableQuickSkip = GM_getValue('enableQuickSkip', false);
   const WIDTH_MODE_KEY = 'truncate.widthMode';
   const widthMode = GM_getValue(WIDTH_MODE_KEY, 'visual');
-  const THEME_KEY = 'colorTheme';
-  const themeMode = GM_getValue(THEME_KEY, 'auto');
-  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const effectiveTheme = themeMode === 'auto' ? (prefersDark ? 'dark' : 'light') : themeMode;
   const BN_TABLE_ROWS_SELECTOR = 'table.ui.very.basic.center.aligned.table tbody tr';
 
   const RENEW_PATH_RE = /^\/problems\/tag\/(\d+)\/?$/;
@@ -261,12 +257,10 @@
   const useCustomColors = GM_getValue('useCustomColors', false);
 
   const palettes = {
-    light: { x4: '#5a5a5a', x5: '#92800b', x6: '#77dd02', c1: '#ff0000', c2: '#ff6629', c3: '#ffbb00', g1: '#ca00ca', g2: '#62ca00', g3: '#13c2c2', d1: '#9900ff', d2: '#000cff', d3: '#597ef7', d4: '#896e00', by: '#8c8c8c', jl: '#ff85c0', uk: '#5e6e5e' },
-    dark: { x4: '#777676', x5: '#c7af11', x6: '#88ff00', c1: '#fc6363', c2: '#fd895b', c3: '#ffc069', g1: '#ce4dce', g2: '#93cc5e', g3: '#36cfc9', d1: '#b37feb', d2: '#666efcff', d3: '#85a5ff', d4: '#b3a15cff', by: '#d9d9d9', jl: '#ffadd2', uk: '#8c8c8c' }
+    light: { x4: '#5a5a5a', x5: '#92800b', x6: '#77dd02', c1: '#ff0000', c2: '#ff6629', c3: '#ffbb00', g1: '#ca00ca', g2: '#62ca00', g3: '#13c2c2', d1: '#9900ff', d2: '#000cff', d3: '#597ef7', d4: '#896e00', by: '#8c8c8c', jl: '#ff85c0', uk: '#5e6e5e' }
   };
 
-  const basePalette = palettes[effectiveTheme] || palettes.light;
-  const palette = Object.assign({}, basePalette, useCustomColors ? storedPalette : {});
+  const palette = Object.assign({}, palettes.light, useCustomColors ? storedPalette : {});
 
   const runtimeApi = (typeof browser !== 'undefined' && browser.runtime && typeof browser.runtime.getURL === 'function')
     ? browser.runtime
@@ -309,7 +303,6 @@
 
   const container = document.createElement('div');
   container.id = 'bn-container';
-  if (effectiveTheme === 'dark') container.classList.add('bn-dark');
   container.innerHTML = panelTemplate;
 
   const colorGrid = container.querySelector('#bn-color-grid');
@@ -387,7 +380,6 @@
   const chkSubmitter = document.getElementById('bn-enable-submitter');
   const planOpts = document.getElementById('bn-plan-options');
   const chkUseColor = document.getElementById('bn-use-custom-color');
-  const themeSelect = document.getElementById('bn-theme-select');
 
   const colorSidebar = document.getElementById('bn-color-sidebar');
   const saveActions = document.getElementById('bn-save-actions');
@@ -403,7 +395,7 @@
   userInp.value = isFinite(maxUserUnits) ? maxUserUnits : '';
   userInp.disabled = !chkUserTr.checked;
 
-  widthModeSel.value = widthMode;
+  if (widthModeSel) widthModeSel.value = widthMode;
 
   chkAv.checked = hideAvatar;
   chkCp.checked = enableCopy;
@@ -417,7 +409,6 @@
   planOpts.style.display = enablePlanAdder ? 'block' : 'none';
 
   chkUseColor.checked = useCustomColors;
-  themeSelect.value = themeMode;
 
   chkVj.checked = enableVjLink;
   chkHideDoneSkip.checked = hideDoneSkip;
@@ -496,7 +487,6 @@
     hideDoneSkip,
     enableQuickSkip,
     widthMode,
-    themeMode,
     bgEnabled: storedBgEnabled,
     bgImageUrl: normalizedBgUrl,
     bgOpacity: normalizedBgOpacity,
@@ -558,14 +548,6 @@
     panel.classList.add('bn-expanded');
     colorSidebar.classList.add('bn-show');
   }
-
-  themeSelect.onchange = () => {
-    const v = themeSelect.value;
-    if (v === 'dark') container.classList.add('bn-dark');
-    else if (v === 'light') container.classList.remove('bn-dark');
-    else { prefersDark ? container.classList.add('bn-dark') : container.classList.remove('bn-dark'); }
-    checkChanged();
-  };
 
   let hideTimer = null;
   const showPanel = () => {
@@ -756,8 +738,7 @@
       (document.getElementById('bn-hide-done-skip').checked !== originalConfig.hideDoneSkip) ||
       (document.getElementById('bn-enable-quick-skip').checked !== originalConfig.enableQuickSkip) ||
       (document.getElementById('bn-use-custom-color').checked !== originalConfig.useCustomColors) ||
-      (document.getElementById('bn-width-mode').value !== originalConfig.widthMode) ||
-      (document.getElementById('bn-theme-select').value !== originalConfig.themeMode) ||
+      ((document.getElementById('bn-width-mode')?.value ?? originalConfig.widthMode) !== originalConfig.widthMode) ||
       (document.getElementById('bn-bg-enabled').checked !== originalConfig.bgEnabled) ||
       (document.getElementById('bn-bg-image-url').value !== originalConfig.bgImageUrl) ||
       (document.getElementById('bn-bg-opacity').value !== originalConfig.bgOpacity) ||
@@ -825,10 +806,10 @@
   chkAutoRenew.onchange = checkChanged;
   chkRankingFilter.onchange = checkChanged;
   chkSubmitter.onchange = checkChanged;
-  widthModeSel.onchange = checkChanged;
+  if (widthModeSel) widthModeSel.onchange = checkChanged;
 
   document.getElementById('bn-color-reset').onclick = () => {
-    const base = palettes[(themeSelect.value === 'auto' ? (prefersDark ? 'dark' : 'light') : themeSelect.value)] || palettes.light;
+    const base = palettes.light;
     COLOR_KEYS.forEach(k => {
       if (colorPickers[k] && hexInputs[k]) {
         colorPickers[k].value = base[k];
@@ -855,7 +836,8 @@
     } else {
       GM_setValue('maxUserUnits', 'none');
     }
-    GM_setValue(WIDTH_MODE_KEY, widthModeSel.value);
+    const widthModeValue = (widthModeSel && widthModeSel.value) ? widthModeSel.value : widthMode;
+    GM_setValue(WIDTH_MODE_KEY, widthModeValue);
 
     GM_setValue('hideAvatar', chkAv.checked);
     GM_setValue('enableCopy', chkCp.checked);
@@ -869,8 +851,6 @@
     GM_setValue('enableAutoRenew', chkAutoRenew.checked);
     GM_setValue('enableSubmitter', chkSubmitter.checked);
     GM_setValue('rankingFilter.enabled', chkRankingFilter.checked);
-
-    GM_setValue(THEME_KEY, themeSelect.value);
 
     const obj = {};
     COLOR_KEYS.forEach(k => { if (colorPickers[k]) obj[k] = colorPickers[k].value; });
@@ -902,7 +882,7 @@
     chkUserTrEl.checked = originalConfig.userTruncate;
     titleInp.value = isFinite(originalConfig.maxTitleUnits) ? originalConfig.maxTitleUnits : '';
     userInp.value = isFinite(originalConfig.maxUserUnits) ? originalConfig.maxUserUnits : '';
-    widthModeSel.value = originalConfig.widthMode;
+    if (widthModeSel) widthModeSel.value = originalConfig.widthMode;
     chkAv.checked = originalConfig.hideAvatar;
     chkCp.checked = originalConfig.enableCopy;
     chkHo.checked = originalConfig.hideOrig;
@@ -929,7 +909,6 @@
     chkRankingFilter.checked = originalConfig.enableRankingFilter;
     chkSubmitter.checked = originalConfig.enableSubmitter;
     chkUseColor.checked = originalConfig.useCustomColors;
-    themeSelect.value = originalConfig.themeMode;
     if (hiToiletInput) hiToiletInput.checked = originalConfig.btEnabled;
     titleInp.disabled = !chkTitleTrEl.checked;
     userInp.disabled = !chkUserTrEl.checked;
@@ -943,9 +922,6 @@
       container.classList.remove('bn-expanded');
       panel.classList.remove('bn-expanded');
     }
-    if (themeSelect.value === 'dark') container.classList.add('bn-dark');
-    else if (themeSelect.value === 'light') container.classList.remove('bn-dark');
-    else { prefersDark ? container.classList.add('bn-dark') : container.classList.remove('bn-dark'); }
     COLOR_KEYS.forEach(k => {
       if (colorPickers[k] && hexInputs[k]) {
         colorPickers[k].value = originalConfig.palette[k];
@@ -1073,9 +1049,10 @@
   function truncateByUnits(str, maxU) {
     if (!isFinite(maxU)) return str;
     let used = 0, out = '';
+    const selectedWidthMode = (widthModeSel && widthModeSel.value) ? widthModeSel.value : widthMode;
     for (const ch of str) {
       const cp = ch.codePointAt(0);
-      const w = unitOfCharByMode(cp, widthModeSel.value || widthMode);
+      const w = unitOfCharByMode(cp, selectedWidthMode);
       if (used + w > maxU) { out += '...'; break; }
       out += ch; used += w;
     }

@@ -17,24 +17,6 @@
   --bn-savebar-h: 48px;
   --bn-version-h: 44px;
 }
-#bn-container.bn-dark {
-  --bn-bg: #1f2227;
-  --bn-bg-subtle: #15171c;
-  --bn-bg-grad-1: #23262c;
-  --bn-bg-grad-2: #1e2126;
-  --bn-border: #2c313a;
-  --bn-border-subtle:#2a2f37;
-  --bn-text: #e8eaed;
-  --bn-text-sub: #d5d7db;
-  --bn-text-muted: #aab0b7;
-  --bn-btn-bg: #23262c;
-  --bn-btn-text:#d5d7db;
-  --bn-shadow: 0 8px 32px rgba(0,0,0,0.4);
-  --bn-panel-shadow: 0 8px 32px rgba(0,0,0,0.5);
-  --bn-trigger-shadow: 0 4px 12px rgba(0,0,0,0.35);
-  --bn-hover-bg:#2a2f37;
-}
-
 #bn-container {
   position: fixed;
   bottom: 20px;
