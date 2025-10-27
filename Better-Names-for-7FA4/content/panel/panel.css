@@ -358,17 +358,41 @@
   margin-left: 24px;
   display: none;
 }
-#bn-title-options,
-#bn-user-options {
-  margin-left: 24px;
+.bn-truncate-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  flex-wrap: nowrap;
 }
-#bn-title-options {
-  display: none;
+.bn-truncate-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
 }
-#bn-user-options {
-  display: none;
+.bn-truncate-toggle input {
+  margin: 0;
 }
-
+.bn-truncate-toggle span {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#bn-panel .bn-truncate-input {
+  flex: 0 0 120px;
+  width: 120px;
+  max-width: 50%;
+  margin-bottom: 0;
+}
+#bn-panel .bn-truncate-input:disabled {
+  background: var(--bn-bg-subtle);
+  cursor: not-allowed;
+}
 #bn-container.bn-pos-br {
   bottom: 20px;
   right: 20px;
