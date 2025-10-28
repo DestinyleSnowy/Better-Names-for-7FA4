@@ -14,6 +14,7 @@
   const maxUserUnits = (storedUserUnits === 'none') ? Infinity : parseInt(storedUserUnits, 10);
   const hideAvatar = GM_getValue('hideAvatar', true);
   const enableCopy = GM_getValue('enableCopy', true);
+  const enableDescCopy = GM_getValue('enableDescCopy', false);
   const hideOrig = GM_getValue('hideOrig', true);
   const enableMenu = GM_getValue('enableUserMenu', true);
   const enablePlanAdder = GM_getValue('enablePlanAdder', true);
@@ -370,6 +371,7 @@
 
   const chkAv = document.getElementById('bn-hide-avatar');
   const chkCp = document.getElementById('bn-enable-copy');
+  const chkDescCp = document.getElementById('bn-enable-desc-copy');
   const chkHo = document.getElementById('bn-hide-orig');
 
   const chkMenu = document.getElementById('bn-enable-user-menu');
@@ -399,6 +401,7 @@
 
   chkAv.checked = hideAvatar;
   chkCp.checked = enableCopy;
+  chkDescCp.checked = enableDescCopy;
   chkHo.checked = hideOrig;
   chkMenu.checked = enableMenu;
   chkGuard.checked = enableGuard;
@@ -474,6 +477,7 @@
     maxUserUnits,
     hideAvatar,
     enableCopy,
+    enableDescCopy,
     hideOrig,
     enableMenu,
     enableGuard,
@@ -727,6 +731,7 @@
       (document.getElementById('bn-enable-user-truncate').checked && ui !== originalConfig.maxUserUnits) ||
       (document.getElementById('bn-hide-avatar').checked !== originalConfig.hideAvatar) ||
       (document.getElementById('bn-enable-copy').checked !== originalConfig.enableCopy) ||
+      (document.getElementById('bn-enable-desc-copy').checked !== originalConfig.enableDescCopy) ||
       (document.getElementById('bn-hide-orig').checked !== originalConfig.hideOrig) ||
       (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) ||
       (document.getElementById('bn-enable-guard').checked !== originalConfig.enableGuard) ||
@@ -783,6 +788,7 @@
 
   chkAv.onchange = checkChanged;
   chkCp.onchange = () => { checkChanged(); };
+  chkDescCp.onchange = checkChanged;
   chkHo.onchange = checkChanged;
   chkMenu.onchange = checkChanged;
   chkGuard.onchange = () => {
@@ -841,6 +847,7 @@
 
     GM_setValue('hideAvatar', chkAv.checked);
     GM_setValue('enableCopy', chkCp.checked);
+    GM_setValue('enableDescCopy', chkDescCp.checked);
     GM_setValue('hideOrig', chkHo.checked);
     GM_setValue('hideDoneSkip', chkHideDoneSkip.checked);
     GM_setValue('enableQuickSkip', chkQuickSkip.checked);
@@ -885,6 +892,7 @@
     if (widthModeSel) widthModeSel.value = originalConfig.widthMode;
     chkAv.checked = originalConfig.hideAvatar;
     chkCp.checked = originalConfig.enableCopy;
+    chkDescCp.checked = originalConfig.enableDescCopy;
     chkHo.checked = originalConfig.hideOrig;
     chkMenu.checked = originalConfig.enableMenu;
     chkGuard.checked = originalConfig.enableGuard;
@@ -1093,20 +1101,48 @@
     return s ? s[0].toUpperCase() : '';
   }
 
+  function stripLeadingBlank(text) {
+    if (typeof text !== 'string') return '';
+    let s = text.replace(/\r\n/g, '\n');
+    s = s.replace(/^[\uFEFF\u200B-\u200D\u2060]+/, '');
+    s = s.replace(/^(?:[ \t]*\n)+/, '');
+    return s;
+  }
+
+  function findProblemActionLink() {
+    const direct = document.querySelector('div.ui.buttons.right.floated > a[href]');
+    if (direct) return direct;
+    for (const g of document.querySelectorAll('div.ui.center.aligned.grid')) {
+      const candBox = g.querySelector('div.ui.buttons.right.floated');
+      if (!candBox) continue;
+      const anchor = candBox.querySelector('a[href]');
+      if (anchor) return anchor;
+    }
+    return null;
+  }
+
+  function sliceDescriptionSection(markdown) {
+    if (typeof markdown !== 'string' || !markdown) return null;
+    const normalized = markdown.replace(/\r\n/g, '\n');
+    const descHeadingRe = /(^|\n)##\s*题目描述\s*(\n|$)/;
+    const descMatch = descHeadingRe.exec(normalized);
+    if (!descMatch) return null;
+    const startIndex = descMatch.index + (descMatch[1] ? descMatch[1].length : 0);
+    const remainder = normalized.slice(startIndex);
+    const inputHeadingRe = /(^|\n)##\s*输入格式\s*(\n|$)/;
+    const inputMatch = inputHeadingRe.exec(remainder);
+    const endIndex = inputMatch ? startIndex + inputMatch.index : normalized.length;
+    const segment = normalized.slice(startIndex, endIndex);
+    const cleaned = stripLeadingBlank(segment).trimEnd();
+    return cleaned ? cleaned : null;
+  }
+
   function fEasierClip() {
     if (!/\/problem\//.test(location.pathname)) return;
     if (firstVisibleCharOfTitle() === 'L') return;
     if (document.getElementById('bn-copy-btn')) return;
 
-    let link = document.querySelector('div.ui.buttons.right.floated > a');
-    if (!link) {
-      for (const g of document.querySelectorAll('div.ui.center.aligned.grid')) {
-        const candBox = g.querySelector('div.ui.buttons.right.floated');
-        if (candBox?.firstElementChild?.tagName === 'A') { link = candBox.firstElementChild; break; }
-      }
-    } else if (link.previousSibling) {
-      link = link.parentElement?.firstElementChild || link;
-    }
+    const link = findProblemActionLink();
     if (!link) return;
     if (hideOrig) link.style.display = 'none';
 
@@ -1114,12 +1150,6 @@
     btn.id = 'bn-copy-btn';
     btn.className = 'small ui button';
     btn.textContent = '复制题面';
-    function stripLeadingBlank(text) {
-      let s = text.replace(/\r\n/g, '\n');
-      s = s.replace(/^[\uFEFF\u200B-\u200D\u2060]+/, '');
-      s = s.replace(/^(?:[ \t]*\n)+/, '');
-      return s;
-    }
 
     btn.onclick = async () => {
       const originalText = btn.textContent;
@@ -1154,6 +1184,66 @@
           btn.style.pointerEvents = '';
         }, 1200);
 
+      } catch (e) {
+        btn.textContent = originalText;
+        btn.style.backgroundColor = originalBg;
+        btn.style.color = originalColor;
+        btn.style.pointerEvents = '';
+        GM_notification({ text: '复制失败：' + e, timeout: 3000 });
+      }
+    };
+
+    link.parentNode.insertBefore(btn, link);
+  }
+
+  function fEasierDescClip() {
+    if (!/\/problem\//.test(location.pathname)) return;
+    if (firstVisibleCharOfTitle() === 'L') return;
+    if (document.getElementById('bn-copy-desc-btn')) return;
+
+    const link = findProblemActionLink();
+    if (!link) return;
+    if (hideOrig) link.style.display = 'none';
+
+    const btn = document.createElement('a');
+    btn.id = 'bn-copy-desc-btn';
+    btn.className = 'small ui button';
+    btn.textContent = '复制题面描述';
+
+    btn.onclick = async () => {
+      const originalText = btn.textContent;
+      const originalBg = btn.style.backgroundColor;
+      const originalColor = btn.style.color;
+
+      btn.textContent = '处理中…';
+      btn.style.pointerEvents = 'none';
+
+      try {
+        const res = await fetch(location.href.replace(/\/$/, '') + '/markdown/text', { credentials: 'include' });
+        let text = await res.text();
+        text = stripLeadingBlank(text);
+        const sliced = sliceDescriptionSection(text);
+        const target = sliced ? sliced : text;
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(target);
+        } else {
+          const ta = document.createElement('textarea');
+          ta.value = target;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          ta.remove();
+        }
+
+        btn.textContent = '复制成功';
+        btn.style.backgroundColor = '#21ba45';
+        btn.style.color = '#ffffff';
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.style.backgroundColor = originalBg;
+          btn.style.color = originalColor;
+          btn.style.pointerEvents = '';
+        }, 1200);
       } catch (e) {
         btn.textContent = originalText;
         btn.style.backgroundColor = originalBg;
@@ -1744,6 +1834,7 @@
   observer.observe(document.body, { childList: true, subtree: true });
 
   if (enableCopy) fEasierClip();
+  if (enableDescCopy) fEasierDescClip();
   if (enableMenu) initUserMenu();
   if (enableVjLink) fVjudgeLink();
 
