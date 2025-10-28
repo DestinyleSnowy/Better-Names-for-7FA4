@@ -1605,10 +1605,23 @@
     return { qualifies: true, insertIndex: computedIndex, questionIcon: true };
   }
 
+  // Utility to safely construct a problem URL path segment
+  function safeProblemUrl(problemId) {
+    // Accept only strings of digits
+    if (typeof problemId !== 'string' && typeof problemId !== 'number') return null;
+    const pidStr = String(problemId);
+    if (!/^\d+$/.test(pidStr)) return null;
+    return `/problem/${pidStr}/skip`;
+  }
+
   function createQuickSkipButton(problemId) {
     const btn = document.createElement('a');
     btn.setAttribute('data-bn-quick-skip', '1');
-    btn.href = `/problem/${problemId}/skip`;
+    const safeHref = safeProblemUrl(problemId);
+    if (!safeHref) {
+      throw new Error('Invalid problemId in createQuickSkipButton: ' + problemId);
+    }
+    btn.href = safeHref;
     btn.dataset.problemId = String(problemId);
     btn.className = 'bn-quick-skip';
     btn.innerHTML = '<i class="coffee icon" aria-hidden="true"></i><span>Skip</span>';
