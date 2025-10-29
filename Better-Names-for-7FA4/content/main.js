@@ -937,6 +937,353 @@ window.getCurrentUserId = getCurrentUserId;
 })();
 
 /* =================================================================
+ *  榜单页：加载全部分页数据
+ * ================================================================= */
+(function () {
+  'use strict';
+
+  const PATH_RE = /^\/progress\/contest_table/;
+  if (!PATH_RE.test(location.pathname)) return;
+  if (typeof window.fetch !== 'function') return;
+
+  const API_PATTERN = /\/progress\/contest_table\/json\b/i;
+  const MAX_PAGES = 200;
+  const originalFetch = window.fetch.bind(window);
+  const responseCache = new Map();
+
+  const ARRAY_KEY_SCORES = new Map([
+    ['data', 40],
+    ['rows', 40],
+    ['list', 35],
+    ['items', 35],
+    ['entries', 35],
+    ['result', 30],
+    ['results', 30],
+    ['records', 30],
+    ['table', 25]
+  ]);
+  const TOTAL_PAGE_KEYS = ['total_page', 'total_pages', 'totalpage', 'totalpages', 'page_count', 'pagecount', 'last_page', 'lastpage', 'pages'];
+  const TOTAL_COUNT_KEYS = ['total_count', 'totalcount', 'total_num', 'totalnum', 'record_count', 'recordcount', 'records'];
+  const PER_PAGE_KEYS = ['per_page', 'page_size', 'pagesize', 'perpage', 'limit', 'rows_per_page'];
+  const PAGE_INDEX_KEYS = ['page', 'current_page', 'currentpage', 'page_index', 'pageindex'];
+  const NEXT_BOOL_KEYS = ['has_more', 'hasmore', 'has_next', 'hasnext'];
+  const NEXT_PAGE_KEYS = ['next_page', 'nextpage', 'next'];
+  const PREV_PAGE_KEYS = ['prev_page', 'prevpage', 'previous_page', 'previous'];
+
+  function getRequestURL(resource) {
+    try {
+      if (typeof resource === 'string') return new URL(resource, location.href);
+      if (resource instanceof Request) return new URL(resource.url, location.href);
+    } catch (err) {
+      console.warn('[BN] contest table: failed to parse request URL', err);
+    }
+    return null;
+  }
+
+  function buildCacheKey(url) {
+    const keyUrl = new URL(url.href);
+    keyUrl.searchParams.delete('page');
+    const pairs = Array.from(keyUrl.searchParams.entries())
+      .sort((a, b) => (a[0] === b[0]) ? a[1].localeCompare(b[1]) : a[0].localeCompare(b[0]));
+    const query = pairs.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
+    return keyUrl.origin + keyUrl.pathname + (query ? `?${query}` : '');
+  }
+
+  function makeResponseFromPayload(payload) {
+    const headers = new Headers(payload.headers);
+    return new Response(payload.body, {
+      status: payload.status,
+      statusText: payload.statusText,
+      headers
+    });
+  }
+
+  function cachePayload(cacheKey, payload) {
+    responseCache.set(cacheKey, payload);
+    return makeResponseFromPayload(payload);
+  }
+
+  function getCachedResponse(cacheKey) {
+    if (!responseCache.has(cacheKey)) return null;
+    return makeResponseFromPayload(responseCache.get(cacheKey));
+  }
+
+  function getByPath(root, path) {
+    return path.reduce((acc, key) => (acc && typeof acc === 'object') ? acc[key] : undefined, root);
+  }
+
+  function setByPath(root, path, value) {
+    if (!path.length) return false;
+    let target = root;
+    for (let i = 0; i < path.length - 1; i += 1) {
+      if (!target || typeof target !== 'object') return false;
+      target = target[path[i]];
+    }
+    if (!target || typeof target !== 'object') return false;
+    target[path[path.length - 1]] = value;
+    return true;
+  }
+
+  function scoreArrayKey(key, array) {
+    if (!Array.isArray(array)) return -Infinity;
+    if (array.length && (typeof array[0] !== 'object' || array[0] === null)) return -Infinity;
+    const lower = key.toLowerCase();
+    const base = array.length ? 60 : 15;
+    const bonus = (ARRAY_KEY_SCORES.get(lower) || 0)
+      + (/list|rows|data|items|entries|result|records|table/.test(lower) ? 5 : 0);
+    return base + bonus;
+  }
+
+  function findDataArrayInfo(root) {
+    let best = null;
+    function traverse(node, path) {
+      if (!node || typeof node !== 'object') return;
+      if (Array.isArray(node)) return;
+      for (const [key, value] of Object.entries(node)) {
+        const currentPath = path.concat(key);
+        if (Array.isArray(value)) {
+          const score = scoreArrayKey(key, value);
+          if (score > (best ? best.score : -Infinity)) {
+            best = { path: currentPath, score, array: value };
+          }
+        }
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+          traverse(value, currentPath);
+        }
+      }
+    }
+    traverse(root, []);
+    if (!best || !Array.isArray(best.array)) return null;
+    if (best.array.length && (typeof best.array[0] !== 'object' || best.array[0] === null)) return null;
+    return { path: best.path, array: best.array };
+  }
+
+  function findNumberByKeys(root, keys) {
+    const targets = keys.map(k => k.toLowerCase());
+    let found = null;
+    function traverse(node) {
+      if (found !== null) return;
+      if (!node || typeof node !== 'object' || Array.isArray(node)) return;
+      for (const [key, value] of Object.entries(node)) {
+        if (typeof value === 'number' && targets.includes(key.toLowerCase())) {
+          found = value;
+          return;
+        }
+      }
+      for (const value of Object.values(node)) {
+        if (value && typeof value === 'object') traverse(value);
+        if (found !== null) return;
+      }
+    }
+    traverse(root);
+    return typeof found === 'number' && isFinite(found) ? found : null;
+  }
+
+  function detectTotalPages(root) {
+    const direct = findNumberByKeys(root, TOTAL_PAGE_KEYS);
+    if (direct) return direct;
+    const pagination = findNumberByKeys(root, ['pages', 'totalPages', 'totalpages']);
+    return pagination || null;
+  }
+
+  function detectTotalCount(root) {
+    const total = findNumberByKeys(root, ['total', ...TOTAL_COUNT_KEYS]);
+    return total || null;
+  }
+
+  function updatePaginationMetadata(root, totalItems) {
+    const pageIndexSet = new Set(PAGE_INDEX_KEYS.map(key => key.toLowerCase()));
+    const totalPageSet = new Set(TOTAL_PAGE_KEYS.map(key => key.toLowerCase()));
+    const perPageSet = new Set(PER_PAGE_KEYS.map(key => key.toLowerCase()));
+    const totalCountSet = new Set([...TOTAL_COUNT_KEYS, 'total'].map(key => key.toLowerCase()));
+    const nextBoolSet = new Set(NEXT_BOOL_KEYS.map(key => key.toLowerCase()));
+    const nextPageSet = new Set(NEXT_PAGE_KEYS.map(key => key.toLowerCase()));
+    const prevPageSet = new Set(PREV_PAGE_KEYS.map(key => key.toLowerCase()));
+    const indicatorKeys = new Set([
+      ...pageIndexSet,
+      ...totalPageSet,
+      ...perPageSet,
+      ...totalCountSet,
+      ...nextBoolSet,
+      ...nextPageSet,
+      ...prevPageSet
+    ]);
+
+    function traverse(node) {
+      if (!node || typeof node !== 'object' || Array.isArray(node)) return;
+      const lowerKeys = Object.keys(node).map(key => key.toLowerCase());
+      const hasIndicator = lowerKeys.some(key => indicatorKeys.has(key));
+      if (hasIndicator) {
+        for (const key of Object.keys(node)) {
+          const lower = key.toLowerCase();
+          if (pageIndexSet.has(lower)) node[key] = 1;
+          else if (totalPageSet.has(lower)) node[key] = 1;
+          else if (perPageSet.has(lower)) node[key] = totalItems;
+          else if (totalCountSet.has(lower)) node[key] = totalItems;
+          else if (nextBoolSet.has(lower)) node[key] = false;
+          else if (nextPageSet.has(lower)) node[key] = null;
+          else if (prevPageSet.has(lower)) node[key] = null;
+        }
+      }
+      for (const value of Object.values(node)) {
+        if (value && typeof value === 'object') traverse(value);
+      }
+    }
+    traverse(root);
+  }
+
+  function deriveRequestInit(resource, init) {
+    const derived = init ? { ...init } : {};
+    if (resource instanceof Request) {
+      const req = resource;
+      if (!derived.method) derived.method = req.method;
+      if (!derived.mode) derived.mode = req.mode;
+      if (derived.credentials === undefined) derived.credentials = req.credentials;
+      if (!derived.cache) derived.cache = req.cache;
+      if (!derived.redirect) derived.redirect = req.redirect;
+      if (!derived.referrer) derived.referrer = req.referrer;
+      if (!derived.referrerPolicy) derived.referrerPolicy = req.referrerPolicy;
+      if (!derived.integrity) derived.integrity = req.integrity;
+      if (derived.keepalive === undefined) derived.keepalive = req.keepalive;
+      if (!derived.headers) derived.headers = new Headers(req.headers);
+      if (!derived.signal && req.signal) derived.signal = req.signal;
+    }
+    if (derived.headers && !(derived.headers instanceof Headers)) derived.headers = new Headers(derived.headers);
+    const method = (derived.method || 'GET').toUpperCase();
+    derived.method = method;
+    if (method === 'GET' && derived.body !== undefined) delete derived.body;
+    if (derived.credentials === undefined) derived.credentials = 'include';
+    return derived;
+  }
+
+  async function fetchPageData(pageNumber, baseUrl, path, init) {
+    const pageUrl = new URL(baseUrl.href);
+    pageUrl.searchParams.set('page', String(pageNumber));
+    try {
+      const res = await originalFetch(pageUrl.toString(), init);
+      if (!res || !res.ok) return null;
+      const json = await res.clone().json().catch(() => null);
+      if (!json || typeof json !== 'object') return null;
+      const list = getByPath(json, path);
+      if (!Array.isArray(list)) return null;
+      if (list.length && (typeof list[0] !== 'object' || list[0] === null)) return null;
+      return list;
+    } catch (err) {
+      console.warn(`[BN] contest table: failed to load page ${pageNumber}`, err);
+      return null;
+    }
+  }
+
+  function createPayloadFromJSON(json, templateResponse) {
+    const headers = new Headers(templateResponse.headers || {});
+    headers.set('content-type', 'application/json; charset=utf-8');
+    headers.delete('content-length');
+    return {
+      body: JSON.stringify(json),
+      status: templateResponse.status,
+      statusText: templateResponse.statusText,
+      headers: Array.from(headers.entries())
+    };
+  }
+
+  async function buildAggregatedPayload({ response, url, resource, init }) {
+    const clone = response.clone();
+    let json;
+    try {
+      json = await clone.json();
+    } catch (err) {
+      console.warn('[BN] contest table: non-JSON response, skip aggregation', err);
+      return null;
+    }
+    if (!json || typeof json !== 'object') return null;
+    const arrayInfo = findDataArrayInfo(json);
+    if (!arrayInfo) {
+      return createPayloadFromJSON(json, response);
+    }
+
+    const currentPage = Number(url.searchParams.get('page')) || 1;
+    const perPage = arrayInfo.array.length;
+    const totalPagesDetected = detectTotalPages(json);
+    const totalCountDetected = detectTotalCount(json);
+    let plannedPages = totalPagesDetected || null;
+    if (!plannedPages && totalCountDetected && perPage) {
+      plannedPages = Math.ceil(totalCountDetected / Math.max(perPage, 1));
+    }
+    if (!plannedPages || !isFinite(plannedPages) || plannedPages <= 0) plannedPages = null;
+
+    const limit = Math.min(plannedPages || MAX_PAGES, MAX_PAGES);
+    const finalPage = Math.max(limit || 1, currentPage);
+    const aggregated = [];
+    const initForPages = deriveRequestInit(resource, init);
+
+    for (let page = 1; page <= finalPage; page += 1) {
+      let list;
+      if (page === currentPage) {
+        list = arrayInfo.array;
+      } else {
+        list = await fetchPageData(page, url, arrayInfo.path, initForPages);
+      }
+      if (!Array.isArray(list)) {
+        if (!plannedPages && page > currentPage) break;
+        continue;
+      }
+      aggregated.push(...list);
+      if (!plannedPages && page >= currentPage && perPage && list.length < perPage) {
+        break;
+      }
+    }
+
+    if (!plannedPages) {
+      let page = finalPage + 1;
+      while (page <= MAX_PAGES) {
+        const list = await fetchPageData(page, url, arrayInfo.path, initForPages);
+        if (!Array.isArray(list) || !list.length) break;
+        aggregated.push(...list);
+        if (perPage && list.length < perPage) break;
+        page += 1;
+      }
+    } else if (plannedPages > finalPage) {
+      for (let page = finalPage + 1; page <= Math.min(plannedPages, MAX_PAGES); page += 1) {
+        const list = await fetchPageData(page, url, arrayInfo.path, initForPages);
+        if (!Array.isArray(list) || !list.length) {
+          if (page > currentPage) break;
+          continue;
+        }
+        aggregated.push(...list);
+      }
+    }
+
+    const merged = aggregated.length ? aggregated : arrayInfo.array;
+    setByPath(json, arrayInfo.path, merged);
+    updatePaginationMetadata(json, merged.length);
+    return createPayloadFromJSON(json, response);
+  }
+
+  async function handleIntercept(resource, init, url, cacheKey) {
+    const cached = getCachedResponse(cacheKey);
+    if (cached) return cached;
+    const response = await originalFetch(resource, init);
+    try {
+      const payload = await buildAggregatedPayload({ response, url, resource, init });
+      if (!payload) return response;
+      return cachePayload(cacheKey, payload);
+    } catch (err) {
+      console.error('[BN] contest table aggregation failed', err);
+      return response;
+    }
+  }
+
+  window.fetch = function (resource, init) {
+    const url = getRequestURL(resource);
+    if (!url || !API_PATTERN.test(url.href)) {
+      return originalFetch(resource, init);
+    }
+    const cacheKey = buildCacheKey(url);
+    return handleIntercept(resource, init, url, cacheKey);
+  };
+})();
+
+/* =================================================================
  *  榜单页：学校筛选
  * ================================================================= */
 (function () {
