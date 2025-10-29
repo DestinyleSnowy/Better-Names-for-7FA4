@@ -59,6 +59,17 @@ def build_user_plan_url(uid: int) -> str:
     ts = int(time.time())
     return f"{BASE}/user_plan?user_id={uid}&date={ts}&type=day&format=td"
 
+class AuthError(RuntimeError):
+    """Raised when the response indicates that authentication is required."""
+
+
+AUTH_FAILURE_TIP = (
+    "❌ 看起来未登录。请在 main.py 里的 DEFAULT_COOKIE 粘贴最新 Cookie，"
+    "或者设置环境变量 JX_COOKIE（示例：export JX_COOKIE='connect.sid=...'），然后重新运行：python main.py。\n"
+    "Cookie 可以在浏览器 DevTools 的任一请求里复制整段。"
+)
+
+
 async def fetch_text(session: aiohttp.ClientSession, url: str, referer: Optional[str] = None) -> Optional[str]:
     timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
     headers = dict(HEADERS)
@@ -67,9 +78,19 @@ async def fetch_text(session: aiohttp.ClientSession, url: str, referer: Optional
     for attempt in range(MAX_RETRIES):
         try:
             async with session.get(url, headers=headers, timeout=timeout) as resp:
+                if resp.status in {401, 403}:
+                    raise AuthError
+                if resp.status in {301, 302, 303, 307, 308}:
+                    location = resp.headers.get("Location", "")
+                    if "login" in location.lower():
+                        raise AuthError
                 # 未登录通常会 200 返回登录页或 302 跳转
                 text = await resp.text()
+                if looks_like_login_page(text):
+                    raise AuthError
                 return text
+        except AuthError:
+            raise
         except Exception:
             if attempt < MAX_RETRIES - 1:
                 await asyncio.sleep(RETRY_BACKOFF[min(attempt, len(RETRY_BACKOFF) - 1)])
@@ -82,7 +103,19 @@ def looks_like_login_page(html: str) -> bool:
     soup = BeautifulSoup(html, "lxml")
     title = (soup.title.get_text(strip=True) if soup.title else "").lower()
     body_text = soup.get_text(" ", strip=True)
-    return ("登录" in body_text and "密码" in body_text) or "login" in title
+    normalized = body_text.lower()
+    keywords = ["登录", "登陆", "帐号", "账号", "密码", "请先登录", "sign in", "log in"]
+    matches = 0
+    for kw in keywords:
+        if kw in body_text or kw in normalized:
+            matches += 1
+    if matches >= 2:
+        return True
+    if soup.find("form", attrs={"action": re.compile("login", re.I)}):
+        return True
+    if soup.find("input", attrs={"type": "password"}):
+        return True
+    return "login" in title
 
 def extract_name_from_user_plan(html: str) -> Optional[str]:
     # XHR 返回的 HTML 片段里，第一个 <td> 形如：
@@ -153,16 +186,16 @@ async def ensure_auth(session: aiohttp.ClientSession) -> str:
     """
     先拉一个 ranklist 页面，判断是否已登录。
     """
-    html = await fetch_text(session, f"{BASE}/ranklist?page=1")
+    if not COOKIE_STR or "..." in COOKIE_STR:
+        raise SystemExit(
+            "❌ DEFAULT_COOKIE 仍是占位符。请粘贴真实 Cookie（或设置环境变量 JX_COOKIE）后再运行。"
+        )
+    try:
+        html = await fetch_text(session, f"{BASE}/ranklist?page=1")
+    except AuthError as exc:
+        raise SystemExit(AUTH_FAILURE_TIP) from exc
     if not html:
         raise SystemExit("❌ 无法访问站点（网络或超时）。")
-    if looks_like_login_page(html):
-        tip = (
-            "❌ 看起来未登录。请更新 main.py 中的 DEFAULT_COOKIE（或设置环境变量 JX_COOKIE）为最新 Cookie，"
-            "然后重新运行：python main.py。\n"
-            "Cookie 可以从浏览器 DevTools 的任一请求中复制整段。"
-        )
-        raise SystemExit(tip)
     return html
 
 async def crawl_names(initial_end: int) -> Dict[int, str]:
@@ -175,7 +208,10 @@ async def crawl_names(initial_end: int) -> Dict[int, str]:
             url = build_user_plan_url(uid)
             referer = f"{BASE}/user_plans/{uid}"
             async with sem:
-                html = await fetch_text(session, url, referer=referer)
+                try:
+                    html = await fetch_text(session, url, referer=referer)
+                except AuthError as exc:
+                    raise SystemExit(AUTH_FAILURE_TIP) from exc
             if not html:
                 return False
             name = extract_name_from_user_plan(html)
@@ -218,7 +254,10 @@ async def crawl_colorkeys() -> Dict[int, str]:
         async def one(page: int):
             url = f"{BASE}/ranklist?page={page}"
             async with sem:
-                html = await fetch_text(session, url)
+                try:
+                    html = await fetch_text(session, url)
+                except AuthError as exc:
+                    raise SystemExit(AUTH_FAILURE_TIP) from exc
             if not html:
                 return
             out.update(extract_uid_and_colorkey_from_ranklist(html))
