@@ -942,7 +942,7 @@ window.getCurrentUserId = getCurrentUserId;
 (function () {
   'use strict';
 
-  const PATH_RE = /^\/progress\/contest_table/;
+  const PATH_RE = /^\/progress\/contest_table(?:\/|$)/;
   if (!PATH_RE.test(location.pathname)) return;
   if (typeof window.fetch !== 'function') return;
 
