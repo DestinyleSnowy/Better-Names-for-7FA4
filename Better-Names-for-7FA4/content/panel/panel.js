@@ -375,7 +375,6 @@
   const chkHo = document.getElementById('bn-hide-orig');
 
   const chkMenu = document.getElementById('bn-enable-user-menu');
-  const chkGuard = document.getElementById('bn-enable-guard');
   const chkPlan = document.getElementById('bn-enable-plan');
   const chkAutoRenew = document.getElementById('bn-enable-renew');
   const chkRankingFilter = document.getElementById('bn-enable-ranking-filter');
@@ -404,7 +403,6 @@
   chkDescCp.checked = enableDescCopy;
   chkHo.checked = hideOrig;
   chkMenu.checked = enableMenu;
-  chkGuard.checked = enableGuard;
   chkPlan.checked = enablePlanAdder;
   chkAutoRenew.checked = enableAutoRenew;
   chkRankingFilter.checked = enableRankingFilterSetting;
@@ -480,7 +478,6 @@
     enableDescCopy,
     hideOrig,
     enableMenu,
-    enableGuard,
     enablePlanAdder,
     enableAutoRenew,
     enableRankingFilter: enableRankingFilterSetting,
@@ -734,7 +731,6 @@
       (document.getElementById('bn-enable-desc-copy').checked !== originalConfig.enableDescCopy) ||
       (document.getElementById('bn-hide-orig').checked !== originalConfig.hideOrig) ||
       (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) ||
-      (document.getElementById('bn-enable-guard').checked !== originalConfig.enableGuard) ||
       (document.getElementById('bn-enable-plan').checked !== originalConfig.enablePlanAdder) ||
       (document.getElementById('bn-enable-renew').checked !== originalConfig.enableAutoRenew) ||
       (document.getElementById('bn-enable-ranking-filter').checked !== originalConfig.enableRankingFilter) ||
@@ -791,20 +787,6 @@
   chkDescCp.onchange = checkChanged;
   chkHo.onchange = checkChanged;
   chkMenu.onchange = checkChanged;
-  chkGuard.onchange = () => {
-    if (!chkGuard.checked) {
-      disableNeedWarn();
-    } else if (typeof window.__bnGuardOriginalNeedWarn === 'function') {
-      window.needWarn = window.__bnGuardOriginalNeedWarn;
-    } else {
-      try {
-        delete window.needWarn;
-      } catch (e) {
-        window.needWarn = undefined;
-      }
-    }
-    checkChanged();
-  };
   chkVj.onchange = checkChanged;
   chkHideDoneSkip.onchange = () => { applyHideDoneSkip(chkHideDoneSkip.checked); checkChanged(); };
   chkQuickSkip.onchange = () => { applyQuickSkip(chkQuickSkip.checked); checkChanged(); };
@@ -852,7 +834,6 @@
     GM_setValue('hideDoneSkip', chkHideDoneSkip.checked);
     GM_setValue('enableQuickSkip', chkQuickSkip.checked);
     GM_setValue('enableUserMenu', chkMenu.checked);
-    GM_setValue('enableGuard', chkGuard.checked);
     GM_setValue('enableVjLink', chkVj.checked);
     GM_setValue('enablePlanAdder', chkPlan.checked);
     GM_setValue('enableAutoRenew', chkAutoRenew.checked);
@@ -895,18 +876,6 @@
     chkDescCp.checked = originalConfig.enableDescCopy;
     chkHo.checked = originalConfig.hideOrig;
     chkMenu.checked = originalConfig.enableMenu;
-    chkGuard.checked = originalConfig.enableGuard;
-    if (!originalConfig.enableGuard) {
-      disableNeedWarn();
-    } else if (typeof window.__bnGuardOriginalNeedWarn === 'function') {
-      window.needWarn = window.__bnGuardOriginalNeedWarn;
-    } else {
-      try {
-        delete window.needWarn;
-      } catch (e) {
-        window.needWarn = undefined;
-      }
-    }
     chkVj.checked = originalConfig.enableVjLink;
     chkHideDoneSkip.checked = originalConfig.hideDoneSkip;
     applyHideDoneSkip(originalConfig.hideDoneSkip);
