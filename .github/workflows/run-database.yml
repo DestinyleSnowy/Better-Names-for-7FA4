@@ -34,9 +34,13 @@ jobs:
         run: python main.py
 
       - name: Commit and push if changed
+        working-directory: ${{ github.workspace }}
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add data/users.json
-          git diff --staged --quiet || git commit -m "Update users.json from database script"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          pwd
+          ls -lah
+          git status
+          git add -A
+          git commit -m "Update users.json" || echo "No changes"
           git push
