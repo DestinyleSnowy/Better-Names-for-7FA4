@@ -1,5 +1,9 @@
 ## CHANGELOG
 
+### 6.0.1 SP2 Developer Beta
+- 移除二三帮守护功能
+- 修复存在的部分问题。
+
 ### 6.0.1 SP1 Developer Beta
 - 添加了题目描述快捷复制的功能。
 - 优化面板的排列。
