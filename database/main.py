@@ -21,7 +21,14 @@ MAX_RETRIES = 3
 RETRY_BACKOFF = (0.6, 1.2, 2.5)
 
 # -------------------- 认证与请求头 --------------------
-COOKIE_STR = os.environ.get("JX_COOKIE", "").strip()
+# 直接将数据库需要的 Cookie 写在这里，避免每次都去 PowerShell 里设置。
+# 如需更新，只要把浏览器里最新的 Cookie 覆盖到 DEFAULT_COOKIE 即可，
+# 或者通过设置环境变量 JX_COOKIE 来覆盖默认值。
+DEFAULT_COOKIE = (
+    "connect.sid=...; io=...; sidebar_collapsed=false; event_filter=all; "
+    "login=%5B%22board%22%2C%2283393899d725503cb8beae5b015b75df%22%5D"
+)
+COOKIE_STR = os.environ.get("JX_COOKIE", DEFAULT_COOKIE).strip()
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -30,9 +37,8 @@ HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "zh-CN,zh;q=0.9",
     "X-Requested-With": "XMLHttpRequest",  # 模拟 XHR
+    "Cookie": COOKIE_STR,
 }
-if COOKIE_STR:
-    HEADERS["Cookie"] = COOKIE_STR
 
 GRADE_TO_COLORKEY = {
     "小四": "x4", "小五": "x5", "小六": "x6",
@@ -152,10 +158,9 @@ async def ensure_auth(session: aiohttp.ClientSession) -> str:
         raise SystemExit("❌ 无法访问站点（网络或超时）。")
     if looks_like_login_page(html):
         tip = (
-            "❌ 看起来未登录。请在 PowerShell 里执行：\n"
-            "$env:JX_COOKIE = 'connect.sid=...; io=...; sidebar_collapsed=false; event_filter=all; login=...'\n"
-            "然后重新运行：python main.py\n"
-            "（Cookie 请从浏览器 DevTools 的某个请求里复制整段）"
+            "❌ 看起来未登录。请更新 main.py 中的 DEFAULT_COOKIE（或设置环境变量 JX_COOKIE）为最新 Cookie，"
+            "然后重新运行：python main.py。\n"
+            "Cookie 可以从浏览器 DevTools 的任一请求中复制整段。"
         )
         raise SystemExit(tip)
     return html
