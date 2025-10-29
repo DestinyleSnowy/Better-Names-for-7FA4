@@ -11,8 +11,7 @@ from bs4 import BeautifulSoup
 
 BASE = "http://jx.7fa4.cn:8888"
 
-UID_START, UID_END = 1, 3113
-RANKLIST_PAGES = range(1, 61)  # 1..60
+UID_START = 1
 DATA_DIR = Path(__file__).resolve().parents[1] / 'Better-Names-for-7FA4' / 'data'
 
 # 并发、超时、重试
@@ -116,7 +115,35 @@ def extract_uid_and_colorkey_from_ranklist(html: str) -> Dict[int, str]:
             result[uid] = colorkey
     return result
 
-async def ensure_auth(session: aiohttp.ClientSession) -> None:
+def load_existing_max_uid() -> int:
+    path = DATA_DIR / "users.json"
+    if not path.exists():
+        return 0
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return 0
+    if isinstance(data, dict):
+        max_uid = 0
+        for key in data.keys():
+            try:
+                max_uid = max(max_uid, int(key))
+            except (TypeError, ValueError):
+                continue
+        return max_uid
+    return 0
+
+def extract_total_ranklist_pages(html: str) -> int:
+    soup = BeautifulSoup(html, "lxml")
+    pages = []
+    for a in soup.select("a[href*='ranklist']"):
+        text = a.get_text(strip=True)
+        if text.isdigit():
+            pages.append(int(text))
+    return max(pages) if pages else 1
+
+async def ensure_auth(session: aiohttp.ClientSession) -> str:
     """
     先拉一个 ranklist 页面，判断是否已登录。
     """
@@ -131,38 +158,57 @@ async def ensure_auth(session: aiohttp.ClientSession) -> None:
             "（Cookie 请从浏览器 DevTools 的某个请求里复制整段）"
         )
         raise SystemExit(tip)
+    return html
 
-async def crawl_names() -> Dict[int, str]:
+async def crawl_names(initial_end: int) -> Dict[int, str]:
     sem = asyncio.Semaphore(CONCURRENCY)
     out: Dict[int, str] = {}
     async with aiohttp.ClientSession() as session:
-        await ensure_auth(session)
+        _ = await ensure_auth(session)
 
-        async def one(uid: int):
+        async def one(uid: int) -> bool:
             url = build_user_plan_url(uid)
             referer = f"{BASE}/user_plans/{uid}"
             async with sem:
                 html = await fetch_text(session, url, referer=referer)
             if not html:
-                return
+                return False
             name = extract_name_from_user_plan(html)
             if name:
                 out[uid] = name
+                return True
+            return False
 
-        tasks = [asyncio.create_task(one(uid)) for uid in range(UID_START, UID_END + 1)]
-        done = 0
-        for fut in asyncio.as_completed(tasks):
-            await fut
-            done += 1
-            if done % 200 == 0:
-                print(f"[names] {done}/{UID_END-UID_START+1}")
+        existing_max = load_existing_max_uid()
+        target_end = max(initial_end, existing_max, UID_START - 1)
+        if target_end >= UID_START:
+            tasks = [asyncio.create_task(one(uid)) for uid in range(UID_START, target_end + 1)]
+            total = target_end - UID_START + 1
+            done = 0
+            for fut in asyncio.as_completed(tasks):
+                await fut
+                done += 1
+                if done % 200 == 0 or done == total:
+                    print(f"[names] {done}/{total}")
+
+        next_uid = max(target_end + 1, UID_START)
+        while True:
+            success = await one(next_uid)
+            if not success:
+                break
+            next_uid += 1
+            if (next_uid - target_end - 1) % 100 == 0:
+                print(f"[names] 扩展到 UID {next_uid - 1}")
     return out
 
 async def crawl_colorkeys() -> Dict[int, str]:
     sem = asyncio.Semaphore(CONCURRENCY)
     out: Dict[int, str] = {}
     async with aiohttp.ClientSession() as session:
-        await ensure_auth(session)
+        first_html = await ensure_auth(session)
+        total_pages = extract_total_ranklist_pages(first_html)
+        print(f"[rank] 发现 {total_pages} 页")
+        out.update(extract_uid_and_colorkey_from_ranklist(first_html))
 
         async def one(page: int):
             url = f"{BASE}/ranklist?page={page}"
@@ -171,19 +217,22 @@ async def crawl_colorkeys() -> Dict[int, str]:
             if not html:
                 return
             out.update(extract_uid_and_colorkey_from_ranklist(html))
-
-        tasks = [asyncio.create_task(one(p)) for p in RANKLIST_PAGES]
-        done = 0
-        for fut in asyncio.as_completed(tasks):
-            await fut
-            done += 1
-            if done % 10 == 0:
-                print(f"[rank] {done}/{len(RANKLIST_PAGES)}")
+        if total_pages >= 2:
+            tasks = [asyncio.create_task(one(p)) for p in range(2, total_pages + 1)]
+            done = 1  # 已处理第一页
+            total = total_pages
+            for fut in asyncio.as_completed(tasks):
+                await fut
+                done += 1
+                if done % 10 == 0 or done == total:
+                    print(f"[rank] {done}/{total}")
     return out
 
 def to_users_object(names: Dict[int, str], cols: Dict[int, str]) -> Dict[int, Dict[str, str]]:
     users: Dict[int, Dict[str, str]] = {}
-    for uid in range(UID_START, UID_END + 1):
+    existing_max = load_existing_max_uid()
+    max_uid = max([*names.keys(), *cols.keys(), existing_max, UID_START - 1])
+    for uid in range(UID_START, max_uid + 1):
         users[uid] = {"name": names.get(uid, ""), "colorKey": cols.get(uid, "uk")}
     return users
 
@@ -209,13 +258,14 @@ def write_outputs(users: Dict[int, Dict[str, str]]) -> None:
     print(f"✅ 已生成 {rel}")
 
 async def main():
-    print("开始抓取姓名（XHR：/user_plan）...")
-    names = await crawl_names()
-    print(f"姓名抓取完成：{len(names)} 条。")
-
-    print("开始抓取年级/颜色（/ranklist?page=1..60）...")
+    print("开始抓取年级/颜色（/ranklist）...")
     colorkeys = await crawl_colorkeys()
     print(f"年级抓取完成：{len(colorkeys)} 条。")
+
+    initial_end = max(colorkeys.keys(), default=UID_START - 1)
+    print("开始抓取姓名（XHR：/user_plan）...")
+    names = await crawl_names(initial_end)
+    print(f"姓名抓取完成：{len(names)} 条。")
 
     users = to_users_object(names, colorkeys)
     apply_special_colorkeys(users)
