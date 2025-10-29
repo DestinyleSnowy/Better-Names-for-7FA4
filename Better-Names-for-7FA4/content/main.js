@@ -947,9 +947,20 @@ window.getCurrentUserId = getCurrentUserId;
   if (typeof window.fetch !== 'function') return;
 
   const API_PATTERN = /\/progress\/contest_table\/json\b/i;
+  const DEBUG = true;
   const MAX_PAGES = 200;
   const originalFetch = window.fetch.bind(window);
   const responseCache = new Map();
+  const debugLog = (...args) => {
+    if (!DEBUG) return;
+    try {
+      console.debug('[BN] contest table:', ...args);
+    } catch (err) {
+      console.log('[BN] contest table (debug fallback):', ...args);
+    }
+  };
+
+  debugLog('aggregation script activated for', location.href);
 
   const ARRAY_KEY_SCORES = new Map([
     ['data', 40],
@@ -977,6 +988,7 @@ window.getCurrentUserId = getCurrentUserId;
     } catch (err) {
       console.warn('[BN] contest table: failed to parse request URL', err);
     }
+    debugLog('unable to build request URL from resource', resource);
     return null;
   }
 
@@ -986,6 +998,7 @@ window.getCurrentUserId = getCurrentUserId;
     const pairs = Array.from(keyUrl.searchParams.entries())
       .sort((a, b) => (a[0] === b[0]) ? a[1].localeCompare(b[1]) : a[0].localeCompare(b[0]));
     const query = pairs.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
+    debugLog('cache key generated', keyUrl.origin + keyUrl.pathname + (query ? `?${query}` : ''));
     return keyUrl.origin + keyUrl.pathname + (query ? `?${query}` : '');
   }
 
@@ -999,12 +1012,27 @@ window.getCurrentUserId = getCurrentUserId;
   }
 
   function cachePayload(cacheKey, payload) {
+    let cachedLength = 'n/a';
+    if (payload && typeof payload.body === 'string') {
+      try {
+        const parsed = JSON.parse(payload.body);
+        if (Array.isArray(parsed)) cachedLength = parsed.length;
+        else if (parsed && typeof parsed === 'object') {
+          const info = findDataArrayInfo(parsed);
+          cachedLength = info && Array.isArray(info.array) ? info.array.length : 'object';
+        }
+      } catch (err) {
+        cachedLength = 'parse-error';
+      }
+    }
+    debugLog('caching payload under key', cacheKey, 'items:', cachedLength);
     responseCache.set(cacheKey, payload);
     return makeResponseFromPayload(payload);
   }
 
   function getCachedResponse(cacheKey) {
     if (!responseCache.has(cacheKey)) return null;
+    debugLog('cache hit for key', cacheKey);
     return makeResponseFromPayload(responseCache.get(cacheKey));
   }
 
@@ -1159,6 +1187,7 @@ window.getCurrentUserId = getCurrentUserId;
   async function fetchPageData(pageNumber, baseUrl, path, init) {
     const pageUrl = new URL(baseUrl.href);
     pageUrl.searchParams.set('page', String(pageNumber));
+    debugLog('fetching page', pageNumber, '->', pageUrl.toString());
     try {
       const res = await originalFetch(pageUrl.toString(), init);
       if (!res || !res.ok) return null;
@@ -1167,9 +1196,11 @@ window.getCurrentUserId = getCurrentUserId;
       const list = getByPath(json, path);
       if (!Array.isArray(list)) return null;
       if (list.length && (typeof list[0] !== 'object' || list[0] === null)) return null;
+      debugLog('page', pageNumber, 'returned', list.length, 'rows');
       return list;
     } catch (err) {
       console.warn(`[BN] contest table: failed to load page ${pageNumber}`, err);
+      debugLog('page request failed', pageNumber, err);
       return null;
     }
   }
@@ -1198,6 +1229,7 @@ window.getCurrentUserId = getCurrentUserId;
     if (!json || typeof json !== 'object') return null;
     const arrayInfo = findDataArrayInfo(json);
     if (!arrayInfo) {
+      debugLog('no array info detected, returning original payload');
       return createPayloadFromJSON(json, response);
     }
 
@@ -1242,6 +1274,7 @@ window.getCurrentUserId = getCurrentUserId;
         if (perPage && list.length < perPage) break;
         page += 1;
       }
+      debugLog('dynamic crawl finished at page', page - 1, 'total rows:', aggregated.length);
     } else if (plannedPages > finalPage) {
       for (let page = finalPage + 1; page <= Math.min(plannedPages, MAX_PAGES); page += 1) {
         const list = await fetchPageData(page, url, arrayInfo.path, initForPages);
@@ -1251,11 +1284,19 @@ window.getCurrentUserId = getCurrentUserId;
         }
         aggregated.push(...list);
       }
+      debugLog('planned crawl finished at page', Math.min(plannedPages, MAX_PAGES), 'total rows:', aggregated.length);
     }
 
     const merged = aggregated.length ? aggregated : arrayInfo.array;
     setByPath(json, arrayInfo.path, merged);
     updatePaginationMetadata(json, merged.length);
+    debugLog('aggregation complete', {
+      path: arrayInfo.path,
+      currentPage,
+      perPage,
+      plannedPages,
+      mergedLength: merged.length
+    });
     return createPayloadFromJSON(json, response);
   }
 
@@ -1266,9 +1307,11 @@ window.getCurrentUserId = getCurrentUserId;
     try {
       const payload = await buildAggregatedPayload({ response, url, resource, init });
       if (!payload) return response;
+      debugLog('returning aggregated payload for', url.toString());
       return cachePayload(cacheKey, payload);
     } catch (err) {
       console.error('[BN] contest table aggregation failed', err);
+      debugLog('aggregation threw error', err);
       return response;
     }
   }
@@ -1276,8 +1319,10 @@ window.getCurrentUserId = getCurrentUserId;
   window.fetch = function (resource, init) {
     const url = getRequestURL(resource);
     if (!url || !API_PATTERN.test(url.href)) {
+      if (url) debugLog('pass-through request', url.href);
       return originalFetch(resource, init);
     }
+    debugLog('intercepting request', url.href);
     const cacheKey = buildCacheKey(url);
     return handleIntercept(resource, init, url, cacheKey);
   };
