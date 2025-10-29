@@ -152,10 +152,7 @@ async def ensure_auth(session: aiohttp.ClientSession) -> str:
         raise SystemExit("❌ 无法访问站点（网络或超时）。")
     if looks_like_login_page(html):
         tip = (
-            "❌ 看起来未登录。请在 PowerShell 里执行：\n"
-            "$env:JX_COOKIE = 'connect.sid=...; io=...; sidebar_collapsed=false; event_filter=all; login=...'\n"
-            "然后重新运行：python main.py\n"
-            "（Cookie 请从浏览器 DevTools 的某个请求里复制整段）"
+            "[Error] Run Powershell"
         )
         raise SystemExit(tip)
     return html
