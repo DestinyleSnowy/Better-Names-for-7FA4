@@ -135,6 +135,7 @@
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
+  align-items: stretch;
   flex: 1;
   min-width: 0;
   padding: 16px 20px 0 20px;
@@ -144,6 +145,13 @@
   .bn-main-content {
     padding: 12px 12px 0 12px;
   }
+}
+
+.bn-section-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
 }
 
 .bn-color-sidebar {
@@ -416,7 +424,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   flex-wrap: nowrap;
 }
 .bn-truncate-toggle {
@@ -446,6 +454,14 @@
 #bn-panel .bn-truncate-input:disabled {
   background: var(--bn-bg-subtle);
   cursor: not-allowed;
+}
+.bn-section-auto-update,
+.bn-section-display-options {
+  padding-bottom: 8px;
+}
+.bn-section-auto-update label:last-child,
+.bn-section-display-options label:last-child {
+  padding-bottom: 0;
 }
 #bn-container.bn-pos-br {
   bottom: 20px;

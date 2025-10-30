@@ -1,8 +1,9 @@
 ## CHANGELOG
 
-### 6.1.0 SP1 Developer Alpha
+### 6.1.0 Developer Beta
 - 添加了 Better Names for 7FA4 主题色的功能。
 - 优化抢厕所功能的请求间隔时间。
+- 优化了面板的排布。
 - 修复面板无法在模测界面正常唤起的问题。
 - 修复存在的部分问题。
 
