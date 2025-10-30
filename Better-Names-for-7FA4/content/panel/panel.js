@@ -551,9 +551,15 @@
   }
 
   let hideTimer = null;
+  const cancelHide = () => {
+    if (hideTimer != null) {
+      clearTimeout(hideTimer);
+      hideTimer = null;
+    }
+  };
   const showPanel = () => {
     if (isDragging || container.classList.contains('bn-dragging')) return;
-    clearTimeout(hideTimer);
+    cancelHide();
     panel.classList.add('bn-show');
     updateContainerState();
   };
@@ -565,6 +571,7 @@
   };
   trigger.addEventListener('mouseenter', showPanel);
   const maybeHidePanel = () => {
+    cancelHide();
     hideTimer = setTimeout(() => {
       if (!pinned && !trigger.matches(':hover') && !panel.matches(':hover') && !container.matches(':hover')) {
         hidePanel();
@@ -573,6 +580,8 @@
   };
   trigger.addEventListener('mouseleave', maybeHidePanel);
   panel.addEventListener('mouseleave', maybeHidePanel);
+  panel.addEventListener('mouseenter', showPanel);
+  container.addEventListener('mouseenter', showPanel);
 
   const __bn_lagMs = 100;
   const __bn_trailWindow = 400;

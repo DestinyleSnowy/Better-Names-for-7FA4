@@ -1,5 +1,9 @@
 ## CHANGELOG
 
+### 6.1.0 SP1 Developer Alpha
+- 修复面板无法在模测界面正常唤起的问题。
+- 修复存在的部分问题。
+
 ### 6.1.0 Developer Alpha
 - 榜多页合并。
 - 修复存在的部分问题。
