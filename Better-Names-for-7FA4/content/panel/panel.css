@@ -3,6 +3,7 @@
   --bn-bg-subtle: #fafbfc;
   --bn-bg-grad-1: #f8f9fa;
   --bn-bg-grad-2: #f1f3f4;
+  --bn-theme-color: #007bff;
   --bn-border: #e0e0e0;
   --bn-border-subtle:#e9ecef;
   --bn-text: #333;
@@ -245,7 +246,16 @@
 }
 #bn-panel label:hover { background: var(--bn-hover-bg); color: var(--bn-text); }
 
-#bn-panel input[type="checkbox"] { width: 16px; height: 16px; accent-color: #007bff; cursor: pointer; flex-shrink: 0; }
+#bn-panel input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--bn-theme-color, #007bff);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+#bn-panel input[type="range"] {
+  accent-color: var(--bn-theme-color, #007bff);
+}
 
 #bn-panel input[type="number"], #bn-panel select {
   width: 100%; max-width: 180px; padding: 6px 8px; border: 1px solid var(--bn-border-subtle);
@@ -278,6 +288,68 @@
 .bn-color-header { padding: 16px 20px; border-bottom: 1px solid var(--bn-border-subtle); background: var(--bn-bg); }
 .bn-color-title { font-size: 14px; font-weight: 600; color: var(--bn-text-sub); margin: 0 0 8px 0; display: flex; align-items: center; gap: 8px; }
 .bn-color-content { padding: 20px; }
+.bn-color-content > .bn-theme-color,
+.bn-color-content > .bn-color-grid,
+.bn-color-content > .bn-color-actions {
+  width: 100%;
+}
+.bn-theme-color {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: 10px;
+  background: var(--bn-bg);
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.bn-theme-color-label {
+  flex: 0 0 84px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bn-text-muted);
+  white-space: nowrap;
+}
+.bn-theme-color-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.bn-theme-color-inputs input[type="color"] {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
+  transition: transform .2s ease, box-shadow .2s ease;
+  background: transparent;
+  padding: 0;
+}
+.bn-theme-color-inputs input[type="color"]:hover {
+  transform: scale(1.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
+}
+.bn-theme-color-inputs .bn-color-hex {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: 'SF Mono','Monaco','Consolas',monospace;
+  background: var(--bn-bg-subtle);
+  color: var(--bn-text);
+  transition: all .2s ease;
+}
+.bn-theme-color-inputs .bn-color-hex:focus {
+  border-color: var(--bn-theme-color, #007bff);
+  background: var(--bn-bg);
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.14);
+  outline: none;
+}
 .bn-color-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 20px; }
 
 .bn-color-item {
@@ -593,4 +665,8 @@ a[data-bn-quick-skip="1"] i.icon,
   #bn-panel { width: 300px; }
   #bn-panel.bn-expanded { width: calc(100vw - 32px); max-width: 520px; }
   .bn-color-sidebar { width: 200px; }
+}
+.bn-theme-color:hover {
+  border-color: var(--bn-theme-color, #007bff);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }

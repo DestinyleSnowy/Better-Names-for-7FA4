@@ -11,6 +11,8 @@
   const storedBgEnabled = GM_getValue('bg_enabled', false);
   const storedBgImageUrl = GM_getValue('bg_imageUrl', '');
   const storedBgOpacity = GM_getValue('bg_opacity', '0.1');
+  const DEFAULT_THEME_COLOR = '#007bff';
+  const storedThemeColorRaw = GM_getValue('themeColor', DEFAULT_THEME_COLOR);
   const DEFAULT_MAX_UNITS = 10;
   const storedTitleUnits = GM_getValue('maxTitleUnits', DEFAULT_MAX_UNITS);
   const storedUserUnits = GM_getValue('maxUserUnits', DEFAULT_MAX_UNITS);
@@ -56,6 +58,24 @@
     if (rounded < HI_TOILET_INTERVAL_MIN) return HI_TOILET_INTERVAL_MIN;
     if (rounded > HI_TOILET_INTERVAL_MAX) return HI_TOILET_INTERVAL_MAX;
     return rounded;
+  }
+  function normalizeHexColor(value, fallback = DEFAULT_THEME_COLOR) {
+    const normalizedFallback = (() => {
+      if (typeof fallback === 'string') {
+        const trimmed = fallback.trim();
+        if (/^#[0-9a-fA-F]{6}$/.test(trimmed)) return `#${trimmed.slice(1).toLowerCase()}`;
+      }
+      return DEFAULT_THEME_COLOR;
+    })();
+    if (typeof value !== 'string') return normalizedFallback;
+    const trimmed = value.trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(trimmed)) return `#${trimmed.slice(1).toLowerCase()}`;
+    if (/^#[0-9a-fA-F]{3}$/.test(trimmed)) {
+      const hex = trimmed.slice(1);
+      const expanded = hex.split('').map(ch => `${ch}${ch}`).join('');
+      return `#${expanded.toLowerCase()}`;
+    }
+    return normalizedFallback;
   }
   function ensureBody(callback) {
     if (document.body) {
@@ -266,6 +286,7 @@
       return fallback;
     } catch { return fallback; }
   }
+  const themeColor = normalizeHexColor(storedThemeColorRaw, DEFAULT_THEME_COLOR);
   const storedPalette = safeGetJSON('userPalette', {});
   const useCustomColors = GM_getValue('useCustomColors', false);
 
@@ -317,6 +338,7 @@
   const container = document.createElement('div');
   container.id = 'bn-container';
   container.innerHTML = panelTemplate;
+  container.style.setProperty('--bn-theme-color', themeColor);
 
   const colorGrid = container.querySelector('#bn-color-grid');
   if (colorGrid) {
@@ -333,6 +355,8 @@
   const panel = document.getElementById('bn-panel');
   const pinBtn = document.getElementById('bn-pin');
   const trigger = document.getElementById('bn-trigger');
+  const themeColorInput = document.getElementById('bn-theme-color');
+  const themeColorHexInput = document.getElementById('bn-theme-color-hex');
   const bgEnabledInput = document.getElementById('bn-bg-enabled');
   const bgUrlInput = document.getElementById('bn-bg-image-url');
   const bgOpacityInput = document.getElementById('bn-bg-opacity');
@@ -497,6 +521,7 @@
     enableRankingFilter: enableRankingFilterSetting,
     enableSubmitter,
     useCustomColors,
+    themeColor,
     palette: Object.assign({}, palette),
     enableVjLink,
     hideDoneSkip,
@@ -522,6 +547,46 @@
   titleInp.disabled = !originalConfig.titleTruncate;
   userInp.disabled = !originalConfig.userTruncate;
   planOpts.style.display = originalConfig.enablePlanAdder ? 'block' : 'none';
+
+  if (themeColorInput) {
+    themeColorInput.value = themeColor;
+    themeColorInput.addEventListener('input', () => {
+      const normalized = normalizeHexColor(themeColorInput.value, originalConfig.themeColor);
+      themeColorInput.value = normalized;
+      if (themeColorHexInput) themeColorHexInput.value = normalized;
+      container.style.setProperty('--bn-theme-color', normalized);
+      checkChanged();
+    });
+  }
+  if (themeColorHexInput) {
+    themeColorHexInput.value = themeColor;
+    const syncThemeColorFromHex = (value) => {
+      const trimmed = value.trim();
+      const prefixed = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+      const normalized = normalizeHexColor(prefixed, themeColorInput ? themeColorInput.value : originalConfig.themeColor);
+      if (themeColorInput) themeColorInput.value = normalized;
+      themeColorHexInput.value = normalized;
+      container.style.setProperty('--bn-theme-color', normalized);
+    };
+    themeColorHexInput.addEventListener('input', () => {
+      const raw = themeColorHexInput.value.trim();
+      if (/^#?[0-9a-fA-F]{6}$/.test(raw)) {
+        syncThemeColorFromHex(raw.startsWith('#') ? raw : `#${raw}`);
+      }
+      checkChanged();
+    });
+    themeColorHexInput.addEventListener('blur', () => {
+      syncThemeColorFromHex(themeColorHexInput.value);
+      checkChanged();
+    });
+    themeColorHexInput.addEventListener('keydown', (evt) => {
+      if (evt.key === 'Enter') {
+        evt.preventDefault();
+        syncThemeColorFromHex(themeColorHexInput.value);
+        themeColorHexInput.blur();
+      }
+    });
+  }
 
   COLOR_KEYS.forEach(k => {
     colorPickers[k] = document.getElementById(`bn-color-${k}`);
@@ -744,6 +809,12 @@
     const paletteChanged = COLOR_KEYS.some(k => {
       return colorPickers[k] && colorPickers[k].value.toLowerCase() !== (originalConfig.palette[k] || '').toLowerCase();
     });
+    const currentThemeColor = themeColorInput
+      ? normalizeHexColor(themeColorInput.value, originalConfig.themeColor)
+      : originalConfig.themeColor;
+    const themeColorChanged = themeColorInput
+      ? currentThemeColor.toLowerCase() !== (originalConfig.themeColor || '').toLowerCase()
+      : false;
 
     const changed =
       (document.getElementById('bn-enable-title-truncate').checked !== originalConfig.titleTruncate) ||
@@ -769,6 +840,7 @@
       (document.getElementById('bn-bg-opacity').value !== originalConfig.bgOpacity) ||
       (document.getElementById('bn-bt-enabled').checked !== originalConfig.btEnabled) ||
       (hiToiletIntervalInput && clampHiToiletInterval(hiToiletIntervalInput.value) !== originalConfig.btInterval) ||
+      themeColorChanged ||
       paletteChanged;
 
     saveActions.classList.toggle('bn-visible', changed);
@@ -823,12 +895,16 @@
 
   document.getElementById('bn-color-reset').onclick = () => {
     const base = palettes.light;
+    const defaultTheme = normalizeHexColor(DEFAULT_THEME_COLOR, DEFAULT_THEME_COLOR);
     COLOR_KEYS.forEach(k => {
       if (colorPickers[k] && hexInputs[k]) {
         colorPickers[k].value = base[k];
         hexInputs[k].value = base[k];
       }
     });
+    if (themeColorInput) themeColorInput.value = defaultTheme;
+    if (themeColorHexInput) themeColorHexInput.value = defaultTheme;
+    container.style.setProperty('--bn-theme-color', defaultTheme);
     chkUseColor.checked = true;
     container.classList.add('bn-expanded'); panel.classList.add('bn-expanded'); colorSidebar.classList.add('bn-show');
     checkChanged();
@@ -869,6 +945,14 @@
     COLOR_KEYS.forEach(k => { if (colorPickers[k]) obj[k] = colorPickers[k].value; });
     GM_setValue('userPalette', JSON.stringify(obj));
     GM_setValue('useCustomColors', chkUseColor.checked);
+    const themeColorValue = themeColorInput
+      ? normalizeHexColor(themeColorInput.value, originalConfig.themeColor)
+      : originalConfig.themeColor;
+    GM_setValue('themeColor', themeColorValue);
+    container.style.setProperty('--bn-theme-color', themeColorValue);
+    if (themeColorInput) themeColorInput.value = themeColorValue;
+    if (themeColorHexInput) themeColorHexInput.value = themeColorValue;
+    originalConfig.themeColor = themeColorValue;
 
     syncSubmitterState(chkSubmitter.checked);
 
@@ -935,6 +1019,9 @@
         hexInputs[k].value = originalConfig.palette[k];
       }
     });
+    if (themeColorInput) themeColorInput.value = originalConfig.themeColor;
+    if (themeColorHexInput) themeColorHexInput.value = originalConfig.themeColor;
+    container.style.setProperty('--bn-theme-color', originalConfig.themeColor);
     if (bgEnabledInput) bgEnabledInput.checked = originalConfig.bgEnabled;
     if (bgUrlInput) bgUrlInput.value = originalConfig.bgImageUrl;
     if (bgOpacityInput) bgOpacityInput.value = originalConfig.bgOpacity;
