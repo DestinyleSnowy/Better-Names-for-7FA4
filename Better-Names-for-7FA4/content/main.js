@@ -1,6 +1,3 @@
-// Better Names for 7FA4
-// 6.0.0 SP18 Developer
-
 function getCurrentUserId() {
   const ud = document.querySelector('#user-dropdown');
   if (ud && ud.dataset && (ud.dataset.user_id || ud.dataset.userId)) {
@@ -37,7 +34,7 @@ window.getCurrentUserId = getCurrentUserId;
 
   const KEY = {
     mode: 'planAdder.mode',
-    selected: 'planAdder.selected.v4', // { [iso]: [{pid, code}] }
+    selected: 'planAdder.selected.v4', 
     date: 'planAdder.date',
     barPos: 'planAdder.barPos',
     autoExit: 'planAdder.autoExit',

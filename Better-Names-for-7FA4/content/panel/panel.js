@@ -4,6 +4,10 @@
   if (typeof window.__GM_ready === 'function') await window.__GM_ready();
 
   const btEnabled = GM_getValue('bt_enabled', false);
+  const DEFAULT_BT_INTERVAL = 2000;
+  const HI_TOILET_INTERVAL_MIN = 10;
+  const HI_TOILET_INTERVAL_MAX = 2000;
+  const storedBtInterval = clampHiToiletInterval(GM_getValue('bt_interval', DEFAULT_BT_INTERVAL));
   const storedBgEnabled = GM_getValue('bg_enabled', false);
   const storedBgImageUrl = GM_getValue('bg_imageUrl', '');
   const storedBgOpacity = GM_getValue('bg_opacity', '0.1');
@@ -44,6 +48,14 @@
   function formatOpacityText(value) {
     const num = clampOpacity(value);
     return num.toFixed(2).replace(/\.?0+$/, '');
+  }
+  function clampHiToiletInterval(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return DEFAULT_BT_INTERVAL;
+    const rounded = Math.round(num);
+    if (rounded < HI_TOILET_INTERVAL_MIN) return HI_TOILET_INTERVAL_MIN;
+    if (rounded > HI_TOILET_INTERVAL_MAX) return HI_TOILET_INTERVAL_MAX;
+    return rounded;
   }
   function ensureBody(callback) {
     if (document.body) {
@@ -326,6 +338,8 @@
   const bgOpacityInput = document.getElementById('bn-bg-opacity');
   const bgOpacityValueSpan = document.getElementById('bn-bg-opacity-value');
   const hiToiletInput = document.getElementById('bn-bt-enabled');
+  const hiToiletIntervalInput = document.getElementById('bn-bt-interval');
+  const hiToiletIntervalValue = document.getElementById('bn-bt-interval-value');
   if (!panel || !pinBtn || !trigger) {
     console.error('[BN] 面板初始化失败：缺少必要的 DOM 元素');
     container.remove();
@@ -491,7 +505,8 @@
     bgEnabled: storedBgEnabled,
     bgImageUrl: normalizedBgUrl,
     bgOpacity: normalizedBgOpacity,
-    btEnabled: btEnabled
+    btEnabled: btEnabled,
+    btInterval: storedBtInterval
   };
 
   if (!enableGuard) {
@@ -753,6 +768,7 @@
       (document.getElementById('bn-bg-image-url').value !== originalConfig.bgImageUrl) ||
       (document.getElementById('bn-bg-opacity').value !== originalConfig.bgOpacity) ||
       (document.getElementById('bn-bt-enabled').checked !== originalConfig.btEnabled) ||
+      (hiToiletIntervalInput && clampHiToiletInterval(hiToiletIntervalInput.value) !== originalConfig.btInterval) ||
       paletteChanged;
 
     saveActions.classList.toggle('bn-visible', changed);
@@ -861,11 +877,15 @@
     const bgOpacityRaw = bgOpacityInput ? bgOpacityInput.value : normalizedBgOpacity;
     const bgOpacity = String(clampOpacity(bgOpacityRaw));
     const btEnabled = hiToiletInput ? hiToiletInput.checked : !!(document.getElementById('bn-bt-enabled')?.checked);
+    const btInterval = hiToiletIntervalInput ? clampHiToiletInterval(hiToiletIntervalInput.value) : originalConfig.btInterval;
     
     GM_setValue('bg_enabled', bgEnabled);
     GM_setValue('bg_imageUrl', bgImageUrl);
     GM_setValue('bg_opacity', bgOpacity);
     GM_setValue('bt_enabled', btEnabled);
+    GM_setValue('bt_interval', btInterval);
+    originalConfig.btInterval = btInterval;
+    originalConfig.btEnabled = btEnabled;
 
     applyBackgroundOverlay(bgEnabled, bgImageUrl, bgOpacity);
     if (bgOpacityInput) bgOpacityInput.value = bgOpacity;
@@ -896,6 +916,7 @@
     chkSubmitter.checked = originalConfig.enableSubmitter;
     chkUseColor.checked = originalConfig.useCustomColors;
     if (hiToiletInput) hiToiletInput.checked = originalConfig.btEnabled;
+    setHiToiletIntervalDisplay(originalConfig.btInterval);
     titleInp.disabled = !chkTitleTrEl.checked;
     userInp.disabled = !chkUserTrEl.checked;
     planOpts.style.display = chkPlan.checked ? 'block' : 'none';
@@ -947,9 +968,33 @@
       });
     }
   }
+  function setHiToiletIntervalDisplay(value) {
+    const clamped = clampHiToiletInterval(value);
+    if (hiToiletIntervalInput) hiToiletIntervalInput.value = String(clamped);
+    if (hiToiletIntervalValue) hiToiletIntervalValue.textContent = String(clamped);
+  }
+  function refreshHiToiletIntervalDisplayFromInput() {
+    if (!hiToiletIntervalInput) return;
+    const clamped = clampHiToiletInterval(hiToiletIntervalInput.value);
+    if (hiToiletIntervalValue) hiToiletIntervalValue.textContent = String(clamped);
+  }
+  if (hiToiletIntervalInput) {
+    hiToiletIntervalInput.addEventListener('input', () => {
+      refreshHiToiletIntervalDisplayFromInput();
+      checkChanged();
+    });
+    hiToiletIntervalInput.addEventListener('change', () => {
+      setHiToiletIntervalDisplay(hiToiletIntervalInput.value);
+      checkChanged();
+    });
+  } else if (hiToiletIntervalValue) {
+    hiToiletIntervalValue.textContent = String(originalConfig.btInterval);
+  }
   if (hiToiletInput) hiToiletInput.addEventListener('change', checkChanged);
   else document.getElementById('bn-bt-enabled')?.addEventListener('change', checkChanged);
-  const HI_TOILET_POLL_INTERVAL = 2000;
+  function getHiToiletPollDelay() {
+    return clampHiToiletInterval(originalConfig.btInterval);
+  }
   let hiToiletTimer = null;
   function getContestIdFromPath(pathname) {
     const match = /^\/contest\/(\d+)/.exec(pathname || '');
@@ -964,7 +1009,8 @@
   function scheduleHiToiletPolling() {
     stopHiToiletPolling();
     if (!originalConfig.btEnabled) return;
-    hiToiletTimer = setTimeout(runHiToiletOnce, HI_TOILET_POLL_INTERVAL);
+    const delay = getHiToiletPollDelay();
+    hiToiletTimer = setTimeout(runHiToiletOnce, delay);
   }
   async function runHiToiletOnce() {
     stopHiToiletPolling();

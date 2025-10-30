@@ -201,6 +201,11 @@
           HiToilet
         </div>
         <label><input type="checkbox" id="bn-bt-enabled" ${btEnabled ? 'checked' : '' } /> 开始抢厕所</label>
+        <div style="margin-top: 8px;">
+          <label style="display: block; margin-bottom: 4px; font-size: 12px; color: var(--bn-text-muted);">轮询间隔:
+            <span id="bn-bt-interval-value">2000</span> ms</label>
+          <input type="range" id="bn-bt-interval" min="10" max="2000" step="10" value="2000" style="width: 100%;">
+        </div>
       </div>
       <div class="bn-section bn-section-color-theme">
         <div class="bn-title">
@@ -265,7 +270,7 @@
       <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
     </div>
     <div class="bn-version">
-      <div class="bn-version-text">6.1.0 Developer Alpha</div>
+      <div class="bn-version-text">6.1.0 SP1 Developer Alpha</div>
     </div>
   </div>
 </div>
