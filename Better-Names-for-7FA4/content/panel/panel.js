@@ -10,6 +10,9 @@
   const storedBtInterval = clampHiToiletInterval(GM_getValue('bt_interval', DEFAULT_BT_INTERVAL));
   const storedBgEnabled = GM_getValue('bg_enabled', false);
   const storedBgImageUrl = GM_getValue('bg_imageUrl', '');
+  const storedBgImageData = GM_getValue('bg_imageData', '');
+  const storedBgImageDataName = GM_getValue('bg_imageDataName', '');
+  const storedBgSourceTypeRaw = GM_getValue('bg_imageSourceType', '');
   const storedBgOpacity = GM_getValue('bg_opacity', '0.1');
   const DEFAULT_THEME_COLOR = '#007bff';
   const storedThemeColorRaw = GM_getValue('themeColor', DEFAULT_THEME_COLOR);
@@ -34,6 +37,7 @@
   const WIDTH_MODE_KEY = 'truncate.widthMode';
   const widthMode = GM_getValue(WIDTH_MODE_KEY, 'visual');
   const BN_TABLE_ROWS_SELECTOR = 'table.ui.very.basic.center.aligned.table tbody tr';
+  const MAX_LOCAL_BG_SIZE = 2 * 1024 * 1024;
 
   const RENEW_PATH_RE = /^\/problems\/tag\/(\d+)\/?$/;
   const RENEW_SUFFIX_RE = /\/renew\/?$/;
@@ -118,9 +122,19 @@
       layer.style.backgroundImage = `url("${trimmedUrl}")`;
     });
   }
+  const normalizedBgData = typeof storedBgImageData === 'string' ? storedBgImageData.trim() : '';
   const normalizedBgUrl = typeof storedBgImageUrl === 'string' ? storedBgImageUrl.trim() : '';
+  const normalizedBgSourceType = (() => {
+    if (storedBgSourceTypeRaw === 'local' && normalizedBgData) return 'local';
+    if (storedBgSourceTypeRaw === 'remote') return 'remote';
+    return normalizedBgData ? 'local' : 'remote';
+  })();
+  const normalizedBgFileName = typeof storedBgImageDataName === 'string' ? storedBgImageDataName : '';
   const normalizedBgOpacity = String(clampOpacity(storedBgOpacity));
-  applyBackgroundOverlay(storedBgEnabled, normalizedBgUrl, normalizedBgOpacity);
+  const initialBackgroundSource = (normalizedBgSourceType === 'local' && normalizedBgData)
+    ? normalizedBgData
+    : normalizedBgUrl;
+  applyBackgroundOverlay(storedBgEnabled, initialBackgroundSource, normalizedBgOpacity);
 
   function readAutoRenewMemory() {
     try {
@@ -361,6 +375,11 @@
   const bgUrlInput = document.getElementById('bn-bg-image-url');
   const bgOpacityInput = document.getElementById('bn-bg-opacity');
   const bgOpacityValueSpan = document.getElementById('bn-bg-opacity-value');
+  const bgFileInput = document.getElementById('bn-bg-image-file');
+  const bgFilePickBtn = document.getElementById('bn-bg-image-file-btn');
+  const bgFileNameSpan = document.getElementById('bn-bg-image-file-name');
+  const bgFileClearBtn = document.getElementById('bn-bg-clear-local');
+  const bgSourceHint = document.getElementById('bn-bg-source-hint');
   const hiToiletInput = document.getElementById('bn-bt-enabled');
   const hiToiletIntervalInput = document.getElementById('bn-bt-interval');
   const hiToiletIntervalValue = document.getElementById('bn-bt-interval-value');
@@ -379,6 +398,9 @@
   let __bn_raf = null;
   let __bn_dragX = 0, __bn_dragY = 0;
   let __bn_pointerId = null;
+  let currentBgSourceType = normalizedBgSourceType;
+  let currentBgImageData = normalizedBgData;
+  let currentBgImageDataName = normalizedBgFileName;
 
   function updateContainerState() {
     if (isDragging || container.classList.contains('bn-dragging')) {
@@ -529,10 +551,16 @@
     widthMode,
     bgEnabled: storedBgEnabled,
     bgImageUrl: normalizedBgUrl,
+    bgImageData: normalizedBgData,
+    bgImageDataName: normalizedBgFileName,
+    bgSourceType: normalizedBgSourceType,
     bgOpacity: normalizedBgOpacity,
     btEnabled: btEnabled,
     btInterval: storedBtInterval
   };
+  currentBgSourceType = originalConfig.bgSourceType;
+  currentBgImageData = originalConfig.bgImageData;
+  currentBgImageDataName = originalConfig.bgImageDataName;
 
   if (!enableGuard) {
     disableNeedWarn();
@@ -815,6 +843,19 @@
     const themeColorChanged = themeColorInput
       ? currentThemeColor.toLowerCase() !== (originalConfig.themeColor || '').toLowerCase()
       : false;
+    const currentBgEnabled = bgEnabledInput ? bgEnabledInput.checked : originalConfig.bgEnabled;
+    const currentBgOpacity = bgOpacityInput ? bgOpacityInput.value : originalConfig.bgOpacity;
+    const currentBgUrl = bgUrlInput ? bgUrlInput.value.trim() : '';
+    let bgSourceChanged = false;
+    if (currentBgSourceType === 'local') {
+      if (originalConfig.bgSourceType !== 'local' ||
+        currentBgImageData !== originalConfig.bgImageData ||
+        (currentBgImageDataName || '') !== (originalConfig.bgImageDataName || '')) {
+        bgSourceChanged = true;
+      }
+    } else if (originalConfig.bgSourceType !== 'remote' || currentBgUrl !== originalConfig.bgImageUrl) {
+      bgSourceChanged = true;
+    }
 
     const changed =
       (document.getElementById('bn-enable-title-truncate').checked !== originalConfig.titleTruncate) ||
@@ -835,9 +876,9 @@
       (document.getElementById('bn-enable-quick-skip').checked !== originalConfig.enableQuickSkip) ||
       (document.getElementById('bn-use-custom-color').checked !== originalConfig.useCustomColors) ||
       ((document.getElementById('bn-width-mode')?.value ?? originalConfig.widthMode) !== originalConfig.widthMode) ||
-      (document.getElementById('bn-bg-enabled').checked !== originalConfig.bgEnabled) ||
-      (document.getElementById('bn-bg-image-url').value !== originalConfig.bgImageUrl) ||
-      (document.getElementById('bn-bg-opacity').value !== originalConfig.bgOpacity) ||
+      (currentBgEnabled !== originalConfig.bgEnabled) ||
+      bgSourceChanged ||
+      (currentBgOpacity !== originalConfig.bgOpacity) ||
       (document.getElementById('bn-bt-enabled').checked !== originalConfig.btEnabled) ||
       (hiToiletIntervalInput && clampHiToiletInterval(hiToiletIntervalInput.value) !== originalConfig.btInterval) ||
       themeColorChanged ||
@@ -853,6 +894,36 @@
     } else {
       el.style.animation = 'slideUp 0.3s ease-out';
       setTimeout(() => { el.style.display = 'none'; }, 300);
+    }
+  }
+
+  function getEffectiveBackgroundUrl() {
+    if (currentBgSourceType === 'local' && currentBgImageData) return currentBgImageData;
+    return bgUrlInput ? bgUrlInput.value.trim() : '';
+  }
+
+  function updateBgSourceUI() {
+    if (bgFileNameSpan) {
+      if (currentBgSourceType === 'local' && currentBgImageData) {
+        const name = currentBgImageDataName || '已选择本地图片';
+        bgFileNameSpan.textContent = name;
+        bgFileNameSpan.title = name;
+      } else {
+        bgFileNameSpan.textContent = '未选择本地图片';
+        bgFileNameSpan.title = '';
+      }
+    }
+    if (bgSourceHint) {
+      if (currentBgSourceType === 'local' && currentBgImageData) {
+        const name = currentBgImageDataName ? ` (${currentBgImageDataName})` : '';
+        bgSourceHint.textContent = `当前背景来源：本地图片${name}`;
+      } else {
+        bgSourceHint.textContent = '当前背景来源：远程图片';
+      }
+    }
+    if (bgFileClearBtn) {
+      const shouldEnable = currentBgSourceType === 'local' && !!currentBgImageData;
+      bgFileClearBtn.disabled = !shouldEnable;
     }
   }
 
@@ -957,21 +1028,46 @@
     syncSubmitterState(chkSubmitter.checked);
 
     const bgEnabled = bgEnabledInput ? bgEnabledInput.checked : false;
-    const bgImageUrl = bgUrlInput ? bgUrlInput.value.trim() : '';
+    const rawBgUrl = bgUrlInput ? bgUrlInput.value.trim() : '';
     const bgOpacityRaw = bgOpacityInput ? bgOpacityInput.value : normalizedBgOpacity;
     const bgOpacity = String(clampOpacity(bgOpacityRaw));
     const btEnabled = hiToiletInput ? hiToiletInput.checked : !!(document.getElementById('bn-bt-enabled')?.checked);
     const btInterval = hiToiletIntervalInput ? clampHiToiletInterval(hiToiletIntervalInput.value) : originalConfig.btInterval;
+    let bgImageSourceType = (currentBgSourceType === 'local' && currentBgImageData) ? 'local' : 'remote';
+    let bgImageUrlToSave = rawBgUrl;
+    let bgImageDataToSave = '';
+    let bgImageDataNameToSave = '';
+    if (bgImageSourceType === 'local') {
+      bgImageUrlToSave = '';
+      bgImageDataToSave = currentBgImageData;
+      bgImageDataNameToSave = currentBgImageDataName || '';
+    }
+    const overlaySource = bgImageSourceType === 'local' && bgImageDataToSave
+      ? bgImageDataToSave
+      : bgImageUrlToSave;
     
     GM_setValue('bg_enabled', bgEnabled);
-    GM_setValue('bg_imageUrl', bgImageUrl);
+    GM_setValue('bg_imageSourceType', bgImageSourceType);
+    GM_setValue('bg_imageUrl', bgImageUrlToSave);
+    GM_setValue('bg_imageData', bgImageDataToSave);
+    GM_setValue('bg_imageDataName', bgImageDataNameToSave);
     GM_setValue('bg_opacity', bgOpacity);
     GM_setValue('bt_enabled', btEnabled);
     GM_setValue('bt_interval', btInterval);
     originalConfig.btInterval = btInterval;
     originalConfig.btEnabled = btEnabled;
+    originalConfig.bgEnabled = bgEnabled;
+    originalConfig.bgImageUrl = bgImageUrlToSave;
+    originalConfig.bgImageData = bgImageDataToSave;
+    originalConfig.bgImageDataName = bgImageDataNameToSave;
+    originalConfig.bgSourceType = bgImageSourceType;
+    originalConfig.bgOpacity = bgOpacity;
+    currentBgSourceType = bgImageSourceType;
+    currentBgImageData = bgImageDataToSave;
+    currentBgImageDataName = bgImageDataNameToSave;
 
-    applyBackgroundOverlay(bgEnabled, bgImageUrl, bgOpacity);
+    updateBgSourceUI();
+    applyBackgroundOverlay(bgEnabled, overlaySource, bgOpacity);
     if (bgOpacityInput) bgOpacityInput.value = bgOpacity;
     if (bgOpacityValueSpan) bgOpacityValueSpan.textContent = formatOpacityText(bgOpacity);
 
@@ -1024,9 +1120,17 @@
     container.style.setProperty('--bn-theme-color', originalConfig.themeColor);
     if (bgEnabledInput) bgEnabledInput.checked = originalConfig.bgEnabled;
     if (bgUrlInput) bgUrlInput.value = originalConfig.bgImageUrl;
+    currentBgSourceType = originalConfig.bgSourceType;
+    currentBgImageData = originalConfig.bgImageData;
+    currentBgImageDataName = originalConfig.bgImageDataName;
+    if (bgFileInput) bgFileInput.value = '';
     if (bgOpacityInput) bgOpacityInput.value = originalConfig.bgOpacity;
     if (bgOpacityValueSpan) bgOpacityValueSpan.textContent = formatOpacityText(originalConfig.bgOpacity);
-    applyBackgroundOverlay(originalConfig.bgEnabled, originalConfig.bgImageUrl, originalConfig.bgOpacity);
+    updateBgSourceUI();
+    const restoreSource = (originalConfig.bgSourceType === 'local' && originalConfig.bgImageData)
+      ? originalConfig.bgImageData
+      : originalConfig.bgImageUrl;
+    applyBackgroundOverlay(originalConfig.bgEnabled, restoreSource, originalConfig.bgOpacity);
     checkChanged();
   }
   restoreOriginalConfig();
@@ -1034,15 +1138,83 @@
     restoreOriginalConfig();
   };
 
-  if (bgEnabledInput && bgUrlInput && bgOpacityInput && bgOpacityValueSpan) {
+  if (bgEnabledInput && bgOpacityInput && bgOpacityValueSpan) {
     const updateBackgroundPreview = () => {
       bgOpacityValueSpan.textContent = formatOpacityText(bgOpacityInput.value);
-      applyBackgroundOverlay(bgEnabledInput.checked, bgUrlInput.value, bgOpacityInput.value);
+      applyBackgroundOverlay(bgEnabledInput.checked, getEffectiveBackgroundUrl(), bgOpacityInput.value);
       checkChanged();
     };
+    const handleBgUrlInput = () => {
+      if (currentBgSourceType === 'local') {
+        currentBgSourceType = 'remote';
+        currentBgImageData = '';
+        currentBgImageDataName = '';
+        if (bgFileInput) bgFileInput.value = '';
+        updateBgSourceUI();
+      }
+      updateBackgroundPreview();
+    };
     bgEnabledInput.addEventListener('change', updateBackgroundPreview);
-    bgUrlInput.addEventListener('input', updateBackgroundPreview);
+    if (bgUrlInput) bgUrlInput.addEventListener('input', handleBgUrlInput);
     bgOpacityInput.addEventListener('input', updateBackgroundPreview);
+    if (bgFilePickBtn && bgFileInput) {
+      bgFilePickBtn.addEventListener('click', () => bgFileInput.click());
+    }
+    if (bgFileInput) {
+      bgFileInput.addEventListener('change', () => {
+        const file = bgFileInput.files && bgFileInput.files[0];
+        if (!file) return;
+        if (file.size > MAX_LOCAL_BG_SIZE) {
+          const maxSizeMb = (MAX_LOCAL_BG_SIZE / (1024 * 1024)).toFixed(1);
+          if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+            window.alert(`本地图片大小超过 ${maxSizeMb} MB，请选择更小的文件。`);
+          }
+          bgFileInput.value = '';
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const result = typeof reader.result === 'string' ? reader.result : '';
+            if (!/^data:image\//i.test(result)) {
+              if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+                window.alert('仅支持图片文件作为背景。');
+              }
+              return;
+            }
+            currentBgSourceType = 'local';
+            currentBgImageData = result;
+            currentBgImageDataName = file.name || '';
+            if (bgUrlInput) bgUrlInput.value = '';
+            updateBgSourceUI();
+            updateBackgroundPreview();
+          } catch (err) {
+            console.error('[BN] 读取本地背景图片失败', err);
+          } finally {
+            bgFileInput.value = '';
+          }
+        };
+        reader.onerror = () => {
+          console.error('[BN] 读取本地背景图片失败', reader.error);
+          if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+            window.alert('读取本地图片失败，请重试。');
+          }
+          bgFileInput.value = '';
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+    if (bgFileClearBtn) {
+      bgFileClearBtn.addEventListener('click', () => {
+        if (currentBgSourceType === 'remote' && !currentBgImageData) return;
+        currentBgSourceType = 'remote';
+        currentBgImageData = '';
+        currentBgImageDataName = '';
+        if (bgFileInput) bgFileInput.value = '';
+        updateBgSourceUI();
+        updateBackgroundPreview();
+      });
+    }
   } else {
     document.getElementById('bn-bg-enabled')?.addEventListener('change', checkChanged);
     document.getElementById('bn-bg-image-url')?.addEventListener('input', checkChanged);

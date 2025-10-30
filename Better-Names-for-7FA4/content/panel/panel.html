@@ -233,10 +233,17 @@
         <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
           <label for="bn-bg-image-url"
             style="margin: 0; font-size: 12px; color: var(--bn-text-muted); white-space: nowrap;">图片URL：</label>
-          <input type="url" id="bn-bg-image-url" value="${bgImageUrl}"
+          <input type="text" id="bn-bg-image-url" value="${bgImageUrl}"
             style="flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid var(--bn-border-subtle); border-radius: 6px; background: var(--bn-bg); color: var(--bn-text); font-size: 12px;"
-            placeholder="暂不支持本地图片">
+            placeholder="输入图片 URL">
         </div>
+        <div class="bn-bg-local-row">
+          <input type="file" id="bn-bg-image-file" accept="image/*" hidden>
+          <button type="button" class="bn-btn" id="bn-bg-image-file-btn">选择本地图片</button>
+          <span class="bn-bg-file-name" id="bn-bg-image-file-name">未选择本地图片</span>
+          <button type="button" class="bn-btn-link" id="bn-bg-clear-local">清除</button>
+        </div>
+        <div class="bn-bg-source-hint" id="bn-bg-source-hint">当前背景来源：远程图片</div>
         <div style="margin-top: 8px;">
           <label style="display: block; margin-bottom: 4px; font-size: 12px; color: var(--bn-text-muted);">透明度: <span
               id="bn-bg-opacity-value">${bgOpacity}</span></label>
@@ -280,7 +287,7 @@
       <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
     </div>
     <div class="bn-version">
-      <div class="bn-version-text">6.1.0 SP1 Developer Beta</div>
+      <div class="bn-version-text">6.1.0 SP2 Developer Beta</div>
     </div>
   </div>
 </div>

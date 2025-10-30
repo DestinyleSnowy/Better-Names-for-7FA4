@@ -131,6 +131,45 @@
   overflow-y: auto;
   padding-bottom: 24px;
 }
+.bn-bg-local-row {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bn-bg-file-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--bn-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bn-btn-link {
+  background: none;
+  border: none;
+  color: var(--bn-theme-color, #007bff);
+  cursor: pointer;
+  padding: 0;
+  font-size: 12px;
+}
+.bn-btn-link:disabled {
+  color: var(--bn-text-muted);
+  cursor: default;
+  opacity: 0.6;
+  text-decoration: none;
+}
+.bn-btn-link:hover,
+.bn-btn-link:focus-visible {
+  text-decoration: underline;
+  outline: none;
+}
+.bn-bg-source-hint {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--bn-text-muted);
+}
 .bn-main-content {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
