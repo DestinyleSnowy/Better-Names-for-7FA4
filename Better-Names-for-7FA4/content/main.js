@@ -957,6 +957,7 @@ window.getCurrentUserId = getCurrentUserId;
   const FALLBACK_GRADE_NAME = '未填写时年';
 
   let cssInjected = false;
+  let filterInitPromise = null;
   const RANKING_FILTER_ENABLED_KEY = 'rankingFilter.enabled';
   const RANKING_FILTER_SELECTED_KEY = 'rankingFilter.selected';
   const RANKING_FILTER_GRADE_KEY = 'rankingFilter.grade.selected';
@@ -1405,7 +1406,7 @@ window.getCurrentUserId = getCurrentUserId;
     return { panel, refresh, syncVisibility, syncCheckboxStates };
   }
 
-  async function init() {
+  async function performRankingFilterInit() {
     injectCSS();
     const table = await waitForTable();
     if (!table) return;
@@ -1496,6 +1497,44 @@ window.getCurrentUserId = getCurrentUserId;
 
     setupFilterUI(table, state, schools, grades);
   }
+
+  async function init() {
+    if (filterInitPromise) return filterInitPromise;
+    filterInitPromise = (async () => {
+      try {
+        await performRankingFilterInit();
+      } finally {
+        filterInitPromise = null;
+      }
+    })();
+    return filterInitPromise;
+  }
+
+  async function reloadRankingFilter() {
+    try {
+      if (filterInitPromise) {
+        await filterInitPromise.catch(() => {});
+      }
+    } catch (_) {
+      // ignore
+    }
+    try {
+      const panel = document.querySelector('.bn-ranking-filter');
+      if (panel && panel.parentElement) panel.parentElement.removeChild(panel);
+    } catch (err) {
+      console.warn('[BN] Failed to remove existing ranking filter panel', err);
+    }
+    try {
+      await init();
+    } catch (err) {
+      console.error('[BN] Ranking filter reload failed', err);
+    }
+  }
+
+  window.__bnReloadRankingFilter = reloadRankingFilter;
+  window.addEventListener('bn:reload-filter', () => {
+    reloadRankingFilter();
+  });
 
   init().catch(err => console.error('[BN] Ranking enhancement failed', err));
 })();

@@ -362,8 +362,38 @@ function patchJQueryGet() {
   }
 
 
-    // ---- gatherAllPages (unchanged) ----
-    async function gatherAllPages(originalUrlStr, opts = { delayMs: 120, pageLimit: 500 }) {
+        // ---- gatherAllPages (with progress support) ----
+    async function gatherAllPages(originalUrlStr, opts = {}) {
+      const options = Object.assign({ delayMs: 120, pageLimit: 500, onProgress: null }, opts || {});
+      const delayMs = typeof options.delayMs === 'number' ? options.delayMs : 120;
+      const pageLimit = typeof options.pageLimit === 'number' ? options.pageLimit : 500;
+      const progressCb = typeof options.onProgress === 'function' ? options.onProgress : null;
+
+      let mergedUsers = [];
+      let pagesFetched = 0;
+      const startTime = Date.now();
+
+      const buildStats = () => ({
+        pages: pagesFetched,
+        users: mergedUsers.length,
+        elapsedMs: Date.now() - startTime
+      });
+
+      const emit = (payload) => {
+        if(!progressCb) return;
+        const base = { type: 'update', stats: buildStats() };
+        let data;
+        if(payload && typeof payload === 'object' && !Array.isArray(payload)){
+          data = payload;
+        } else if(typeof payload === 'string'){
+          data = { text: payload };
+        } else {
+          data = {};
+        }
+        try { progressCb(Object.assign({}, base, data)); } catch(_) { /* ignore progress errors */ }
+      };
+
+      emit({ text: '准备抓取所有页面...', stage: 'init' });
       if(!nativeFetch) throw new Error('native fetch not available in page context');
       const orig = parseUrl(originalUrlStr);
       if(!orig) throw new Error('invalid url ' + originalUrlStr);
@@ -383,8 +413,9 @@ function patchJQueryGet() {
         return u.toString();
       };
 
-      const fetchJson = async (u) => {
+      const fetchJson = async (u, pageNumber) => {
         console.log('show-all: native fetch ->', u);
+        emit({ text: `正在抓取第 ${pageNumber} 页...`, stage: 'fetch', currentPage: pageNumber });
         const res = await nativeFetch(u, {
           credentials: 'include',
           headers: {
@@ -397,38 +428,44 @@ function patchJQueryGet() {
       };
 
       console.log('show-all: fetching page 1');
-      const first = await fetchJson(makeUrl(1));
+      const first = await fetchJson(makeUrl(1), 1);
       if(first && first.success === false){
         console.warn('show-all: first page returned success=false, aborting gather');
+        emit({ text: '首页返回 success=false，已停止合并', stage: 'error', tone: 'warning' });
         return first;
       }
       let users = extractItems(first) || [];
       const isTopArray = Array.isArray(first);
-      const mergedUsers = users.slice();
+      mergedUsers = users.slice();
+      pagesFetched = 1;
       const mergedTable = (first && first.table && typeof first.table === 'object') ? Object.assign({}, first.table) : {};
       const totalHint = first && (first.total || first.total_count || first.count);
+      emit({ text: `第 1 页抓取完成，累计 ${mergedUsers.length} 条数据`, stage: 'page-complete', currentPage: 1 });
       let page = 2;
       while(true){
-        if(page > opts.pageLimit) { console.warn('show-all: page limit reached', page); break; }
+        if(page > pageLimit) { console.warn('show-all: page limit reached', page); emit({ text: `达到抓取页数上限 ${pageLimit}，停止合并`, stage: 'limit', tone: 'warning' }); break; }
         if(totalHint && mergedUsers.length >= totalHint) { console.log('show-all: reached totalHint', totalHint); break; }
 
         const urlPage = makeUrl(page);
         try {
           console.log('show-all: fetching page', page);
-          const j = await fetchJson(urlPage);
-          if(j && j.success === false){ console.warn('show-all: page', page, 'returned success=false — stop'); break; }
+          const j = await fetchJson(urlPage, page);
+          if(j && j.success === false){ console.warn('show-all: page', page, 'returned success=false - stop'); emit({ text: `第 ${page} 页返回 success=false，停止合并`, stage: 'error', tone: 'warning', currentPage: page }); break; }
           const a = extractItems(j) || [];
-          if(!a || a.length === 0){ console.log('show-all: page', page, 'empty — stop'); break; }
+          if(!a || a.length === 0){ console.log('show-all: page', page, 'empty - stop'); emit({ text: `第 ${page} 页没有更多数据，停止合并`, stage: 'empty', tone: 'info', currentPage: page }); break; }
           mergedUsers.push(...a);
           if(j && j.table && typeof j.table === 'object'){
             for(const k in j.table) mergedTable[k] = j.table[k];
           }
+          pagesFetched = Math.max(pagesFetched, page);
+          emit({ text: `第 ${page} 页抓取完成，累计 ${mergedUsers.length} 条数据`, stage: 'page-complete', currentPage: page });
         } catch(e){
           console.error('show-all: error fetching page', page, e);
+          emit({ text: `抓取第 ${page} 页失败：${e && e.message ? e.message : e}`, stage: 'error', tone: 'error', currentPage: page });
           break;
         }
         page++;
-        if(opts.delayMs) await new Promise(r=>setTimeout(r, opts.delayMs));
+        if(delayMs) await new Promise(r=>setTimeout(r, delayMs));
       }
 
       if(isTopArray) return mergedUsers;
@@ -448,12 +485,13 @@ function patchJQueryGet() {
       else if('count' in out) out.count = newTotal;
       else out.total = newTotal;
       console.log('show-all: gatherAllPages done. total merged users =', mergedUsers.length);
+      emit({ text: `合并完成，共 ${mergedUsers.length} 条数据`, stage: 'done', tone: 'success' });
 
       try { await ensureRowsForUsers(originalUrlStr, mergedUsers); } catch(e){ console.warn('show-all: ensure rows error', e); }
       return out;
     }
 
-    // waitForjQuery & patch $.get (unchanged)
+// waitForjQuery & patch $.get (manual trigger UI)
     function waitForjQuery(timeout = 6000) {
       return new Promise((resolve, reject) => {
         if(window.jQuery) return resolve(window.jQuery);
@@ -472,39 +510,430 @@ function patchJQueryGet() {
         if(!$ || typeof $.get !== 'function'){ console.warn('show-all: cannot patch $.get'); return; }
 
         const origGet = $.get.bind($);
-        $.get = function(url /*, success, dataType */){
-          let urlStr = (typeof url === 'string') ? url : (url && url.url ? url.url : '');
+        let gatherRequested = false;
+        let gatherInProgress = false;
+        let replayLastGet = null;
+        let statsRefs = null;
+        let lastStats = { pages: 0, users: 0, elapsedMs: 0 };
+
+        const CONTROL_ID = 'bn-merge-container';
+        const BUTTON_ID = 'bn-merge-button';
+        const TITLE_CLASS = 'bn-merge-title';
+        const STATS_CLASS = 'bn-merge-stats';
+        const STAT_ITEM_CLASS = 'bn-merge-stat';
+        const STAT_VALUE_CLASS = 'bn-merge-stat-value';
+        const DEFAULT_IDLE_TEXT = '合并榜单';
+        const RETRY_TEXT = '重新合并';
+        const ERROR_RETRY_TEXT = '重试合并';
+
+        const applyContainerStyles = (el) => {
+          el.style.position = 'fixed';
+          el.style.top = '86px';
+          el.style.right = '16px';
+          el.style.zIndex = '2147483647';
+          el.style.color = '#1f2933';
+          el.style.padding = '14px 16px';
+          el.style.minWidth = '220px';
+          el.style.borderRadius = '12px';
+          el.style.background = 'linear-gradient(135deg, rgba(255,255,255,0.92), rgba(245,247,250,0.96))';
+          el.style.border = '1px solid rgba(209, 213, 219, 0.7)';
+          el.style.boxShadow = '0 12px 30px rgba(15, 23, 42, 0.18)';
+          el.style.backdropFilter = 'blur(12px)';
+          el.style.fontSize = '13px';
+          el.style.lineHeight = '1.5';
+          el.style.display = 'flex';
+          el.style.flexDirection = 'column';
+          el.style.alignItems = 'stretch';
+          el.style.gap = '8px';
+        };
+
+        const styleButton = (btn, isNew) => {
+          btn.type = 'button';
+          btn.id = BUTTON_ID;
+          if(isNew) btn.textContent = DEFAULT_IDLE_TEXT;
+          btn.style.background = 'linear-gradient(135deg, #6366f1, #4f46e5)';
+          btn.style.color = '#ffffff';
+          btn.style.border = 'none';
+          btn.style.padding = '8px 18px';
+          btn.style.borderRadius = '20px';
+          btn.style.cursor = 'pointer';
+          btn.style.fontSize = '13px';
+          btn.style.fontWeight = '600';
+          btn.style.letterSpacing = '0.02em';
+          btn.style.boxShadow = '0 6px 18px rgba(99, 102, 241, 0.35)';
+          btn.style.transition = 'all 0.2s ease';
+          btn.onmouseenter = () => {
+            if(btn.disabled) return;
+            btn.style.boxShadow = '0 8px 22px rgba(79, 70, 229, 0.38)';
+            btn.style.transform = 'translateY(-1px)';
+          };
+          btn.onmouseleave = () => {
+            btn.style.boxShadow = btn.disabled ? '0 0 0 rgba(0,0,0,0)' : '0 6px 18px rgba(99, 102, 241, 0.35)';
+            btn.style.transform = 'translateY(0)';
+          };
+        };
+
+        const createStatsElements = () => {
+          const wrap = document.createElement('div');
+          wrap.className = STATS_CLASS;
+          wrap.style.display = 'flex';
+          wrap.style.justifyContent = 'space-between';
+          wrap.style.alignItems = 'center';
+          wrap.style.gap = '12px';
+          wrap.style.background = 'rgba(255,255,255,0.7)';
+          wrap.style.border = '1px solid rgba(209,213,219,0.6)';
+          wrap.style.borderRadius = '10px';
+          wrap.style.padding = '8px 12px';
+          wrap.style.fontSize = '11px';
+          wrap.style.color = '#6b7280';
+
+          const makeItem = (label) => {
+            const item = document.createElement('div');
+            item.className = STAT_ITEM_CLASS;
+            item.style.display = 'flex';
+            item.style.flexDirection = 'column';
+            item.style.alignItems = 'flex-start';
+            item.style.gap = '2px';
+
+            const value = document.createElement('span');
+            value.className = STAT_VALUE_CLASS;
+            value.textContent = '--';
+            value.style.fontSize = '14px';
+            value.style.fontWeight = '600';
+            value.style.color = '#111827';
+
+            const labelEl = document.createElement('span');
+            labelEl.textContent = label;
+            labelEl.style.fontSize = '11px';
+            labelEl.style.letterSpacing = '0.02em';
+
+            item.appendChild(value);
+            item.appendChild(labelEl);
+            wrap.appendChild(item);
+            return value;
+          };
+
+          return {
+            wrap,
+            pages: makeItem('抓取页数'),
+            users: makeItem('抓取人数'),
+            time: makeItem('耗时')
+          };
+        };
+
+        const ensureStats = (container) => {
+          if(!container) return null;
+          if(!statsRefs || !statsRefs.wrap || !statsRefs.wrap.isConnected){
+            statsRefs = createStatsElements();
+            const title = container.querySelector('.' + TITLE_CLASS);
+            if(title && title.nextSibling){
+              container.insertBefore(statsRefs.wrap, title.nextSibling);
+            } else {
+              container.appendChild(statsRefs.wrap);
+            }
+          } else if(statsRefs.wrap.parentElement !== container){
+            const title = container.querySelector('.' + TITLE_CLASS);
+            if(title && title.nextSibling){
+              container.insertBefore(statsRefs.wrap, title.nextSibling);
+            } else {
+              container.appendChild(statsRefs.wrap);
+            }
+          }
+          return statsRefs;
+        };
+
+        const normalizeStats = (stats) => {
+          const toInt = (v) => {
+            const num = Number(v);
+            return Number.isFinite(num) ? Math.max(0, Math.floor(num)) : 0;
+          };
+          const toMs = (v) => {
+            const num = Number(v);
+            return Number.isFinite(num) && num >= 0 ? num : 0;
+          };
+          if(!stats || typeof stats !== 'object') return { pages: 0, users: 0, elapsedMs: 0 };
+          return {
+            pages: toInt(stats.pages),
+            users: toInt(stats.users),
+            elapsedMs: toMs(stats.elapsedMs)
+          };
+        };
+
+        const formatDuration = (ms) => {
+          const num = Number(ms);
+          if(!Number.isFinite(num) || num <= 0) return '0.0s';
+          const seconds = num / 1000;
+          if(seconds < 60) return `${seconds.toFixed(1)}s`;
+          const minutes = Math.floor(seconds / 60);
+          const remain = seconds - minutes * 60;
+          return `${minutes}m${remain.toFixed(1)}s`;
+        };
+
+        const updateStatsDisplay = (stats) => {
+          const refs = statsRefs;
+          if(stats && typeof stats === 'object'){
+            lastStats = normalizeStats(stats);
+          }
+          if(!refs) return;
+          const data = lastStats;
+          refs.pages.textContent = String(data.pages ?? 0);
+          refs.users.textContent = String(data.users ?? 0);
+          refs.time.textContent = formatDuration(data.elapsedMs);
+        };
+
+        const resetStatsDisplay = () => {
+          lastStats = { pages: 0, users: 0, elapsedMs: 0 };
+          if((!statsRefs || !statsRefs.wrap || !statsRefs.wrap.isConnected) && typeof document !== 'undefined'){
+            const container = document.getElementById(CONTROL_ID);
+            if(container) ensureStats(container);
+          }
+          updateStatsDisplay(lastStats);
+        };
+
+        const triggerFilterReload = () => {
+          try {
+            window.dispatchEvent(new CustomEvent('bn:reload-filter'));
+          } catch(e){
+            console.warn('show-all: dispatch bn:reload-filter failed', e);
+          }
+          try {
+            if(typeof window.__bnReloadRankingFilter === 'function'){
+              window.__bnReloadRankingFilter();
+            }
+          } catch(e){
+            console.warn('show-all: __bnReloadRankingFilter call failed', e);
+          }
+        };
+
+        const ensureTitle = (container) => {
+          let title = container.querySelector('.' + TITLE_CLASS);
+          if(!title){
+            title = document.createElement('div');
+            title.className = TITLE_CLASS;
+            title.style.display = 'flex';
+            title.style.alignItems = 'center';
+            title.style.gap = '8px';
+            title.style.fontSize = '13px';
+            title.style.fontWeight = '600';
+            title.style.color = '#111827';
+            const dot = document.createElement('span');
+            dot.textContent = '●';
+            dot.style.color = '#6366f1';
+            dot.style.fontSize = '10px';
+            dot.style.marginTop = '-2px';
+            const text = document.createElement('span');
+            text.textContent = '榜单助手';
+            title.appendChild(dot);
+            title.appendChild(text);
+            container.insertBefore(title, container.firstChild);
+          }
+          return title;
+        };
+
+        const ensureControls = () => {
+          try {
+            if(!document || !document.body) return null;
+          } catch(_) {
+            return null;
+          }
+          let container = document.getElementById(CONTROL_ID);
+          if(!container){
+            container = document.createElement('div');
+            container.id = CONTROL_ID;
+            applyContainerStyles(container);
+            const button = document.createElement('button');
+            styleButton(button, true);
+            ensureTitle(container);
+            statsRefs = ensureStats(container);
+            container.appendChild(button);
+            document.body.appendChild(container);
+            updateStatsDisplay(lastStats);
+            return { button, status: null };
+          }
+          applyContainerStyles(container);
+          ensureTitle(container);
+          statsRefs = ensureStats(container);
+          updateStatsDisplay(lastStats);
+          let button = container.querySelector('#' + BUTTON_ID);
+          if(!button){
+            button = document.createElement('button');
+            styleButton(button, true);
+            container.appendChild(button);
+          } else {
+            styleButton(button, false);
+          }
+          return { button, status: null };
+        };
+
+        const controls = ensureControls();
+        const mergeButton = controls && controls.button;
+        const statusEl = controls && controls.status;
+
+        const setStatus = (text, tone = 'info') => {
+          if(statusEl){
+            statusEl.textContent = text || '';
+            let color = '#4b5563';
+            if(tone === 'success') color = '#047857';
+            else if(tone === 'error') color = '#b91c1c';
+            else if(tone === 'warning') color = '#b45309';
+            statusEl.style.color = color;
+          }
+        };
+        const setButtonIdle = (label) => {
+          if(!mergeButton) return;
+          mergeButton.disabled = false;
+          mergeButton.textContent = label || DEFAULT_IDLE_TEXT;
+          mergeButton.style.opacity = '1';
+          mergeButton.style.cursor = 'pointer';
+          mergeButton.style.boxShadow = '0 6px 18px rgba(99, 102, 241, 0.35)';
+          mergeButton.style.transform = 'translateY(0)';
+        };
+        const setButtonBusy = (label) => {
+          if(!mergeButton) return;
+          mergeButton.disabled = true;
+          mergeButton.textContent = label || '合并中...';
+          mergeButton.style.opacity = '0.6';
+          mergeButton.style.cursor = 'default';
+          mergeButton.style.boxShadow = '0 0 0 rgba(0,0,0,0)';
+          mergeButton.style.transform = 'translateY(0)';
+        };
+
+        if(mergeButton && !mergeButton.dataset.bnMergeBound){
+          mergeButton.dataset.bnMergeBound = '1';
+          setButtonIdle(DEFAULT_IDLE_TEXT);
+          setStatus('等待榜单加载...');
+          mergeButton.addEventListener('click', () => {
+            if(gatherInProgress){
+              return;
+            }
+            if(typeof replayLastGet !== 'function'){
+              setStatus('暂未检测到榜单请求，请刷新后重试', 'warning');
+              return;
+            }
+            gatherRequested = true;
+            gatherInProgress = true;
+            resetStatsDisplay();
+            setButtonBusy('合并中...');
+            setStatus('准备抓取所有页面...', 'info');
+            try {
+              replayLastGet();
+            } catch(err){
+              console.error('show-all: failed to trigger manual merge', err);
+              gatherRequested = false;
+              gatherInProgress = false;
+              setStatus(`触发合并失败：${err && err.message ? err.message : err}`, 'error');
+              setButtonIdle(ERROR_RETRY_TEXT);
+            }
+          });
+        }
+
+        const patchedGet = function(...args){
+          const urlArg = args[0];
+          const urlStr = (typeof urlArg === 'string') ? urlArg : (urlArg && urlArg.url ? urlArg.url : '');
           if(typeof urlStr === 'string' && urlStr.indexOf('/progress/contest_table/json') !== -1){
             let success = null;
-            if(arguments.length >= 2 && typeof arguments[1] === 'function') success = arguments[1];
-            else if(arguments.length >= 3 && typeof arguments[2] === 'function') success = arguments[2];
+            if(args.length >= 2 && typeof args[1] === 'function') success = args[1];
+            else if(args.length >= 3 && typeof args[2] === 'function') success = args[2];
 
-            const d = $.Deferred();
-            (async () => {
+            const argsCopy = args.slice();
+            replayLastGet = () => patchedGet.apply($, argsCopy);
+
+            if(!gatherRequested){
+              if(!gatherInProgress) setStatus('检测到榜单数据，可点击「合并榜单」', 'info');
+              return origGet.apply($, args);
+            }
+
+            gatherRequested = false;
+            gatherInProgress = true;
+            setButtonBusy('合并中...');
+            const deferred = $.Deferred();
+
+            const notifyProgress = (payload) => {
+              if(payload && typeof payload === 'object'){
+                if(payload.stats) updateStatsDisplay(payload.stats);
+                const tone = payload.tone || (payload.text
+                  ? (/失败|错误|异常/.test(payload.text) ? 'error'
+                    : /完成|成功/.test(payload.text) ? 'success'
+                    : /警|warning/i.test(payload.stage || '') ? 'warning'
+                    : 'info')
+                  : null);
+                if(typeof payload.text === 'string' && payload.text.length > 0){
+                  setStatus(payload.text, tone || 'info');
+                } else if(payload.stage === 'done'){
+                  setStatus('合并完成', 'success');
+                }
+                return;
+              }
+              if(!payload){
+                return;
+              }
+              const text = String(payload);
+              let tone = 'info';
+              if(/失败|错误|异常/.test(text)) tone = 'error';
+              else if(/完成|成功/.test(text)) tone = 'success';
+              setStatus(text, tone);
+            };
+
+            const fallbackToOriginal = () => {
               try {
-                const merged = await gatherAllPages(urlStr, { delayMs: 100 });
-                if(merged && merged.success === false){
-                  if(typeof success === 'function'){ try { success(merged); } catch(e){ console.error('show-all: success cb threw', e); } }
-                  d.resolve(merged);
+                const orig = origGet.apply($, argsCopy);
+                if(orig && typeof orig.done === 'function'){
+                  orig.done((r) => deferred.resolve(r));
+                  if(typeof orig.fail === 'function'){
+                    orig.fail((err) => deferred.reject(err));
+                  }
                   return;
                 }
-                if(typeof success === 'function'){ try { success(merged); } catch(e){ console.error('show-all: success cb threw', e); } }
-                d.resolve(merged);
+                if(orig && typeof orig.then === 'function'){
+                  orig.then((val) => deferred.resolve(val), (err) => deferred.reject(err));
+                  return;
+                }
+                deferred.resolve(orig);
+              } catch(e2){
+                deferred.reject(e2);
+              }
+            };
+
+            (async () => {
+              try {
+                const merged = await gatherAllPages(urlStr, { delayMs: 100, onProgress: notifyProgress });
+                if(merged && merged.success === false){
+                  setStatus('接口返回 success=false，已保持原状', 'warning');
+                  if(typeof success === 'function'){
+                    try { success(merged); } catch(cbErr){
+                      console.error('show-all: success cb threw', cbErr);
+                    }
+                  }
+                  gatherInProgress = false;
+                  setButtonIdle(RETRY_TEXT);
+                  deferred.resolve(merged);
+                  return;
+                }
+                if(typeof success === 'function'){
+                  try { success(merged); } catch(cbErr){
+                    console.error('show-all: success cb threw', cbErr);
+                  }
+                }
+                gatherInProgress = false;
+                setButtonIdle(RETRY_TEXT);
+                setStatus('合并完成，可重新执行合并', 'success');
+                triggerFilterReload();
+                deferred.resolve(merged);
               } catch(err){
                 console.error('show-all: gatherAllPages error', err);
-                try {
-                  const orig = origGet.apply($, arguments);
-                  orig.done && orig.done(r=>d.resolve(r));
-                  orig.fail && orig.fail(e=>d.reject(e));
-                } catch(e2){
-                  d.reject(err);
-                }
+                setStatus('合并失败，回退到原始请求', 'error');
+                setButtonIdle(ERROR_RETRY_TEXT);
+                gatherInProgress = false;
+                fallbackToOriginal();
               }
             })();
-            return d.promise();
+
+            return deferred.promise();
           }
-          return origGet.apply($, arguments);
+          return origGet.apply($, args);
         };
+
+        $.get = patchedGet;
 
         console.log('show-all: $.get patched for contest_table/json (page context)');
       } catch(e){
