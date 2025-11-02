@@ -1,0 +1,17 @@
+{
+  "submitters": [
+    {
+      "id": "origin",
+      "name": "Submitter",
+      "popup": "submitter/submitter/popup.html",
+      "description": "原生 7fa4 外站题提交器"
+    },
+    {
+      "id": "rsubmitter",
+      "name": "Rust Submitter",
+      "popup": "submitter/rsubmitter-7fa4/popup.html",
+      "description": "Rust 开发 7fa4 提交器"
+    }
+  ],
+  "default": "origin"
+}

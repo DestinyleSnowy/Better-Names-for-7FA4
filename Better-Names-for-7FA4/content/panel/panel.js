@@ -29,7 +29,8 @@
   const enablePlanAdder = GM_getValue('enablePlanAdder', true);
   const enableGuard = GM_getValue('enableGuard', false);
   const enableAutoRenew = GM_getValue('enableAutoRenew', false);
-  const enableSubmitter = GM_getValue('enableSubmitter', true);
+  const SUBMITTERS_CONFIG_URL = 'submitter/submitters.json';
+  const storedSelectedSubmitter = GM_getValue('selectedSubmitter', 'none');
   const enableRankingFilterSetting = GM_getValue('rankingFilter.enabled', false);
   const enableVjLink = GM_getValue('enableVjLink', true);
   const hideDoneSkip = GM_getValue('hideDoneSkip', false);
@@ -402,6 +403,8 @@
   let currentBgImageData = normalizedBgData;
   let currentBgImageDataName = normalizedBgFileName;
 
+  initSubmittersSelector();
+
   function updateContainerState() {
     if (isDragging || container.classList.contains('bn-dragging')) {
       container.classList.add('bn-collapsed');
@@ -438,7 +441,8 @@
   const chkPlan = document.getElementById('bn-enable-plan');
   const chkAutoRenew = document.getElementById('bn-enable-renew');
   const chkRankingFilter = document.getElementById('bn-enable-ranking-filter');
-  const chkSubmitter = document.getElementById('bn-enable-submitter');
+  const submitterSelect = document.getElementById('bn-submitter-select');
+  const submitterDescription = document.getElementById('bn-submitter-description');
   const planOpts = document.getElementById('bn-plan-options');
   const chkUseColor = document.getElementById('bn-use-custom-color');
 
@@ -466,7 +470,6 @@
   chkPlan.checked = enablePlanAdder;
   chkAutoRenew.checked = enableAutoRenew;
   chkRankingFilter.checked = enableRankingFilterSetting;
-  chkSubmitter.checked = enableSubmitter;
   planOpts.style.display = enablePlanAdder ? 'block' : 'none';
 
   chkUseColor.checked = useCustomColors;
@@ -541,7 +544,7 @@
     enablePlanAdder,
     enableAutoRenew,
     enableRankingFilter: enableRankingFilterSetting,
-    enableSubmitter,
+    selectedSubmitter: storedSelectedSubmitter,
     useCustomColors,
     themeColor,
     palette: Object.assign({}, palette),
@@ -856,6 +859,8 @@
     } else if (originalConfig.bgSourceType !== 'remote' || currentBgUrl !== originalConfig.bgImageUrl) {
       bgSourceChanged = true;
     }
+    
+    const submitterSelect = document.getElementById('bn-submitter-select');
 
     const changed =
       (document.getElementById('bn-enable-title-truncate').checked !== originalConfig.titleTruncate) ||
@@ -870,7 +875,6 @@
       (document.getElementById('bn-enable-plan').checked !== originalConfig.enablePlanAdder) ||
       (document.getElementById('bn-enable-renew').checked !== originalConfig.enableAutoRenew) ||
       (document.getElementById('bn-enable-ranking-filter').checked !== originalConfig.enableRankingFilter) ||
-      (document.getElementById('bn-enable-submitter').checked !== originalConfig.enableSubmitter) ||
       (document.getElementById('bn-enable-vj').checked !== originalConfig.enableVjLink) ||
       (document.getElementById('bn-hide-done-skip').checked !== originalConfig.hideDoneSkip) ||
       (document.getElementById('bn-enable-quick-skip').checked !== originalConfig.enableQuickSkip) ||
@@ -880,6 +884,7 @@
       bgSourceChanged ||
       (currentBgOpacity !== originalConfig.bgOpacity) ||
       (document.getElementById('bn-bt-enabled').checked !== originalConfig.btEnabled) ||
+      (submitterSelect && submitterSelect.value !== originalConfig.selectedSubmitter) ||
       (hiToiletIntervalInput && clampHiToiletInterval(hiToiletIntervalInput.value) !== originalConfig.btInterval) ||
       themeColorChanged ||
       paletteChanged;
@@ -927,13 +932,6 @@
     }
   }
 
-  function syncSubmitterState(enabled) {
-    if (typeof chrome === 'undefined' || !chrome.runtime || typeof chrome.runtime.sendMessage !== 'function') return;
-    try {
-      chrome.runtime.sendMessage({ type: 'bn_toggle_submitter', enabled });
-    } catch (e) {}
-  }
-
   const chkTitleTrEl = document.getElementById('bn-enable-title-truncate');
   const chkUserTrEl = document.getElementById('bn-enable-user-truncate');
   const updateTruncateState = (chk, input) => {
@@ -961,7 +959,6 @@
   chkPlan.onchange = () => { toggleOption(chkPlan, planOpts); checkChanged(); };
   chkAutoRenew.onchange = checkChanged;
   chkRankingFilter.onchange = checkChanged;
-  chkSubmitter.onchange = checkChanged;
   if (widthModeSel) widthModeSel.onchange = checkChanged;
 
   document.getElementById('bn-color-reset').onclick = () => {
@@ -1009,7 +1006,6 @@
     GM_setValue('enableVjLink', chkVj.checked);
     GM_setValue('enablePlanAdder', chkPlan.checked);
     GM_setValue('enableAutoRenew', chkAutoRenew.checked);
-    GM_setValue('enableSubmitter', chkSubmitter.checked);
     GM_setValue('rankingFilter.enabled', chkRankingFilter.checked);
 
     const obj = {};
@@ -1024,8 +1020,6 @@
     if (themeColorInput) themeColorInput.value = themeColorValue;
     if (themeColorHexInput) themeColorHexInput.value = themeColorValue;
     originalConfig.themeColor = themeColorValue;
-
-    syncSubmitterState(chkSubmitter.checked);
 
     const bgEnabled = bgEnabledInput ? bgEnabledInput.checked : false;
     const rawBgUrl = bgUrlInput ? bgUrlInput.value.trim() : '';
@@ -1071,6 +1065,10 @@
     if (bgOpacityInput) bgOpacityInput.value = bgOpacity;
     if (bgOpacityValueSpan) bgOpacityValueSpan.textContent = formatOpacityText(bgOpacity);
 
+    const selectedSubmitter = submitterSelect.value;
+    GM_setValue('selectedSubmitter', selectedSubmitter);
+    syncSubmitterState(selectedSubmitter);
+
     setTimeout(() => location.reload(), 50);
   };
 
@@ -1093,8 +1091,11 @@
     chkPlan.checked = originalConfig.enablePlanAdder;
     chkAutoRenew.checked = originalConfig.enableAutoRenew;
     chkRankingFilter.checked = originalConfig.enableRankingFilter;
-    chkSubmitter.checked = originalConfig.enableSubmitter;
     chkUseColor.checked = originalConfig.useCustomColors;
+    if (submitterSelect) {
+      submitterSelect.value = originalConfig.selectedSubmitter;
+      updateSubmitterDescription(originalConfig.selectedSubmitter);
+    }
     if (hiToiletInput) hiToiletInput.checked = originalConfig.btEnabled;
     setHiToiletIntervalDisplay(originalConfig.btInterval);
     titleInp.disabled = !chkTitleTrEl.checked;
@@ -1348,6 +1349,115 @@
       out += ch; used += w;
     }
     return out;
+  }
+
+  async function loadSubmittersConfig() {
+    try {
+      if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function') {
+        try {
+          const url = chrome.runtime.getURL('submitter/submitters.json');
+          console.log('Loading submitters config from:', url);
+          const response = await fetch(url, { cache: 'no-store' });
+          if (response && response.ok) {
+            const config = await response.json();
+            console.log('Successfully loaded submitters config');
+            return config;
+          }
+        } catch (err) {
+          console.warn('Failed to load submitters config via chrome.runtime.getURL:', err);
+        }
+      }
+      
+      try {
+        const response = await fetch('/submitter/submitters.json', { cache: 'no-store' });
+        if (response && response.ok) {
+          const config = await response.json();
+          console.log('Successfully loaded submitters config from relative path');
+          return config;
+        }
+      } catch (err) {
+        console.warn('Failed to load submitters config from relative path:', err);
+      }
+      
+      throw new Error('All attempts to load submitters config failed');
+      
+    } catch (error) {
+      console.error('Error loading submitters config, using fallback:', error);
+      throw error;
+    }
+  }
+
+  async function initSubmittersSelector() {
+    const config = await loadSubmittersConfig();
+    const select = document.getElementById('bn-submitter-select');
+    const description = document.getElementById('bn-submitter-description');
+    
+    if (!select) return;
+    
+    const disabledOption = select.querySelector('option[value="none"]');
+    select.innerHTML = '';
+    if (disabledOption) {
+      select.appendChild(disabledOption);
+    } else {
+      const noneOption = document.createElement('option');
+      noneOption.value = 'none';
+      noneOption.textContent = '禁用';
+      select.appendChild(noneOption);
+    }
+    
+    config.submitters.forEach(submitter => {
+      const option = document.createElement('option');
+      option.value = submitter.id;
+      option.textContent = submitter.name;
+      option.dataset.description = submitter.description || '';
+      option.dataset.popup = submitter.popup || '';
+      select.appendChild(option);
+    });
+    
+    select.value = storedSelectedSubmitter;
+    
+    updateSubmitterDescription(select.value);
+    
+    select.addEventListener('change', function() {
+      updateSubmitterDescription(this.value);
+      checkChanged();
+    });
+  }
+
+  function updateSubmitterDescription(selectedId) {
+    const description = document.getElementById('bn-submitter-description');
+    if (!description) return;
+    
+    if (selectedId === 'none') {
+      description.textContent = 'Submitter 功能已禁用';
+      description.className = 'bn-submitter-description bn-submitter-disabled';
+      return;
+    }
+    
+    const submitterSelect = document.getElementById('bn-submitter-select');
+    const selectedOption = submitterSelect?.querySelector(`option[value="${selectedId}"]`);
+    
+    if (selectedOption && selectedOption.dataset.description) {
+      description.textContent = selectedOption.dataset.description;
+      description.className = 'bn-submitter-description';
+    } else {
+      description.textContent = '未知的 Submitter';
+      description.className = 'bn-submitter-description bn-submitter-unknown';
+    }
+  }
+
+  function syncSubmitterState(selectedSubmitter) {
+    if (typeof chrome === 'undefined' || !chrome.runtime || typeof chrome.runtime.sendMessage !== 'function') return;
+    try {
+      const enabled = selectedSubmitter !== 'none';
+      chrome.runtime.sendMessage({ 
+        type: 'bn_toggle_submitter', 
+        enabled,
+        submitterId: selectedSubmitter
+      });
+    } catch (e) {
+      console.warn('Failed to sync submitter state:', e);
+    }
   }
 
   async function loadUsersData() {
@@ -2100,6 +2210,8 @@
   applyQuickSkip(enableQuickSkip);
   applyHideDoneSkip(hideDoneSkip);
   ;
+
+  let submittersConfig = null;
 
   // 批处理观察器（rAF 合批）
   let moQueue = new Set();

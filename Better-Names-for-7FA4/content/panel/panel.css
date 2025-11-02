@@ -725,3 +725,74 @@ a[data-bn-quick-skip="1"] i.icon,
   border-color: var(--bn-theme-color, #007bff);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
+
+.bn-submitter-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.bn-submitter-selector .bn-submitter-dropdown {
+  all: unset;
+  box-sizing: border-box;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 8px 12px !important;
+  border: 1px solid var(--bn-border-subtle) !important;
+  border-radius: 6px !important;
+  background: var(--bn-bg) !important;
+  color: var(--bn-text) !important;
+  font-size: 14px !important;
+  font-family: inherit !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.bn-submitter-selector .bn-submitter-dropdown:focus {
+  outline: none !important;
+  border-color: var(--bn-theme-color) !important;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1) !important;
+}
+
+.bn-submitter-selector .bn-submitter-description {
+  all: unset;
+  display: block;
+  font-size: 12px !important;
+  color: var(--bn-text-muted) !important;
+  padding: 6px 8px !important;
+  background: var(--bn-bg-subtle) !important;
+  border-radius: 4px !important;
+  border-left: 3px solid var(--bn-theme-color) !important;
+  margin: 8px 0 0 0 !important;
+  line-height: 1.4;
+}
+
+.bn-submitter-selector .bn-submitter-description.bn-submitter-disabled {
+  border-left-color: var(--bn-border) !important;
+  color: var(--bn-text-muted) !important;
+  opacity: 0.6;
+}
+
+.bn-submitter-selector .bn-submitter-description.bn-submitter-unknown {
+  border-left-color: #ff6b6b !important;
+  color: #e53e3e !important;
+  background: rgba(255, 107, 107, 0.05) !important;
+}
+
+.bn-submitter-selector label {
+  all: unset;
+  display: block !important;
+  font-size: 13px !important;
+  color: var(--bn-text-sub) !important;
+  margin: 0 0 4px 0 !important;
+  padding: 0 !important;
+  cursor: default !important;
+  white-space: normal !important;
+}
+
+.bn-submitter-selector label:hover {
+  background: transparent !important;
+  color: var(--bn-text-sub) !important;
+}

@@ -9,16 +9,27 @@ self.addEventListener('activate', (e) => {
 
 const SUBMITTER_POPUP = 'submitter/popup.html';
 
-function applySubmitterState(enabled) {
+async function loadSubmittersConfig() {
+  try {
+    const url = chrome.runtime.getURL('submitter/submitters.json');
+    const response = await fetch(url);
+    return await response.json();
+  } catch (e) {
+    console.error('Failed to load submitters config', e);
+    return { submitters: [] };
+  }
+}
+
+function applySubmitterState(enabled, popup = '') {
   try {
     if (!chrome || !chrome.action) return;
-    const popup = enabled ? SUBMITTER_POPUP : '';
+    
     if (chrome.action.setPopup) {
       chrome.action.setPopup({ popup }, () => {
-        // Touch lastError to suppress uncontrolled logs
         void chrome.runtime && chrome.runtime.lastError;
       });
     }
+    
     if (enabled) {
       if (chrome.action.enable) chrome.action.enable();
     } else if (chrome.action.disable) {
@@ -29,19 +40,28 @@ function applySubmitterState(enabled) {
   }
 }
 
-function ensureSubmitterStateFromStorage() {
+async function ensureSubmitterStateFromStorage() {
   try {
     if (!chrome || !chrome.storage || !chrome.storage.local) {
       applySubmitterState(true);
       return;
     }
-    chrome.storage.local.get({ enableSubmitter: true }, (items) => {
+    
+    chrome.storage.local.get(['selectedSubmitter'], async (items) => {
       try {
-        const raw = items && Object.prototype.hasOwnProperty.call(items, 'enableSubmitter')
-          ? items.enableSubmitter
-          : true;
-        const enabled = raw !== false;
-        applySubmitterState(enabled);
+        const selectedSubmitter = items.selectedSubmitter || 'none';
+        const enabled = selectedSubmitter !== 'none';
+        let popup = SUBMITTER_POPUP;
+        
+        if (enabled) {
+          const config = await loadSubmittersConfig();
+          const submitter = config.submitters.find(s => s.id === selectedSubmitter);
+          if (submitter && submitter.popup) {
+            popup = submitter.popup;
+          }
+        }
+        
+        applySubmitterState(enabled, popup);
       } catch (e) {
         applySubmitterState(true);
       }
@@ -62,12 +82,14 @@ if (chrome && chrome.runtime && chrome.runtime.onInstalled) {
 if (chrome && chrome.storage && chrome.storage.onChanged) {
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== 'local') return;
-    if (Object.prototype.hasOwnProperty.call(changes, 'enableSubmitter')) {
-      const change = changes.enableSubmitter;
-      const enabled = change && Object.prototype.hasOwnProperty.call(change, 'newValue')
-        ? change.newValue !== false
-        : true;
-      applySubmitterState(enabled);
+    
+    if (Object.prototype.hasOwnProperty.call(changes, 'selectedSubmitter')) {
+      const change = changes.selectedSubmitter;
+      const selectedSubmitter = change && Object.prototype.hasOwnProperty.call(change, 'newValue')
+        ? change.newValue
+        : 'none';
+      
+      ensureSubmitterStateFromStorage();
     }
   });
 }
@@ -77,7 +99,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'bn_toggle_submitter') {
     const enabled = msg.enabled !== false;
-    applySubmitterState(enabled);
+    const submitterId = msg.submitterId || 'none';
+    try {
+      chrome.storage.local.set({ selectedSubmitter: enabled ? submitterId : 'none' });
+    } catch (e) {
+      console.warn('Failed to save submitter state:', e);
+    }
+    ensureSubmitterStateFromStorage();
     sendResponse({ ok: true });
     return true;
   }

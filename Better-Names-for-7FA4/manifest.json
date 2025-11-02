@@ -1,8 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "Better Names for 7FA4",
+  "name": "Better Names for 7FA4 with Submitter",
   "version": "6.1.0.3",
   "description": "强大的 7FA4 用户名与颜色映射插件",
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
   "permissions": [
     "storage",
     "notifications",
@@ -59,7 +62,8 @@
       "resources": [
         "content/jquery.min.js",
         "data/users.json",
-        "content/panel/panel.html"
+        "content/panel/panel.html",
+        "submitter/submitters.json"
       ],
       "matches": [
         "http://7fa4.cn:8888/*",
@@ -71,7 +75,8 @@
         "http://10.210.57.10:8888/*",
         "http://211.137.101.118:8888/*",
         "http://10.210.57.10:5283/*",
-        "http://211.137.101.118:5283/*"
+        "http://211.137.101.118:5283/*",
+        "<all_urls>"
       ]
     }
   ],
@@ -81,6 +86,6 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_popup": "submitter/popup.html"
+    "default_popup": "submitter/submitter/popup.html"
   }
 }
