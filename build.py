@@ -222,7 +222,8 @@ class DependencyBuilder:
     def select_best_asset(self, assets, release_info, repo_url):
         """选择最佳的 asset（优先非源码包）"""
         # GitHub 和 GitLab 的 assets 结构不同
-        if "github.com" in repo_url:
+        host = urlparse(repo_url).hostname
+        if host == "github.com":
             # GitHub: assets 是列表
             asset_list = assets
         else:
@@ -244,7 +245,7 @@ class DependencyBuilder:
         source_assets = []
         
         for asset in asset_list:
-            if "github.com" in repo_url:
+            if host == "github.com":
                 name = asset.get("name", "").lower()
                 url = asset.get("browser_download_url", "")
             else:
@@ -274,7 +275,7 @@ class DependencyBuilder:
             return selected_url, selected_name
         else:
             # 回退到第一个 asset
-            if asset_list and "github.com" in repo_url:
+            if asset_list and host == "github.com":
                 selected_url = asset_list[0].get("browser_download_url")
                 selected_name = asset_list[0].get("name")
             elif asset_list:
