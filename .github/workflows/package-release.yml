@@ -20,6 +20,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build dependencies
+        run: python -m pip install --upgrade pip requests
+
+      - name: Build submitter dependencies
+        run: python build.py build
+
       - name: Create ZIP package
         run: |
           cd Better-Names-for-7FA4
