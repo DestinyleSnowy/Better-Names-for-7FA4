@@ -310,11 +310,12 @@ class DependencyBuilder:
             headers = {}
             
             # 设置认证头
-            if "github.com" in repo_url:
+            host = urlparse(repo_url).hostname
+            if host == "github.com" or (host and host.endswith(".github.com")):
                 github_token = os.environ.get('GITHUB_TOKEN')
                 if github_token:
                     headers['Authorization'] = f'token {github_token}'
-            elif "jx.7fa4.cn" in repo_url:
+            elif host == "jx.7fa4.cn" or (host and host.endswith(".jx.7fa4.cn")):
                 gitlab_token = os.environ.get('GITLAB_TOKEN')
                 if gitlab_token:
                     headers['PRIVATE-TOKEN'] = gitlab_token
