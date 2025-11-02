@@ -1,5 +1,9 @@
 ## CHANGELOG
 
+### 6.1.1 Developer Beta
+- 合并 rsubmitter 进入本插件。
+- 修复存在的部分问题。
+
 ### 6.1.0 
 - **Alpha** 添加榜单多页合并功能。
 - **Beta SP1** 添加了 Better Names for 7FA4 主题色的功能。
