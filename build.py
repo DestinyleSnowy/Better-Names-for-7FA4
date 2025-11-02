@@ -156,7 +156,8 @@ class DependencyBuilder:
         """获取最新 release 信息"""
         parsed_url = urlparse(repo_url)
         
-        if "github.com" in repo_url:
+        # 只允许真正的 github.com 域名（不允许类似 evil-github.com.xyz）
+        if parsed_url.hostname and parsed_url.hostname.lower() == "github.com":
             # GitHub 仓库
             path_parts = parsed_url.path.strip('/').split('/')
             if len(path_parts) < 2:
