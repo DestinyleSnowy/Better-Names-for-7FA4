@@ -490,6 +490,8 @@ window.getCurrentUserId = getCurrentUserId;
     count();
   }
 
+  
+
   function toolbar() {
     if ($('#plan-bar')) return;
     const bar = document.createElement('div'); bar.id = 'plan-bar';
