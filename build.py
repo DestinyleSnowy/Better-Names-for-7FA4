@@ -392,35 +392,91 @@ class DependencyBuilder:
         
         for move_op in move_operations:
             from_path = target_dir / move_op["from"]
-            # 目标路径应该在 Better-Names-for-7FA4 目录下
             to_path = self.project_root / "Better-Names-for-7FA4" / move_op["to"]
             
             if not from_path.exists():
                 print(f"⚠️ 源路径不存在: {from_path}")
-                continue
+                # 尝试在解压目录中查找可能的子目录
+                possible_dirs = list(target_dir.glob("*/wasm")) if "wasm" in str(from_path) else []
+                if possible_dirs:
+                    print(f"  可能的目标: {possible_dirs}")
+                    from_path = possible_dirs[0]  # 使用第一个找到的目录
+                    print(f"  使用替代路径: {from_path}")
+                else:
+                    continue
             
             # 确保目标目录存在
             to_path.parent.mkdir(parents=True, exist_ok=True)
             
-            # 如果目标已存在，先删除
-            if to_path.exists():
-                if to_path.is_file():
-                    try:
-                        to_path.unlink()
-                    except PermissionError:
-                        os.chmod(str(to_path), stat.S_IWRITE)
-                        to_path.unlink()
-                else:
-                    self.safe_rmtree(to_path)
-            
-            # 移动文件/目录
+            # 处理移动/合并操作
             try:
-                shutil.move(str(from_path), str(to_path))
-                print(f"  ✅ 移动: {move_op['from']} -> {move_op['to']}")
+                if from_path.is_file():
+                    # 文件移动：如果目标文件已存在，覆盖它
+                    if to_path.exists():
+                        if to_path.is_file():
+                            # 删除现有文件
+                            to_path.unlink()
+                        else:
+                            # 目标是目录，删除整个目录
+                            self.safe_rmtree(to_path)
+                    shutil.move(str(from_path), str(to_path))
+                    print(f"  ✅ 移动文件: {move_op['from']} -> {move_op['to']}")
+                    
+                elif from_path.is_dir():
+                    # 目录移动：合并目录内容
+                    if to_path.exists():
+                        if to_path.is_file():
+                            # 目标是文件但源是目录，先删除文件
+                            to_path.unlink()
+                            shutil.move(str(from_path), str(to_path))
+                            print(f"  ✅ 移动目录(覆盖文件): {move_op['from']} -> {move_op['to']}")
+                        else:
+                            # 目标是目录，合并内容
+                            self.merge_directories(from_path, to_path)
+                            # 删除源目录
+                            self.safe_rmtree(from_path)
+                            print(f"  ✅ 合并目录: {move_op['from']} -> {move_op['to']}")
+                    else:
+                        # 目标不存在，直接移动
+                        shutil.move(str(from_path), str(to_path))
+                        print(f"  ✅ 移动目录: {move_op['from']} -> {move_op['to']}")
+                        
             except Exception as e:
                 print(f"  ❌ 移动失败 {move_op['from']} -> {move_op['to']}: {e}")
         
         return True
+
+    def merge_directories(self, src_dir, dst_dir):
+        """合并两个目录的内容"""
+        for item in src_dir.iterdir():
+            src_item = src_dir / item.name
+            dst_item = dst_dir / item.name
+            
+            if src_item.is_file():
+                # 如果是文件，覆盖目标文件
+                if dst_item.exists():
+                    dst_item.unlink()
+                shutil.move(str(src_item), str(dst_item))
+            elif src_item.is_dir():
+                # 如果是目录，递归合并
+                if dst_item.exists():
+                    self.merge_directories(src_item, dst_item)
+                else:
+                    shutil.move(str(src_item), str(dst_item))
+
+    def create_git_files(self, target_dir):
+        """在目标目录下创建 .gitkeep 和 .gitignore 文件"""
+        # 创建 .gitkeep 文件（空文件）
+        gitkeep_path = target_dir / ".gitkeep"
+        with open(gitkeep_path, 'w', encoding='utf-8') as f:
+            pass  # 创建空文件
+        
+        # 创建 .gitignore 文件
+        gitignore_path = target_dir / ".gitignore"
+        with open(gitignore_path, 'w', encoding='utf-8') as f:
+            f.write("*\n!*.gitkeep\n")
+        
+        print(f"  ✅ 在 {target_dir} 下创建 .gitkeep 和 .gitignore 文件")
     
     def build_dependency(self, submitter):
         """构建单个依赖项"""
@@ -456,6 +512,10 @@ class DependencyBuilder:
         if success:
             # 处理移动操作
             self.process_move_operations(submitter_id, target_dir, move_operations)
+        
+            # 在目标目录下创建 .gitkeep 和 .gitignore 文件
+            self.create_git_files(target_dir)
+            
             print(f"✅ 成功构建: {submitter['name']}")
         else:
             print(f"❌ 构建失败: {submitter['name']}")

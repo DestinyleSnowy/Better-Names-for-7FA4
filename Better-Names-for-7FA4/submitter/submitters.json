@@ -8,7 +8,7 @@
       "package": {
         "type": "git",
         "repo": "http://jx.7fa4.cn:9080/tools/submitter",
-        "target": "submitters/submitter",
+        "target": "submitter",
         "move": []
       }
     },
@@ -20,8 +20,12 @@
       "package": {
         "type": "release",
         "repo": "https://github.com/fltLi/rsubmitter-7fa4",
-        "target": "submitters/rsubmitter-7fa4",
+        "target": "rsubmitter-7fa4",
         "move": [
+          {
+            "from": "rsubmitter-7fa4",
+            "to": "submitter/rsubmitter-7fa4"
+          },
           {
             "from": "wasm",
             "to": "wasm"
