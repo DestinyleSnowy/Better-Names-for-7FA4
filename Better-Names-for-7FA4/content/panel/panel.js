@@ -393,7 +393,11 @@
   let pinned = !!GM_getValue('panelPinned', false);
   const CORNER_KEY = 'bn.corner';
   const SNAP_MARGIN = 20;
+  const DRAG_THRESHOLD = 6;
   let isDragging = false;
+  let dragPending = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
   let wasPinned = false;
   let gearW = 48, gearH = 48;
   let __bn_trail = [];
@@ -433,10 +437,41 @@
   function applyCorner(pos) {
     container.classList.remove('bn-pos-br', 'bn-pos-bl', 'bn-pos-tr', 'bn-pos-tl');
     container.classList.add('bn-pos-' + pos);
-    GM_setValue(CORNER_KEY, pos);
+    const offset = `${SNAP_MARGIN}px`;
+    switch (pos) {
+      case 'tl':
+        container.style.top = offset;
+        container.style.left = offset;
+        container.style.right = 'auto';
+        container.style.bottom = 'auto';
+        break;
+      case 'tr':
+        container.style.top = offset;
+        container.style.right = offset;
+        container.style.left = 'auto';
+        container.style.bottom = 'auto';
+        break;
+      case 'bl':
+        container.style.bottom = offset;
+        container.style.left = offset;
+        container.style.right = 'auto';
+        container.style.top = 'auto';
+        break;
+      case 'br':
+      default:
+        container.style.bottom = offset;
+        container.style.right = offset;
+        container.style.left = 'auto';
+        container.style.top = 'auto';
+        break;
+    }
+    try {
+      GM_setValue(CORNER_KEY, pos);
+    } catch (_) {}
   }
 
-  applyCorner(GM_getValue(CORNER_KEY, 'br'));
+  const initialCorner = GM_getValue(CORNER_KEY, 'br');
+  applyCorner(initialCorner);
   updateContainerState();
 
   const titleInp = document.getElementById('bn-title-input');
@@ -734,6 +769,41 @@
     __bn_dragX = x; __bn_dragY = y;
     trigger.style.transform = `translate3d(${x}px, ${y}px, 0)`;
   }
+  function __bn_beginDrag(e) {
+    dragPending = false;
+    isDragging = true;
+    wasPinned = pinned;
+    panel.classList.remove('bn-show');
+
+    const rect = trigger.getBoundingClientRect();
+    gearW = rect.width; gearH = rect.height;
+    trigger.style.position = 'fixed';
+    trigger.style.left = '0px'; trigger.style.top = '0px';
+    trigger.style.bottom = 'auto'; trigger.style.right = 'auto';
+    trigger.style.transition = 'none';
+    trigger.style.willChange = 'transform';
+    trigger.style.touchAction = 'none';
+
+    container.classList.add('bn-dragging');
+    updateContainerState();
+
+    __bn_trail = [];
+    __bn_applyTransform(e.clientX - gearW / 2, e.clientY - gearH / 2);
+
+    if (!__bn_raf) __bn_raf = requestAnimationFrame(__bn_tick);
+  }
+  function __bn_cleanupPointer() {
+    dragPending = false;
+    if (__bn_pointerId !== null && trigger.releasePointerCapture) {
+      try { trigger.releasePointerCapture(__bn_pointerId); } catch (_) { }
+    }
+    document.removeEventListener('pointermove', __bn_onMove);
+    document.removeEventListener('pointerup', __bn_onUp);
+    document.removeEventListener('mousemove', __bn_onMove);
+    document.removeEventListener('mouseup', __bn_onUp);
+    __bn_trail = [];
+    __bn_pointerId = null;
+  }
   function __bn_tick() {
     if (!isDragging) { __bn_raf = null; return; }
     const s = __bn_sampleAt(__bn_now() - __bn_lagMs);
@@ -741,12 +811,31 @@
     __bn_raf = requestAnimationFrame(__bn_tick);
   }
   function __bn_onMove(e) {
+    if (dragPending) {
+      const dx = e.clientX - dragStartX;
+      const dy = e.clientY - dragStartY;
+      if ((dx * dx + dy * dy) >= DRAG_THRESHOLD * DRAG_THRESHOLD) {
+        __bn_beginDrag(e);
+      } else {
+        return;
+      }
+    }
     if (!isDragging) return;
     __bn_pushTrail(e);
     if (!__bn_raf) __bn_raf = requestAnimationFrame(__bn_tick);
   }
   function __bn_onUp(e) {
-    if (!isDragging) return;
+    if (dragPending) {
+      dragPending = false;
+      if (__bn_raf) cancelAnimationFrame(__bn_raf);
+      __bn_raf = null;
+      __bn_cleanupPointer();
+      return;
+    }
+    if (!isDragging) {
+      __bn_cleanupPointer();
+      return;
+    }
     isDragging = false;
     if (__bn_raf) cancelAnimationFrame(__bn_raf);
     __bn_raf = null;
@@ -768,55 +857,56 @@
     const fx = corners[best].x - gearW / 2;
     const fy = corners[best].y - gearH / 2;
 
-    trigger.style.transition = 'transform 0.24s ease-out';
-    __bn_applyTransform(fx, fy);
+    let finalized = false;
+    let fallbackTimer = null;
+    const finalize = () => {
+      if (finalized) return;
+      finalized = true;
 
-    setTimeout(() => {
       trigger.style.transition = '';
-      applyCorner(best);
       trigger.style.position = '';
       trigger.style.left = trigger.style.top = '';
       trigger.style.bottom = trigger.style.right = '';
       trigger.style.transform = '';
+      trigger.style.touchAction = '';
+      trigger.style.willChange = '';
+
+      applyCorner(best);
       container.classList.remove('bn-dragging');
       if (wasPinned) {
         bringContainerToFront();
         panel.classList.add('bn-show');
       }
       updateContainerState();
+      __bn_cleanupPointer();
+    };
 
-      if (__bn_pointerId !== null && trigger.releasePointerCapture) { try { trigger.releasePointerCapture(__bn_pointerId); } catch (_) { } }
-      document.removeEventListener('pointermove', __bn_onMove);
-      document.removeEventListener('pointerup', __bn_onUp);
-      document.removeEventListener('mousemove', __bn_onMove);
-      document.removeEventListener('mouseup', __bn_onUp);
-      __bn_trail = []; __bn_pointerId = null;
-    }, 260);
+    const onTransitionEnd = (event) => {
+      if (event.propertyName && event.propertyName !== 'transform') return;
+      trigger.removeEventListener('transitionend', onTransitionEnd);
+      if (fallbackTimer !== null) clearTimeout(fallbackTimer);
+      finalize();
+    };
+
+    trigger.addEventListener('transitionend', onTransitionEnd);
+    fallbackTimer = setTimeout(() => {
+      trigger.removeEventListener('transitionend', onTransitionEnd);
+      finalize();
+    }, 320);
+
+    trigger.style.transition = 'transform 0.24s ease-out';
+    __bn_applyTransform(fx, fy);
   }
   const __bn_onDown = (e) => {
     if (e.type === 'mousedown' && window.PointerEvent) return;
     if ((e.type === 'mousedown' || e.type === 'pointerdown') && e.button !== 0) return;
     e.preventDefault();
 
-    wasPinned = pinned;
-    panel.classList.remove('bn-show');
-
-    const rect = trigger.getBoundingClientRect();
-    gearW = rect.width; gearH = rect.height;
-    trigger.style.position = 'fixed';
-    trigger.style.left = '0px'; trigger.style.top = '0px';
-    trigger.style.bottom = 'auto'; trigger.style.right = 'auto';
-    trigger.style.transition = 'none';
-    trigger.style.willChange = 'transform';
-    trigger.style.touchAction = 'none';
-
-    isDragging = true;
-    container.classList.add('bn-dragging');
-    updateContainerState();
-
+    dragPending = true;
+    isDragging = false;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
     __bn_trail = [];
-    __bn_pushTrail(e);
-    __bn_applyTransform(e.clientX - gearW / 2, e.clientY - gearH / 2);
 
     if (e.pointerId != null && trigger.setPointerCapture) {
       __bn_pointerId = e.pointerId;
@@ -827,7 +917,6 @@
       document.addEventListener('mousemove', __bn_onMove);
       document.addEventListener('mouseup', __bn_onUp);
     }
-    if (!__bn_raf) __bn_raf = requestAnimationFrame(__bn_tick);
   };
   if (window.PointerEvent) {
     trigger.addEventListener('pointerdown', __bn_onDown, { passive: false });
