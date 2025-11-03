@@ -970,8 +970,8 @@
     } else if (originalConfig.bgSourceType !== 'remote' || currentBgUrl !== originalConfig.bgImageUrl) {
       bgSourceChanged = true;
     }
-    
     const submitterSelect = document.getElementById('bn-submitter-select');
+    const submitterInitialized = submitterSelect?.dataset?.bnInitialized === '1';
 
     const changed =
       (document.getElementById('bn-enable-title-truncate').checked !== originalConfig.titleTruncate) ||
@@ -996,7 +996,7 @@
       bgSourceChanged ||
       (currentBgOpacity !== originalConfig.bgOpacity) ||
       (document.getElementById('bn-bt-enabled').checked !== originalConfig.btEnabled) ||
-      (submitterSelect && submitterSelect.value !== originalConfig.selectedSubmitter) ||
+      (submitterInitialized && submitterSelect.value !== originalConfig.selectedSubmitter) ||
       (hiToiletIntervalInput && clampHiToiletInterval(hiToiletIntervalInput.value) !== originalConfig.btInterval) ||
       themeColorChanged ||
       paletteChanged;
@@ -1575,11 +1575,11 @@
       option.dataset.popup = submitter.popup || '';
       select.appendChild(option);
     });
-    
     select.value = storedSelectedSubmitter;
-    
     updateSubmitterDescription(select.value);
-    
+    select.dataset.bnInitialized = '1';
+    checkChanged();
+
     select.addEventListener('change', function() {
       updateSubmitterDescription(this.value);
       checkChanged();
