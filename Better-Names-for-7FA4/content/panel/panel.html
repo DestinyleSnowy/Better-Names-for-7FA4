@@ -211,43 +211,60 @@
         </div>
         <label><input type="checkbox" id="bn-use-custom-color" /> 启用自定义颜色</label>
       </div>
-      <div class="bn-section">
-        <div class="bn-title">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><rect width="24" height="24" opacity="0"></rect><g><path d="M4.01 9.91Q3.19 9.91 2.51 10.32Q1.82 10.73 1.42 11.41Q1.01 12.1 1.01 12.91L1.01 18.96Q1.01 19.78 1.42 20.46Q1.82 21.14 2.51 21.55Q3.19 21.96 4.01 21.96L6.53 21.96Q6.74 21.96 6.89 21.82Q7.03 21.67 7.03 21.48L7.03 10.42Q7.03 10.22 6.89 10.07Q6.74 9.91 6.53 9.91L4.01 9.91ZM3.53 17.18Q3.53 16.87 3.74 16.66Q3.96 16.44 4.27 16.44Q4.58 16.44 4.81 16.66Q5.04 16.87 5.04 17.18L5.04 18.65Q5.04 18.96 4.81 19.19Q4.58 19.42 4.27 19.42Q3.96 19.42 3.74 19.19Q3.53 18.96 3.53 18.65L3.53 17.18ZM8.14 21.74Q8.14 21.84 8.21 21.91Q8.28 21.98 8.38 21.98L17.42 21.98Q18.77 21.98 19.84 21.18Q20.9 20.38 21.26 19.1L22.87 13.49Q23.09 12.72 22.93 11.95Q22.78 11.18 22.3 10.58Q21.7 9.84 21 9.66Q20.3 9.48 19.27 9.48L19.06 9.48L15.5 9.5Q16.58 5.4 16.68 5.04Q16.87 4.03 16.66 3.37Q16.44 2.71 15.62 2.28Q14.9 1.87 14.11 2.03Q13.32 2.18 12.86 2.78L8.14 9.17L8.14 21.74Z" fill="rgba(0,0,0,0.9019607843137255)"></path></g></svg>
-          HiToilet
+      <div class="bn-analysis-grid">
+        <div class="bn-analysis-stack">
+          <div class="bn-section bn-section-analysis">
+            <div class="bn-title">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+                <rect width="24" height="24" opacity="0"></rect>
+                <g>
+                  <path
+                    d="M4 20H7V10H4ZM9 20h3V6H9Zm5 0h3v-8h-3Zm5 0h3V4h-3Z"
+                    fill="rgba(0,0,0,0.9019607843137255)"></path>
+                </g>
+              </svg>
+              数据分析
+            </div>
+          </div>
+          <div class="bn-section bn-section-hitoilet">
+            <div class="bn-title">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><rect width="24" height="24" opacity="0"></rect><g><path d="M4.01 9.91Q3.19 9.91 2.51 10.32Q1.82 10.73 1.42 11.41Q1.01 12.1 1.01 12.91L1.01 18.96Q1.01 19.78 1.42 20.46Q1.82 21.14 2.51 21.55Q3.19 21.96 4.01 21.96L6.53 21.96Q6.74 21.96 6.89 21.82Q7.03 21.67 7.03 21.48L7.03 10.42Q7.03 10.22 6.89 10.07Q6.74 9.91 6.53 9.91L4.01 9.91ZM3.53 17.18Q3.53 16.87 3.74 16.66Q3.96 16.44 4.27 16.44Q4.58 16.44 4.81 16.66Q5.04 16.87 5.04 17.18L5.04 18.65Q5.04 18.96 4.81 19.19Q4.58 19.42 4.27 19.42Q3.96 19.42 3.74 19.19Q3.53 18.96 3.53 18.65L3.53 17.18ZM8.14 21.74Q8.14 21.84 8.21 21.91Q8.28 21.98 8.38 21.98L17.42 21.98Q18.77 21.98 19.84 21.18Q20.9 20.38 21.26 19.1L22.87 13.49Q23.09 12.72 22.93 11.95Q22.78 11.18 22.3 10.58Q21.7 9.84 21 9.66Q20.3 9.48 19.27 9.48L19.06 9.48L15.5 9.5Q16.58 5.4 16.68 5.04Q16.87 4.03 16.66 3.37Q16.44 2.71 15.62 2.28Q14.9 1.87 14.11 2.03Q13.32 2.18 12.86 2.78L8.14 9.17L8.14 21.74Z" fill="rgba(0,0,0,0.9019607843137255)"></path></g></svg>
+              HiToilet
+            </div>
+            <label><input type="checkbox" id="bn-bt-enabled" ${btEnabled ? 'checked' : '' } /> 开始抢厕所</label>
+            <div style="margin-top: 8px;">
+              <label style="display: block; margin-bottom: 4px; font-size: 12px; color: var(--bn-text-muted);">轮询间隔:
+                <span id="bn-bt-interval-value">2000</span> ms</label>
+              <input type="range" id="bn-bt-interval" min="10" max="2000" step="10" value="2000" style="width: 100%;">
+            </div>
+          </div>
         </div>
-        <label><input type="checkbox" id="bn-bt-enabled" ${btEnabled ? 'checked' : '' } /> 开始抢厕所</label>
-        <div style="margin-top: 8px;">
-          <label style="display: block; margin-bottom: 4px; font-size: 12px; color: var(--bn-text-muted);">轮询间隔:
-            <span id="bn-bt-interval-value">2000</span> ms</label>
-          <input type="range" id="bn-bt-interval" min="10" max="2000" step="10" value="2000" style="width: 100%;">
-        </div>
-      </div>
-      <div class="bn-section">
-        <div class="bn-title">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><rect width="24" height="24" opacity="0"></rect><g><path d="M8.5 7.25Q7.78 7.25 7.26 7.76Q6.74 8.28 6.74 9Q6.74 9.72 7.26 10.24Q7.78 10.75 8.5 10.75Q9.22 10.75 9.73 10.24Q10.25 9.72 10.25 9Q10.25 8.28 9.73 7.76Q9.22 7.25 8.5 7.25ZM5.93 1.99Q4.87 1.99 3.96 2.52Q3.05 3.05 2.52 3.96Q1.99 4.87 1.99 5.93L1.99 18.05Q1.99 19.13 2.52 20.04Q3.05 20.95 3.96 21.48Q4.87 22.01 5.93 22.01L18.07 22.01Q19.13 22.01 20.03 21.48Q20.93 20.95 21.46 20.04Q21.98 19.13 21.98 18.05L21.98 5.93Q21.98 4.87 21.46 3.96Q20.93 3.05 20.03 2.52Q19.13 1.99 18.07 1.99L5.93 1.99ZM3.5 5.93Q3.5 4.9 4.21 4.2Q4.92 3.5 5.93 3.5L18.07 3.5Q19.08 3.5 19.79 4.21Q20.5 4.92 20.5 5.93L20.5 14.35L16.7 11.11Q16.03 10.51 15.14 10.48Q14.26 10.44 13.54 10.97L3.5 18.29L3.5 18.05L3.5 5.93ZM5.93 20.5Q5.4 20.5 4.93 20.28Q4.46 20.06 4.13 19.7L14.42 12.19Q14.74 11.98 15.1 11.99Q15.46 12 15.72 12.24L20.5 16.32L20.5 18.05Q20.5 19.06 19.79 19.78Q19.08 20.5 18.07 20.5L5.93 20.5Z" fill="rgba(0,0,0,0.9019607843137255)"></path></g></svg>
-          背景图片
-        </div>
-        <label><input type="checkbox" id="bn-bg-enabled" ${bgEnabled ? 'checked' : '' } /> 启用背景图片</label>
-        <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
-          <label for="bn-bg-image-url"
-            style="margin: 0; font-size: 12px; color: var(--bn-text-muted); white-space: nowrap;">图片URL：</label>
-          <input type="text" id="bn-bg-image-url" value="${bgImageUrl}"
-            style="flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid var(--bn-border-subtle); border-radius: 6px; background: var(--bn-bg); color: var(--bn-text); font-size: 12px;"
-            placeholder="输入图片 URL">
-        </div>
-        <div class="bn-bg-local-row">
-          <input type="file" id="bn-bg-image-file" accept="image/*" hidden>
-          <button type="button" class="bn-btn" id="bn-bg-image-file-btn">选择本地图片</button>
-          <span class="bn-bg-file-name" id="bn-bg-image-file-name">未选择本地图片</span>
-          <button type="button" class="bn-btn-link" id="bn-bg-clear-local">清除</button>
-        </div>
-        <div class="bn-bg-source-hint" id="bn-bg-source-hint">当前背景来源：远程图片</div>
-        <div style="margin-top: 8px;">
-          <label style="display: block; margin-bottom: 4px; font-size: 12px; color: var(--bn-text-muted);">透明度: <span
-              id="bn-bg-opacity-value">${bgOpacity}</span></label>
-          <input type="range" id="bn-bg-opacity" min="0.01" max="1" step="0.01" value="${bgOpacity}"
-            style="width: 100%;">
+        <div class="bn-section bn-section-background">
+          <div class="bn-title">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><rect width="24" height="24" opacity="0"></rect><g><path d="M8.5 7.25Q7.78 7.25 7.26 7.76Q6.74 8.28 6.74 9Q6.74 9.72 7.26 10.24Q7.78 10.75 8.5 10.75Q9.22 10.75 9.73 10.24Q10.25 9.72 10.25 9Q10.25 8.28 9.73 7.76Q9.22 7.25 8.5 7.25ZM5.93 1.99Q4.87 1.99 3.96 2.52Q3.05 3.05 2.52 3.96Q1.99 4.87 1.99 5.93L1.99 18.05Q1.99 19.13 2.52 20.04Q3.05 20.95 3.96 21.48Q4.87 22.01 5.93 22.01L18.07 22.01Q19.13 22.01 20.03 21.48Q20.93 20.95 21.46 20.04Q21.98 19.13 21.98 18.05L21.98 5.93Q21.98 4.87 21.46 3.96Q20.93 3.05 20.03 2.52Q19.13 1.99 18.07 1.99L5.93 1.99ZM3.5 5.93Q3.5 4.9 4.21 4.2Q4.92 3.5 5.93 3.5L18.07 3.5Q19.08 3.5 19.79 4.21Q20.5 4.92 20.5 5.93L20.5 14.35L16.7 11.11Q16.03 10.51 15.14 10.48Q14.26 10.44 13.54 10.97L3.5 18.29L3.5 18.05L3.5 5.93ZM5.93 20.5Q5.4 20.5 4.93 20.28Q4.46 20.06 4.13 19.7L14.42 12.19Q14.74 11.98 15.1 11.99Q15.46 12 15.72 12.24L20.5 16.32L20.5 18.05Q20.5 19.06 19.79 19.78Q19.08 20.5 18.07 20.5L5.93 20.5Z" fill="rgba(0,0,0,0.9019607843137255)"></path></g></svg>
+            背景图片
+          </div>
+          <label><input type="checkbox" id="bn-bg-enabled" ${bgEnabled ? 'checked' : '' } /> 启用背景图片</label>
+          <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
+            <label for="bn-bg-image-url"
+              style="margin: 0; font-size: 12px; color: var(--bn-text-muted); white-space: nowrap;">图片URL：</label>
+            <input type="text" id="bn-bg-image-url" value="${bgImageUrl}"
+              style="flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid var(--bn-border-subtle); border-radius: 6px; background: var(--bn-bg); color: var(--bn-text); font-size: 12px;"
+              placeholder="输入图片 URL">
+          </div>
+          <div class="bn-bg-local-row">
+            <input type="file" id="bn-bg-image-file" accept="image/*" hidden>
+            <button type="button" class="bn-btn" id="bn-bg-image-file-btn">选择本地图片</button>
+            <span class="bn-bg-file-name" id="bn-bg-image-file-name">未选择本地图片</span>
+            <button type="button" class="bn-btn-link" id="bn-bg-clear-local">清除</button>
+          </div>
+          <div class="bn-bg-source-hint" id="bn-bg-source-hint">当前背景来源：远程图片</div>
+          <div style="margin-top: 8px;">
+            <label style="display: block; margin-bottom: 4px; font-size: 12px; color: var(--bn-text-muted);">透明度: <span
+                id="bn-bg-opacity-value">${bgOpacity}</span></label>
+            <input type="range" id="bn-bg-opacity" min="0.01" max="1" step="0.01" value="${bgOpacity}"
+              style="width: 100%;">
+          </div>
         </div>
       </div>
     </div>
@@ -286,7 +303,7 @@
       <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
     </div>
     <div class="bn-version">
-      <div class="bn-version-text">6.2.0 Developer Beta</div>
+      <div class="bn-version-text">6.2.0 SP1 Developer Beta</div>
     </div>
   </div>
 </div>
