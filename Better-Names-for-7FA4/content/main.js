@@ -315,14 +315,63 @@ window.getCurrentUserId = getCurrentUserId;
     count();
   }
 
+  const PLAN_TOGGLE_ON_LABEL = '退出【添加计划】模式';
+  const PLAN_TOGGLE_OFF_LABEL = '进入【添加计划】模式';
+  const PLAN_TOGGLE_HOST_SELECTORS = [
+    '.ui.grid .row .four.wide.right.aligned.column',
+    '.ui.grid .row .right.aligned.column',
+    '.ui.grid .row .column:last-child',
+    '.ui.grid'
+  ];
+  let toggleButtonRetryTimer = null;
+  let toggleButtonReadyListenerAttached = false;
+  function resolveToggleHost() {
+    for (const selector of PLAN_TOGGLE_HOST_SELECTORS) {
+      const el = $(selector);
+      if (el) return el;
+    }
+    return document.body || null;
+  }
+  function scheduleToggleButtonRetry() {
+    if (document.readyState === 'loading') {
+      if (toggleButtonReadyListenerAttached) return;
+      toggleButtonReadyListenerAttached = true;
+      document.addEventListener('DOMContentLoaded', () => {
+        toggleButtonReadyListenerAttached = false;
+        toggleButton();
+      }, { once: true });
+      return;
+    }
+    if (toggleButtonRetryTimer) return;
+    toggleButtonRetryTimer = setTimeout(() => {
+      toggleButtonRetryTimer = null;
+      toggleButton();
+    }, 250);
+  }
+  function updatePlanToggleLabel(target = $('#plan-toggle')) {
+    if (!target) return;
+    target.textContent = modeOn ? PLAN_TOGGLE_ON_LABEL : PLAN_TOGGLE_OFF_LABEL;
+  }
   function toggleButton() {
-    const host = $('.ui.grid .row .four.wide.right.aligned.column') || document.body;
-    if ($('#plan-toggle', host)) return;
-    const btn = document.createElement('button');
-    btn.id = 'plan-toggle'; btn.className = 'ui mini button'; btn.style.marginLeft = '8px';
-    btn.textContent = modeOn ? '退出【添加计划】模式' : '进入【添加计划】模式';
-    btn.onclick = () => { modeOn ? exitMode() : enterMode(); btn.textContent = modeOn ? '退出【添加计划】模式' : '进入【添加计划】模式'; };
-    host.appendChild(btn);
+    const host = resolveToggleHost();
+    if (!host) {
+      scheduleToggleButtonRetry();
+      return;
+    }
+    let btn = $('#plan-toggle');
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.id = 'plan-toggle';
+      btn.type = 'button';
+      btn.className = 'ui mini button';
+      btn.style.marginLeft = '8px';
+      btn.addEventListener('click', () => {
+        if (modeOn) exitMode();
+        else enterMode();
+      });
+    }
+    if (btn.parentElement !== host) host.appendChild(btn);
+    updatePlanToggleLabel(btn);
   }
 
   function insertSelectColumn() {
@@ -876,13 +925,13 @@ window.getCurrentUserId = getCurrentUserId;
   /* ========= 模式切换 ========= */
   function enterMode() {
     modeOn = true; GM_setValue(KEY.mode, true); insertSelectColumn(); toolbar(); observe();
-    const b = $('#plan-toggle'); if (b) b.textContent = '退出【添加计划】';
+    updatePlanToggleLabel();
   }
   function exitMode() {
     modeOn = false; GM_setValue(KEY.mode, false);
     $('#plan-bar')?.remove(); $('#padder-th')?.remove();
     $$(SEL.rows).forEach(r => { r.classList.remove('padder-selected'); r.querySelector('td.padder-cell')?.remove(); });
-    const b = $('#plan-toggle'); if (b) b.textContent = '进入【添加计划】';
+    updatePlanToggleLabel();
   }
 
   /* ========= 启动 ========= */
