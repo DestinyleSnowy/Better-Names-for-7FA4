@@ -1590,6 +1590,120 @@ window.getCurrentUserId = getCurrentUserId;
   init().catch(err => console.error('[BN] Ranking enhancement failed', err));
 })();
 
+/* === BN PATCH: user plan title real name === */
+(function () {
+  const match = location.pathname.match(/^\/user_plans\/(\d+)(?:\/|$)/);
+  if (!match) return;
+
+  const uid = match[1];
+  const TITLE_SUFFIX = '\u4e2a\u4eba\u8ba1\u5212 - 7FA4';
+
+  function applyTitle(name) {
+    if (!name) return;
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const next = `${trimmed} - ${TITLE_SUFFIX}`;
+    if (document.title !== next) document.title = next;
+  }
+
+  function bestName(entry) {
+    if (!entry || typeof entry !== 'object') return '';
+    const raw = entry.name || entry.displayName || entry.nickname || '';
+    return typeof raw === 'string' ? raw.trim() : '';
+  }
+
+  function candidateUrls() {
+    const urls = [];
+    const pushUrl = (url) => {
+      if (typeof url === 'string' && url && !urls.includes(url)) urls.push(url);
+    };
+    if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function') {
+      try { pushUrl(chrome.runtime.getURL('data/users.json')); } catch (_) { /* ignore */ }
+    }
+    if (typeof browser !== 'undefined' && browser.runtime && typeof browser.runtime.getURL === 'function') {
+      try { pushUrl(browser.runtime.getURL('data/users.json')); } catch (_) { /* ignore */ }
+    }
+    return urls;
+  }
+
+  function loadUsersData() {
+    if (window.__bnUsersData && typeof window.__bnUsersData === 'object') {
+      return Promise.resolve(window.__bnUsersData);
+    }
+    if (window.__bnUsersDataPromise) return window.__bnUsersDataPromise;
+    window.__bnUsersDataPromise = (async () => {
+      const urls = candidateUrls();
+      for (const url of urls) {
+        try {
+          const resp = await fetch(url, { cache: 'no-store' });
+          if (resp && resp.ok) {
+            const data = await resp.json();
+            if (data && typeof data === 'object') {
+              window.__bnUsersData = data;
+              return data;
+            }
+          }
+        } catch (err) {
+          console.warn('[BN] Failed to load users.json from', url, err);
+        }
+      }
+      window.__bnUsersData = {};
+      return window.__bnUsersData;
+    })();
+    return window.__bnUsersDataPromise;
+  }
+
+  loadUsersData()
+    .then(users => {
+      if (!users || typeof users !== 'object') return;
+      let record = users[uid] || users[String(uid)];
+      if (!record && Array.isArray(users)) {
+        record = users.find(item => item && String(item.id || item.user_id || '') === uid);
+      }
+      const name = bestName(record);
+      if (name) applyTitle(name);
+    })
+    .catch(err => console.warn('[BN] Unable to resolve user name for title', err));
+})();
+
+/* === BN PATCH: problem tag title enhancement === */
+(function () {
+  if (!/^\/problems\/tag\//.test(location.pathname)) return;
+
+  const TITLE_SUFFIX = '\u4e60\u9898 - 7FA4';
+  const BUTTON_SELECTOR = 'body > div.pusher > div:nth-child(1) > div > div.padding > div.ui.grid > div > div.eight.wide.column > div > a.ui.mini.blue.button';
+
+  const normalizeText = (text) => (typeof text === 'string' ? text.replace(/\s+/g, ' ').trim() : '');
+
+  const applyTitle = () => {
+    const button = document.querySelector(BUTTON_SELECTOR);
+    if (!button) return false;
+    const label = normalizeText(button.textContent);
+    if (!label) return false;
+    const next = `${label} - ${TITLE_SUFFIX}`;
+    if (document.title !== next) document.title = next;
+    return true;
+  };
+
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    if (applyTitle()) return;
+  }
+
+  const tryApply = () => applyTitle();
+  const onLoad = () => {
+    tryApply();
+  };
+
+  if (!tryApply()) {
+    const observer = new MutationObserver(() => {
+      if (tryApply()) observer.disconnect();
+    });
+    observer.observe(document.documentElement || document, { childList: true, subtree: true });
+    window.addEventListener('load', onLoad, { once: true });
+    setTimeout(() => observer.disconnect(), 10000);
+  }
+})();
+
 /* === BN PATCH 2: user menu pure fade-in (no size change) + shadow fade === */
 (function () {
   const css = `

@@ -31,6 +31,35 @@ jobs:
       - name: Build submitter dependencies
         run: python build.py build
 
+      - name: Commit updated submitter
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          git config --global user.name "DestinyleSnowy"
+          git config --global user.email "destinylesnowyx@gmail.com"
+
+          git fetch origin "$DEFAULT_BRANCH"
+          REMOTE_SHA=$(git rev-parse "origin/$DEFAULT_BRANCH")
+          if [ "$REMOTE_SHA" != "$GITHUB_SHA" ]; then
+            echo "Skipping push because $DEFAULT_BRANCH is at $REMOTE_SHA instead of release commit $GITHUB_SHA."
+            exit 0
+          fi
+
+          if [ -d Better-Names-for-7FA4/submitter ]; then
+            git add Better-Names-for-7FA4/submitter
+          fi
+          if [ -f Better-Names-for-7FA4/submitters.json ]; then
+            git add Better-Names-for-7FA4/submitters.json
+          fi
+          if git diff --cached --quiet; then
+            echo "No submitter changes to commit."
+            exit 0
+          fi
+
+          git commit -m "chore: update submitter dependencies for $GITHUB_REF_NAME"
+          git push origin HEAD:"$DEFAULT_BRANCH"
+
       - name: Create ZIP package
         run: |
           cd Better-Names-for-7FA4

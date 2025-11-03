@@ -1445,6 +1445,53 @@
       .replace(/'/g, '&#39;');
   }
 
+  // Sanitize a small subset of HTML allowed in submitter descriptions.
+  // Only allow <a href="...">text</a> and strip other tags/attributes.
+  function sanitizeSubmitterDescription(raw) {
+    if (typeof raw !== 'string' || !raw) return '';
+    // Quick path: if there's no '<', it's safe text
+    if (raw.indexOf('<') === -1) return escapeHtml(raw);
+
+    try {
+      const doc = new DOMParser().parseFromString(raw, 'text/html');
+      const container = document.createElement('span');
+      for (const node of Array.from(doc.body.childNodes)) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          container.appendChild(document.createTextNode(node.textContent || ''));
+          continue;
+        }
+        if (node.nodeType === Node.ELEMENT_NODE && node.tagName.toLowerCase() === 'a') {
+          const a = document.createElement('a');
+          const href = node.getAttribute('href') || '';
+          // Only allow http/https and relative URLs; normalize via URL when possible
+          try {
+            const url = new URL(href, location.href);
+            if (url.protocol === 'http:' || url.protocol === 'https:') {
+              a.href = url.toString();
+            } else {
+              // disallow other protocols
+              a.href = '#';
+            }
+          } catch (e) {
+            // malformed href -> treat as text
+            a.href = '#';
+          }
+          a.target = '_blank';
+          a.rel = 'noopener';
+          a.textContent = node.textContent || node.getAttribute('title') || a.href;
+          container.appendChild(a);
+          continue;
+        }
+        // For any other element, append its text content (safe)
+        container.appendChild(document.createTextNode(node.textContent || ''));
+      }
+      return container.innerHTML;
+    } catch (e) {
+      // Fallback: escape everything
+      return escapeHtml(raw);
+    }
+  }
+
   function truncateByUnits(str, maxU) {
     if (!isFinite(maxU)) return str;
     let used = 0, out = '';
@@ -1545,7 +1592,15 @@
     const selectedOption = submitterSelect?.querySelector(`option[value="${selectedId}"]`);
     
     if (selectedOption && selectedOption.dataset.description) {
-      description.textContent = selectedOption.dataset.description;
+      const raw = selectedOption.dataset.description || '';
+      // Use a small sanitizer that allows only anchor tags; fall back to plain text
+      const safe = sanitizeSubmitterDescription(raw);
+      // If sanitizer returned a string with '<', it contains allowed HTML (anchors), set as HTML
+      if (safe.indexOf('<') !== -1) {
+        description.innerHTML = safe;
+      } else {
+        description.textContent = safe;
+      }
       description.className = 'bn-submitter-description';
     } else {
       description.textContent = '未知的 Submitter';
