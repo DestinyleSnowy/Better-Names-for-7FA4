@@ -35,6 +35,7 @@
   const enableVjLink = GM_getValue('enableVjLink', true);
   const hideDoneSkip = GM_getValue('hideDoneSkip', false);
   const enableQuickSkip = GM_getValue('enableQuickSkip', false);
+  const enableTitleOptimization = GM_getValue('enableTitleOptimization', true);
   const WIDTH_MODE_KEY = 'truncate.widthMode';
   const widthMode = GM_getValue(WIDTH_MODE_KEY, 'visual');
   const BN_TABLE_ROWS_SELECTOR = 'table.ui.very.basic.center.aligned.table tbody tr';
@@ -499,6 +500,7 @@
   const chkVj = document.getElementById('bn-enable-vj');
   const chkHideDoneSkip = document.getElementById('bn-hide-done-skip');
   const chkQuickSkip = document.getElementById('bn-enable-quick-skip');
+  const chkTitleOpt = document.getElementById('bn-enable-title-optimization');
 
   chkTitleTr.checked = isFinite(maxTitleUnits);
   titleInp.value = isFinite(maxTitleUnits) ? maxTitleUnits : '';
@@ -525,6 +527,7 @@
   chkVj.checked = enableVjLink;
   chkHideDoneSkip.checked = hideDoneSkip;
   chkQuickSkip.checked = enableQuickSkip;
+  chkTitleOpt.checked = enableTitleOptimization;
 
   const disableNeedWarn = () => {
     if (typeof window.needWarn === 'function' && !window.__bnGuardOriginalNeedWarn) {
@@ -599,6 +602,7 @@
     enableVjLink,
     hideDoneSkip,
     enableQuickSkip,
+    enableTitleOptimization,
     widthMode,
     bgEnabled: storedBgEnabled,
     bgImageUrl: normalizedBgUrl,
@@ -985,6 +989,7 @@
       (document.getElementById('bn-enable-vj').checked !== originalConfig.enableVjLink) ||
       (document.getElementById('bn-hide-done-skip').checked !== originalConfig.hideDoneSkip) ||
       (document.getElementById('bn-enable-quick-skip').checked !== originalConfig.enableQuickSkip) ||
+      (document.getElementById('bn-enable-title-optimization').checked !== originalConfig.enableTitleOptimization) ||
       (document.getElementById('bn-use-custom-color').checked !== originalConfig.useCustomColors) ||
       ((document.getElementById('bn-width-mode')?.value ?? originalConfig.widthMode) !== originalConfig.widthMode) ||
       (currentBgEnabled !== originalConfig.bgEnabled) ||
@@ -1063,6 +1068,7 @@
   chkVj.onchange = checkChanged;
   chkHideDoneSkip.onchange = () => { applyHideDoneSkip(chkHideDoneSkip.checked); checkChanged(); };
   chkQuickSkip.onchange = () => { applyQuickSkip(chkQuickSkip.checked); checkChanged(); };
+  chkTitleOpt.onchange = checkChanged;
   chkPlan.onchange = () => { toggleOption(chkPlan, planOpts); checkChanged(); };
   chkAutoRenew.onchange = checkChanged;
   chkRankingFilter.onchange = checkChanged;
@@ -1109,6 +1115,7 @@
     GM_setValue('hideOrig', chkHo.checked);
     GM_setValue('hideDoneSkip', chkHideDoneSkip.checked);
     GM_setValue('enableQuickSkip', chkQuickSkip.checked);
+    GM_setValue('enableTitleOptimization', chkTitleOpt.checked);
     GM_setValue('enableUserMenu', chkMenu.checked);
     GM_setValue('enableVjLink', chkVj.checked);
     GM_setValue('enablePlanAdder', chkPlan.checked);
@@ -1195,6 +1202,7 @@
     applyHideDoneSkip(originalConfig.hideDoneSkip);
     chkQuickSkip.checked = originalConfig.enableQuickSkip;
     applyQuickSkip(originalConfig.enableQuickSkip);
+    chkTitleOpt.checked = originalConfig.enableTitleOptimization;
     chkPlan.checked = originalConfig.enablePlanAdder;
     chkAutoRenew.checked = originalConfig.enableAutoRenew;
     chkRankingFilter.checked = originalConfig.enableRankingFilter;

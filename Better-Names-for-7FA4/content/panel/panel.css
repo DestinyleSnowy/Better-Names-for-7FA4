@@ -194,6 +194,11 @@
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  height: 100%;
+}
+
+.bn-section-column-truncate .bn-section-truncate {
+  flex: 1 1 auto;
 }
 
 .bn-color-sidebar {

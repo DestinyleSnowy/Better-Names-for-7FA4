@@ -1594,6 +1594,7 @@ window.getCurrentUserId = getCurrentUserId;
 (function () {
   const match = location.pathname.match(/^\/user_plans\/(\d+)(?:\/|$)/);
   if (!match) return;
+  if (!GM_getValue('enableTitleOptimization', true)) return;
 
   const uid = match[1];
   const TITLE_SUFFIX = '\u4e2a\u4eba\u8ba1\u5212 - 7FA4';
@@ -1669,6 +1670,7 @@ window.getCurrentUserId = getCurrentUserId;
 /* === BN PATCH: problem tag title enhancement === */
 (function () {
   if (!/^\/problems\/tag\//.test(location.pathname)) return;
+  if (!GM_getValue('enableTitleOptimization', true)) return;
 
   const TITLE_SUFFIX = '\u4e60\u9898 - 7FA4';
   const BUTTON_SELECTOR = 'body > div.pusher > div:nth-child(1) > div > div.padding > div.ui.grid > div > div.eight.wide.column > div > a.ui.mini.blue.button';
