@@ -1,7 +1,9 @@
 ## CHANGELOG
 
-### 6.1.1 Developer Beta
-- 合并 rsubmitter 进入本插件。
+### 6.2.0 Developer Beta
+- **SP0** 合并 rsubmitter 进入本插件。
+- **SP1** 修复启用添加计划模式按钮消失的问题。
+- **SP1** 修复面板无法显示在页面最上层的问题。
 - 修复存在的部分问题。
 
 ### 6.1.0 

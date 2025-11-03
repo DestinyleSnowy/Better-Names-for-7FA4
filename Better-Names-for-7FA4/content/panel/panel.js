@@ -366,6 +366,7 @@
     });
   }
   document.body.appendChild(container);
+  bringContainerToFront();
 
   const panel = document.getElementById('bn-panel');
   const pinBtn = document.getElementById('bn-pin');
@@ -404,6 +405,18 @@
   let currentBgImageDataName = normalizedBgFileName;
 
   initSubmittersSelector();
+
+  function bringContainerToFront() {
+    try {
+      container.style.zIndex = '2147483647';
+      const parent = container.parentElement;
+      if (parent && parent.lastElementChild !== container) {
+        parent.appendChild(container);
+      }
+    } catch (error) {
+      console.warn('[BN] Failed to elevate panel container', error);
+    }
+  }
 
   function updateContainerState() {
     if (isDragging || container.classList.contains('bn-dragging')) {
@@ -571,6 +584,7 @@
 
   pinBtn.classList.toggle('bn-pinned', pinned);
   if (pinned) {
+    bringContainerToFront();
     panel.classList.add('bn-show');
   }
   updateContainerState();
@@ -671,6 +685,7 @@
   const showPanel = () => {
     if (isDragging || container.classList.contains('bn-dragging')) return;
     cancelHide();
+    bringContainerToFront();
     panel.classList.add('bn-show');
     updateContainerState();
   };
@@ -764,7 +779,10 @@
       trigger.style.bottom = trigger.style.right = '';
       trigger.style.transform = '';
       container.classList.remove('bn-dragging');
-      if (wasPinned) { panel.classList.add('bn-show'); }
+      if (wasPinned) {
+        bringContainerToFront();
+        panel.classList.add('bn-show');
+      }
       updateContainerState();
 
       if (__bn_pointerId !== null && trigger.releasePointerCapture) { try { trigger.releasePointerCapture(__bn_pointerId); } catch (_) { } }
