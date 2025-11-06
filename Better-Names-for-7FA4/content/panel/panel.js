@@ -34,7 +34,43 @@
   const enableRankingFilterSetting = GM_getValue('rankingFilter.enabled', false);
   const enableVjLink = GM_getValue('enableVjLink', true);
   const hideDoneSkip = GM_getValue('hideDoneSkip', false);
-  const enableQuickSkip = GM_getValue('enableQuickSkip', false);
+  let rawQuickSkip;
+  let quickSkipMigrated = false;
+  try {
+    rawQuickSkip = GM_getValue('enableQuickSkip');
+  } catch (err) {
+    rawQuickSkip = undefined;
+  }
+  try {
+    quickSkipMigrated = !!GM_getValue('quickSkip.migrated.v1', false);
+  } catch (err) {
+    quickSkipMigrated = false;
+  }
+  const normalizeQuickSkip = (value) => {
+    if (value === undefined || value === null) return undefined;
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value !== 0;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return false;
+      if (/^(false|0)$/i.test(trimmed)) return false;
+      if (/^(true|1)$/i.test(trimmed)) return true;
+      return true;
+    }
+    return true;
+  };
+  let enableQuickSkip = normalizeQuickSkip(rawQuickSkip);
+  if (!quickSkipMigrated) {
+    if (enableQuickSkip === undefined || enableQuickSkip === false) {
+      enableQuickSkip = true;
+    }
+    try {
+      GM_setValue('enableQuickSkip', enableQuickSkip);
+      GM_setValue('quickSkip.migrated.v1', true);
+      quickSkipMigrated = true;
+    } catch (_) { /* ignore */ }
+  }
+  if (enableQuickSkip === undefined) enableQuickSkip = true;
   const enableTitleOptimization = GM_getValue('enableTitleOptimization', true);
   const WIDTH_MODE_KEY = 'truncate.widthMode';
   const widthMode = GM_getValue(WIDTH_MODE_KEY, 'visual');
