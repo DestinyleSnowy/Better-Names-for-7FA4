@@ -1667,6 +1667,264 @@ window.getCurrentUserId = getCurrentUserId;
     .catch(err => console.warn('[BN] Unable to resolve user name for title', err));
 })();
 
+/* === BN PATCH: user plan quick skip === */
+(function () {
+  const pathMatch = location.pathname.match(/^\/user_plans\/(\d+)(?:\/|$)/);
+  if (!pathMatch) return;
+  if (!GM_getValue('enableQuickSkip', false)) return;
+  const planUid = (() => {
+    if (pathMatch && pathMatch[1]) {
+      const value = Number(pathMatch[1]);
+      if (Number.isFinite(value)) return value;
+    }
+    try {
+      const params = new URLSearchParams(location.search || '');
+      const keys = ['uid', 'user_id', 'userId'];
+      for (const key of keys) {
+        const raw = params.get(key);
+        if (raw && /^\d+$/.test(raw)) {
+          const value = Number(raw);
+          if (Number.isFinite(value)) return value;
+        }
+      }
+    } catch (e) { }
+    return NaN;
+  })();
+  const currentUid = (() => {
+    try {
+      const getter = (typeof getCurrentUserId === 'function')
+        ? getCurrentUserId
+        : (typeof window !== 'undefined' && typeof window.getCurrentUserId === 'function')
+          ? window.getCurrentUserId
+          : null;
+      if (!getter) return NaN;
+      const value = Number(getter());
+      return Number.isFinite(value) ? value : NaN;
+    } catch (e) {
+      return NaN;
+    }
+  })();
+  if (!Number.isFinite(planUid) || !Number.isFinite(currentUid) || planUid !== currentUid) return;
+
+  const ROW_SELECTOR = 'tr[id^="day-"] > td:nth-child(2) table tbody tr.problem-line';
+  const STYLE_ID = 'bn-user-plan-quick-skip-style';
+  const ELEMENT_NODE = (typeof Node === 'function' && Node.ELEMENT_NODE) || 1;
+
+  function ensureStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+    const css = `
+td.bn-plan-quick-skip-target {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+td.bn-plan-quick-skip-target .bn-plan-quick-skip-wrap {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.bn-plan-quick-skip-wrap .bn-quick-skip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: rgba(123, 76, 217, 0.12);
+  border-radius: 0;
+  border-radius: 50%;
+  text-decoration: none;
+  color: #7f3dcf;
+  transition: color .2s ease, background .2s ease, transform .2s ease;
+}
+.bn-plan-quick-skip-wrap .bn-quick-skip:hover {
+  color: #4b2c92;
+  background: rgba(123, 76, 217, 0.18);
+  transform: translateY(-1px);
+}
+.bn-plan-quick-skip-wrap .bn-quick-skip:active {
+  transform: translateY(0);
+  background: rgba(123, 76, 217, 0.14);
+}
+.bn-plan-quick-skip-wrap .bn-quick-skip:visited {
+  color: #7f3dcf;
+}
+.bn-plan-quick-skip-wrap .bn-quick-skip i.icon {
+  margin: 0 !important;
+  font-size: 12px;
+  line-height: 1;
+  color: currentColor;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bn-plan-quick-skip-wrap .bn-quick-skip {
+    transition: none;
+  }
+}
+`;
+    const styleEl = document.createElement('style');
+    styleEl.id = STYLE_ID;
+    styleEl.textContent = css;
+    (document.head || document.documentElement || document.body).appendChild(styleEl);
+  }
+
+  function safeProblemUrl(problemId) {
+    if (typeof problemId !== 'string' && typeof problemId !== 'number') return null;
+    const pidStr = String(problemId).trim();
+    if (!/^\d+$/.test(pidStr)) return null;
+    return `/problem/${pidStr}/skip`;
+  }
+
+  function createQuickSkipButton(problemId) {
+    const href = safeProblemUrl(problemId);
+    if (!href) return null;
+    const btn = document.createElement('a');
+    btn.className = 'bn-quick-skip';
+    btn.setAttribute('data-bn-quick-skip', '1');
+    btn.href = href;
+    btn.dataset.problemId = String(problemId);
+    btn.innerHTML = '<i class="coffee icon" aria-hidden="true"></i>';
+    btn.setAttribute('title', '\u5feb\u901f\u8df3\u8fc7');
+    btn.setAttribute('aria-label', '\u5feb\u901f\u8df3\u8fc7');
+
+    btn.addEventListener('click', async (event) => {
+      if (!event) return;
+      if (event.defaultPrevented) return;
+      if (typeof event.button === 'number' && event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (btn.dataset.bnQuickSkipPending === '1') return;
+      btn.dataset.bnQuickSkipPending = '1';
+      const targetUrl = btn.href;
+      try {
+        const response = await fetch(targetUrl, {
+          method: 'GET',
+          credentials: 'include',
+          redirect: 'follow'
+        });
+        if (!response || !response.ok) throw new Error('Skip request failed');
+      } catch (err) {
+        delete btn.dataset.bnQuickSkipPending;
+        location.href = targetUrl;
+        return;
+      }
+      location.reload();
+    });
+
+    return btn;
+  }
+
+  function getProblemIdFromRow(row) {
+    if (!row) return null;
+    const anchor = row.querySelector('a[href^="/problem/"]');
+    if (!anchor) return null;
+    const href = anchor.getAttribute('href') || '';
+    const match = href.match(/\/problem\/(\d+)/);
+    return match ? match[1] : null;
+  }
+
+  function shouldDisplayQuickSkip(row) {
+    if (!row) return false;
+    const statusCell = row.cells?.[1] || row.querySelector('td:nth-child(2)');
+    if (!statusCell) return false;
+    const text = (statusCell.textContent || '').trim();
+    if (!text) return false;
+    return text.includes('\u672a\u63d0\u4ea4');
+  }
+
+  function removePlanQuickSkip(row) {
+    if (!row) return;
+    const targetCell = row.cells?.[2] || row.querySelector('td:last-child');
+    if (targetCell) {
+      const wrapper = targetCell.querySelector('.bn-plan-quick-skip-wrap');
+      if (wrapper) wrapper.remove();
+      if (!targetCell.querySelector('.bn-plan-quick-skip-wrap')) {
+        targetCell.classList.remove('bn-plan-quick-skip-target');
+      }
+    }
+    delete row.__bnPlanQuickSkipApplied;
+  }
+
+  function ensureButtonForRow(row) {
+    if (!row) return;
+
+    if (!shouldDisplayQuickSkip(row)) {
+      removePlanQuickSkip(row);
+      return;
+    }
+
+    const pid = getProblemIdFromRow(row);
+    if (!pid) {
+      removePlanQuickSkip(row);
+      return;
+    }
+
+    const targetCell = row.cells?.[2] || row.querySelector('td:last-child');
+    if (!targetCell) {
+      removePlanQuickSkip(row);
+      return;
+    }
+
+    let wrapper = targetCell.querySelector('.bn-plan-quick-skip-wrap');
+    if (!wrapper) {
+      wrapper = document.createElement('span');
+      wrapper.className = 'bn-plan-quick-skip-wrap';
+      targetCell.appendChild(wrapper);
+    } else {
+      wrapper.innerHTML = '';
+    }
+    targetCell.classList.add('bn-plan-quick-skip-target');
+
+    const btn = createQuickSkipButton(pid);
+    if (!btn) {
+      removePlanQuickSkip(row);
+      return;
+    }
+    wrapper.appendChild(btn);
+    row.__bnPlanQuickSkipApplied = true;
+  }
+
+  function processExistingRows() {
+    document.querySelectorAll(ROW_SELECTOR).forEach(ensureButtonForRow);
+  }
+
+  function processNode(node) {
+    if (!node) return;
+    if (node.nodeType !== ELEMENT_NODE) return;
+    if (node.matches && node.matches(ROW_SELECTOR)) {
+      ensureButtonForRow(node);
+      return;
+    }
+    if (node.querySelectorAll) {
+      node.querySelectorAll(ROW_SELECTOR).forEach(ensureButtonForRow);
+    }
+  }
+
+  function startObserver() {
+    processExistingRows();
+    if (typeof MutationObserver !== 'function') return;
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        const added = mutation.addedNodes;
+        if (!added || !added.length) continue;
+        for (let i = 0; i < added.length; i += 1) {
+          processNode(added[i]);
+        }
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  ensureStyle();
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startObserver, { once: true });
+  } else {
+    startObserver();
+  }
+})();
+
 /* === BN PATCH: problem tag title enhancement === */
 (function () {
   if (!/^\/problems\/tag\//.test(location.pathname)) return;

@@ -4,6 +4,7 @@
       "id": "origin",
       "name": "Submitter",
       "popup": "submitter/submitter/popup.html",
+      "autoSync": false,
       "description": "原生 7fa4 外站题提交器 (by <a href=\"http://jx.7fa4.cn:9080/tools\">@tools</a>)",
       "package": {
         "type": "git",

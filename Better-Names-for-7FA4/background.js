@@ -537,6 +537,41 @@ function patchJQueryGet() {
         const $ = await waitForjQuery(6000).catch(e => { console.warn('show-all: jQuery not found in time'); return null; });
         if(!$ || typeof $.get !== 'function'){ console.warn('show-all: cannot patch $.get'); return; }
 
+        const shouldEnableMergeAssistant = (() => {
+          try {
+            const params = new URLSearchParams(location.search || '');
+            const tidParam = params.get('tid');
+            if (tidParam && tidParam.trim().startsWith('3')) return true;
+            const tablesParams = params.getAll('tables');
+            if (tablesParams && tablesParams.length > 0) {
+              const regexes = [
+                /"tid"\s*:\s*"?(\d+)/g,
+                /'tid'\s*:\s*'?(\d+)/g,
+              ];
+              for (const raw of tablesParams) {
+                if (!raw) continue;
+                let str = raw;
+                try { str = decodeURIComponent(str); } catch (e) { /* ignore decode issues */ }
+                for (const re of regexes) {
+                  re.lastIndex = 0;
+                  let match;
+                  while ((match = re.exec(str)) !== null) {
+                    const tidValue = String(match[1] || '').trim();
+                    if (tidValue.startsWith('3')) return true;
+                  }
+                }
+              }
+            }
+          } catch (err) {
+            console.warn('show-all: merge assistant tid check failed', err);
+          }
+          return false;
+        })();
+        if(!shouldEnableMergeAssistant){
+          console.log('show-all: merge assistant disabled for this URL');
+          return;
+        }
+
         const origGet = $.get.bind($);
         let gatherRequested = false;
         let gatherInProgress = false;
