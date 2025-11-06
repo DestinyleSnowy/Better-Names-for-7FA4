@@ -30,6 +30,13 @@
   const enableGuard = GM_getValue('enableGuard', false);
   const enableAutoRenew = GM_getValue('enableAutoRenew', false);
   const SUBMITTERS_CONFIG_URL = 'submitter/submitters.json';
+  const SUPPORTED_PORTS = new Set(['', '8888', '5283']);
+  const SUPPORTED_HOSTS = new Set(['7fa4.cn', '10.210.57.10', '211.137.101.118']);
+  const isSupportedHostname = (host) => {
+    if (typeof host !== 'string' || !host) return false;
+    if (SUPPORTED_HOSTS.has(host)) return true;
+    return host.endsWith('.7fa4.cn');
+  };
   const storedSelectedSubmitter = GM_getValue('selectedSubmitter', 'none');
   const enableRankingFilterSetting = GM_getValue('rankingFilter.enabled', false);
   const enableVjLink = GM_getValue('enableVjLink', true);
@@ -236,9 +243,9 @@
     try {
       const url = new URL(rawHref, baseHref || location.href);
       if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
-      if (url.port && url.port !== '8888') return null;
+      if (!SUPPORTED_PORTS.has(url.port || '')) return null;
       const host = url.hostname || '';
-      if (!(host === '7fa4.cn' || host.endsWith('.7fa4.cn'))) return null;
+      if (!isSupportedHostname(host)) return null;
       if (RENEW_SUFFIX_RE.test(url.pathname)) return null;
       const match = url.pathname.match(RENEW_PATH_RE);
       if (!match || match[1] % 100 == 0) return null;

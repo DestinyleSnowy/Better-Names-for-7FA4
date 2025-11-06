@@ -1,9 +1,17 @@
-const host_list = [
-	'oj.7fa4.cn', 'jx.7fa4.cn:8888', 'in.7fa4.cn:8888', '10.210.57.10:8888'
+const SUPPORTED_7FA4_HOSTS = [
+	'7fa4.cn',
+	'in.7fa4.cn',
+	'jx.7fa4.cn',
+	'10.210.57.10',
+	'211.137.101.118'
 ];
-const key_cookies = [
-	'login', 'connect.sid'
-];
+const SUPPORTED_7FA4_PORTS = ['8888', '5283'];
+const SUPPORTED_7FA4_TARGETS = SUPPORTED_7FA4_HOSTS.flatMap(host => SUPPORTED_7FA4_PORTS.map(port => `${host}:${port}`));
+const SUPPORTED_7FA4_TARGET_PATTERN = SUPPORTED_7FA4_TARGETS.map(hostPort =>
+	hostPort.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+).join('|');
+const host_list = ['oj.7fa4.cn', ...SUPPORTED_7FA4_TARGETS];
+const key_cookies = ['login', 'connect.sid'];
 
 function replaceLast(str, find, replace) {
 	const lastIndex = str.lastIndexOf(find);
@@ -153,7 +161,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 		xyd: /https:\/\/www\.xinyoudui\.com\/ac\/contest\/.*?\/problem\/(\d+)/,
 		oifha: /https:\/\/oifha.com\/d\/.+\/record\/(\w+)/,
 		mx: /https:\/\/mna\.wang\/contest\/submission\/(\d+)/,
-		'7fa4': /http:\/\/(?:jx)|(?:in)\.7fa4\.cn:8888\/submission\/(\d+)/,
+		'7fa4': new RegExp(`^https?:\/\/(?:${SUPPORTED_7FA4_TARGET_PATTERN})\/submission\/(\\d+)`),
 	}
 	let oj_host = {
 		luogu: 'https://www.luogu.com.cn',
@@ -169,7 +177,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 		xyd: 'https://www.xinyoudui.com',
 		oifha: 'https://oifha.com',
 		mx: 'https://mna.wang',
-		'7fa4': '7fa4.cn:8888',
+		'7fa4': SUPPORTED_7FA4_TARGETS,
 	}
 	let deal_uoj = (oj) => (rid) => {
 		let q = $(html);
@@ -629,7 +637,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 	}
 	let state = null, is_oj = false;
 	for(let name in oj_urls){
-		if(!sender.origin.endsWith(oj_host[name]))
+		const hostMatchers = Array.isArray(oj_host[name]) ? oj_host[name] : [oj_host[name]];
+		if(!hostMatchers.some(hostSuffix => typeof hostSuffix === 'string' && sender.origin.endsWith(hostSuffix)))
 			continue;
 		is_oj = true;
 		let m = oj_urls[name].exec(sender.url);
