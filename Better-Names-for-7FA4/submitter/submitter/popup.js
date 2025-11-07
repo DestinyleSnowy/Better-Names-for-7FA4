@@ -19,6 +19,13 @@ function replaceLast(str, find, replace) {
 	return str.substring(0, lastIndex) + replace + str.substring(lastIndex + find.length);
 }
 
+function stripWwwPrefix(value) {
+	if (typeof value !== 'string') return value;
+	return value
+		.replace(/(^https?:\/\/)www\./, '$1')
+		.replace(/^www\./, '');
+}
+
 function freshLoginStatus() {
 	const a = document.getElementById('loginStatus');
 	chrome.storage.sync.get("cookies", ({ cookies }) => {
@@ -148,19 +155,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 	let html = request.html;
 	let in_contest = request.in_contest;
 	let oj_urls = {
-		luogu: /https:\/\/www\.luogu\.com\.cn\/record\/(\d+)/,
-		uoj: /https:\/\/uoj\.ac\/submission\/(\d+)/,
-		qoj: /https:\/\/qoj\.ac\/submission\/(\d+)/,
-		cf: /https:\/\/codeforces\.com\/contest\/\d+\/submission\/(\d+)/,
-		cfgym: /https:\/\/codeforces\.com\/gym\/\d+\/submission\/(\d+)/,
-		atc: /https:\/\/atcoder\.jp\/contests\/.+\/submissions\/(\d+)/,
-		vj: /https:\/\/vjudge\.net\/solution\/(\d+)/,
-		cc: /https:\/\/www\.codechef\.com\/viewsolution\/(\d+)/,
-		csa: /https:\/\/csacademy\.com\/contest\/archive\/task\/(.+)\/.+/,
-		zr: /http:\/\/www\.zhengruioi\.com\/submission\/(\d+)/,
-		xyd: /https:\/\/www\.xinyoudui\.com\/ac\/contest\/.*?\/problem\/(\d+)/,
-		oifha: /https:\/\/oifha.com\/d\/.+\/record\/(\w+)/,
-		mx: /https:\/\/mna\.wang\/contest\/submission\/(\d+)/,
+		luogu: /https:\/\/(?:www\.)?luogu\.com\.cn\/record\/(\d+)/,
+		uoj: /https:\/\/(?:www\.)?uoj\.ac\/submission\/(\d+)/,
+		qoj: /https:\/\/(?:www\.)?qoj\.ac\/submission\/(\d+)/,
+		cf: /https:\/\/(?:www\.)?codeforces\.com\/contest\/\d+\/submission\/(\d+)/,
+		cfgym: /https:\/\/(?:www\.)?codeforces\.com\/gym\/\d+\/submission\/(\d+)/,
+		atc: /https:\/\/(?:www\.)?atcoder\.jp\/contests\/.+\/submissions\/(\d+)/,
+		vj: /https:\/\/(?:www\.)?vjudge\.net\/solution\/(\d+)/,
+		cc: /https:\/\/(?:www\.)?codechef\.com\/viewsolution\/(\d+)/,
+		csa: /https:\/\/(?:www\.)?csacademy\.com\/contest\/archive\/task\/(.+)\/.+/,
+		zr: /http:\/\/(?:www\.)?zhengruioi\.com\/submission\/(\d+)/,
+		xyd: /https:\/\/(?:www\.)?xinyoudui\.com\/ac\/contest\/.*?\/problem\/(\d+)/,
+		oifha: /https:\/\/(?:www\.)?oifha\.com\/d\/.+\/record\/(\w+)/,
+		mx: /https:\/\/(?:www\.)?mna\.wang\/contest\/submission\/(\d+)/,
 		'7fa4': new RegExp(`^https?:\/\/(?:${SUPPORTED_7FA4_TARGET_PATTERN})\/submission\/(\\d+)`),
 	}
 	let oj_host = {
@@ -638,7 +645,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 	let state = null, is_oj = false;
 	for(let name in oj_urls){
 		const hostMatchers = Array.isArray(oj_host[name]) ? oj_host[name] : [oj_host[name]];
-		if(!hostMatchers.some(hostSuffix => typeof hostSuffix === 'string' && sender.origin.endsWith(hostSuffix)))
+		const normalizedOrigin = stripWwwPrefix(sender.origin);
+		if(!hostMatchers.some(hostSuffix => typeof hostSuffix === 'string' && normalizedOrigin.endsWith(stripWwwPrefix(hostSuffix))))
 			continue;
 		is_oj = true;
 		let m = oj_urls[name].exec(sender.url);
