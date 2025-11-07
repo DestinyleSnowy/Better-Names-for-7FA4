@@ -530,20 +530,11 @@ class DependencyBuilder:
         print("🚀 开始构建所有提交器依赖...")
         
         success_count = 0
-        total_count = 0
+        total_count = len(self.config["submitters"])
         
         for submitter in self.config["submitters"]:
-            if not submitter.get("autoSync", True):
-                print(f"  Skipping auto sync: {submitter['name']} ({submitter['id']})")
-                continue
-            
-            total_count += 1
             if self.build_dependency(submitter):
                 success_count += 1
-        
-        if total_count == 0:
-            print("No submitters are marked for auto sync; nothing to build.")
-            return True
         
         print(f"\n📊 构建完成: {success_count}/{total_count} 个提交器构建成功")
         
@@ -562,10 +553,6 @@ class DependencyBuilder:
         print("🧹 清理所有依赖...")
         
         for submitter in self.config["submitters"]:
-            if not submitter.get("autoSync", True):
-                print(f"  Skipping clean: {submitter['name']} ({submitter['id']})")
-                continue
-            
             target_path = submitter["package"]["target"]
             target_dir = self.project_root / "Better-Names-for-7FA4" / "submitter" / target_path
             
