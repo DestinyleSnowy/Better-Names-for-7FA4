@@ -1,6 +1,6 @@
 {
 	"name": "7FA4 submitter",
-	"version": "0.1",
+	"version": "0.1.4",
 	"description": "Submit code from foreign OJ's",
 	"manifest_version": 3,
 	"permissions": [

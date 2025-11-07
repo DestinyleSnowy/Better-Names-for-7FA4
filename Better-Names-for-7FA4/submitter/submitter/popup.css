@@ -1,7 +1,288 @@
-.button{
-	width: 150px;
+/* popup.css — 两列布局（左：按钮组，右：状态/版本），窄屏自动回退单列 */
+:root{
+  --bg: #ffffff;
+  --card: #ffffff;
+  --muted: #6b7280;
+  --accent: #2563eb;
+  --accent-2: #06b6d4;
+  --success: #10b981;
+  --danger: #ef4444;
+  --radius: 12px;
+  --gap: 10px;
+  --pad: 12px;
+  font-family: Inter, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
 }
 
-.text {
-	font-size: 12;
+/* page base */
+html, body {
+  width: auto;
+  min-width: 360px;
+  margin: 0;
+  padding: 0;
+  background-color: #ffffff;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #0f172a;
+}
+
+/* popup wrapper */
+.popup {
+  width: 100%;
+  max-width: 360px;
+  margin: 0;
+  box-sizing: border-box;
+  background: #ffffff;
+}
+
+/* card becomes a grid with explicit areas so we can place siblings into left/right */
+.card {
+  background: #ffffff;
+  border-radius: calc(var(--radius) + 4px);
+  box-shadow: 0 10px 28px rgba(16,24,40,0.07);
+  padding: var(--pad);
+  display: grid;
+  grid-template-columns: 1fr; /* default single column until main row defined */
+  grid-template-rows: auto auto auto 1fr auto;
+  grid-template-areas:
+    "header"
+    "main"
+    "update"
+    "meta"
+    "footer";
+  gap: var(--gap);
+}
+
+/* header */
+header {
+  grid-area: header;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(15,23,42,0.04);
+}
+
+.logo {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 16px;
+  box-shadow: 0 6px 16px rgba(37,99,235,0.12), inset 0 -6px 18px rgba(255,255,255,0.06);
+}
+
+h1 { font-size: 15px; margin: 0; line-height: 1; }
+.subtitle { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+/* MAIN ROW: left (buttons) + right (status) */
+/* We'll assign #statusWrap and .actions into grid-area 'main' but make an internal two-column layout */
+#statusWrap { grid-area: main; order: 2; } /* keep order but we will restyle */
+.actions    { grid-area: main; order: 1; } /* both share same area, we style container behavior below */
+
+/* Create internal two-column layout inside the 'main' area using a pseudo container approach:
+   place .actions and #statusWrap side-by-side on wide screens by making the parent (.card) define
+   a two-column layout for the 'main' row using grid-template-areas override. */
+@media (min-width: 420px) {
+  .card {
+    grid-template-columns: 1fr 240px; /* left flexible, right fixed-ish for status */
+    grid-template-rows: auto;
+    grid-template-areas:
+      "header header"
+      "actions status"
+      "update update"
+      "meta meta"
+      "footer footer";
+  }
+
+  /* place actual elements into named areas */
+  .actions { grid-area: actions; display: flex; flex-direction: column; gap: 10px; }
+  #statusWrap { grid-area: status; display: flex; flex-direction: column; gap: 10px; justify-content: center; padding-left: 8px; border-left: 1px solid rgba(15,23,42,0.04); }
+}
+
+/* fallback single-column layout (mobile / narrow) */
+@media (max-width: 419px) {
+  .card {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "header"
+      "actions"
+      "status"
+      "update"
+      "meta"
+      "footer";
+  }
+  .actions { grid-area: actions; display: grid; grid-template-columns: 1fr; gap: 10px; }
+  #statusWrap { grid-area: status; display:flex; gap:8px; align-items:center; justify-content:space-between; padding-top:4px; border-top: 1px solid rgba(15,23,42,0.04); }
+}
+
+/* action buttons styling */
+.actions {
+  gap: 10px;
+  padding-top: 6px;
+  align-items: start;
+}
+
+/* primary button */
+.button {
+  -webkit-appearance: none;
+  appearance: none;
+  border: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  cursor: pointer;
+  background: linear-gradient(180deg, #0f172a, #111827);
+  color: white;
+  box-shadow: 0 6px 18px rgba(17,24,39,0.08);
+  transition: transform .08s ease, box-shadow .12s ease;
+  width: 100%;
+  text-align: center;
+}
+.button:active { transform: translateY(1px) scale(0.998); }
+.button.secondary {
+  background: linear-gradient(180deg,#eef2ff,#e6f0ff);
+  color: #0f172a;
+  box-shadow: none;
+  border: 1px solid rgba(37,99,235,0.08);
+}
+.button.ghost {
+  background: transparent;
+  color: var(--accent);
+  border: 1px dashed rgba(37,99,235,0.12);
+}
+
+/* if .full exists, ensure it spans correctly in both layouts */
+.full { width: 100%; }
+
+/* status area specifics (right column) */
+#loginStatus {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #111827;
+  padding: 6px 4px;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.status-dot, .status-ok {
+  width: 10px; height: 10px; border-radius: 50%;
+  box-shadow: 0 0 0 4px rgba(0,0,0,0.03);
+}
+.status-dot { background: #f59e0b; box-shadow: 0 0 0 6px rgba(245,158,11,0.06); }
+.status-ok  { background: var(--success); box-shadow: 0 0 0 6px rgba(16,185,129,0.06); }
+
+/* update notice area (still controlled by JS) */
+.notice {
+  grid-area: update;
+  margin-top: 6px;
+  padding: 10px;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid rgba(37,99,235,0.06);
+  display: none;
+  font-size: 13px;
+  color: #0f172a;
+}
+.notice.show { display: block; }
+
+/* meta & footer */
+.meta {
+  grid-area: meta;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  padding-top: 6px;
+  border-top: 1px solid rgba(15,23,42,0.04);
+}
+
+footer {
+  grid-area: footer;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin-top: 6px;
+  font-size:12px;
+}
+
+/* links */
+.link { color: var(--accent); text-decoration: none; font-weight: 500; }
+
+/* small-screen fine tuning */
+@media (max-width: 320px) {
+  .logo { width: 40px; height: 40px; flex: 0 0 40px; font-size: 14px; }
+  .card { padding: 10px; }
+  .button { padding: 9px 10px; font-size: 13px; }
+}
+
+/* accessibility focus */
+.button:focus, .link:focus {
+  outline: 3px solid rgba(37,99,235,0.12);
+  outline-offset: 2px;
+}
+
+/* 强制 #statusWrap 内部垂直堆叠：覆盖现有媒体查询带来的横向布局 */
+#statusWrap {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  align-items: stretch !important;
+  padding: 8px 0 !important; /* 适度上下内边距 */
+  border: none !important;   /* 避免和左右边框冲突（原来可能在大屏加了左边框） */
+}
+
+/* 保持登录状态行的内联样式但确保宽度占满并垂直居中 */
+#statusWrap #loginStatusInline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+/* 让 meta 在堆叠时显得像独立一行，保留左右分布 */
+#statusWrap .meta {
+  display: flex !important;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin: 0;
+  padding: 6px 0 0 0;
+  border-top: 1px solid rgba(15,23,42,0.04); /* 如果想要分隔线可以保留 */
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* 针对窄屏（你原先的 max-width:419px）重复保证：仍然垂直堆叠 */
+@media (max-width: 419px) {
+  #statusWrap {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding-top: 8px !important;
+    border-top: 1px solid rgba(15,23,42,0.04) !important;
+  }
+  /* 在窄屏上把 meta 的边框放回到它的顶端（如果你想要） */
+  #statusWrap .meta {
+    border-top: none;
+    padding-top: 6px;
+  }
+}
+
+/* 在宽屏（>=420px）仍旧把右侧那一列和左侧区分开，但保证 #statusWrap 内垂直堆叠 */
+@media (min-width: 420px) {
+  #statusWrap {
+    padding-left: 8px !important; /* 保持你原先在大屏用的左内边距（可选） */
+    border-left: 1px solid rgba(15,23,42,0.04); /* 如果你要保留左侧分隔线可保留 */
+  }
 }

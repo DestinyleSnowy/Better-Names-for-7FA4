@@ -8,13 +8,47 @@
 </head>
 
 <body>
-	<p id="loginStatus" class="text"></p>
-	<button id="sendPage" class="button">发送提交</button>
-	<button id="sendVjPage" class="button">发送提交 | vjudge 题号</button>
-	<button id="getCookies" class="button">更新 7FA4 登录信息</button>
+	<!-- <p id="loginStatus" class="text" aria-live="polite" style="display:none;"></p> -->
+
+  <div class="popup card" role="dialog" aria-label="7FA4 提交器">
+    <header>
+      <div class="logo">S</div>
+      <div style="flex:1">
+        <h1>7FA4 Submitter</h1>
+        <div class="subtitle">快速发送提交 · 支持 vjudge 题号</div>
+      </div>
+    </header>
+
+    <!-- 主内容区域：先放按钮组（left），再放状态（right）以便 CSS 两栏布局生效 -->
+    <div class="actions">
+      <button id="sendPage" class="button">发送提交</button>
+      <button id="sendVjPage" class="button secondary">发送提交 · vjudge 题号</button>
+      <button id="getCookies" class="button ghost full" title="更新 7FA4 登录信息">更新 7FA4 登录信息</button>
+      <!-- <button id="openSettings" class="button full">设置 / 帮助</button> -->
+    </div>
+
+    <div id="statusWrap">
+      <div id="loginStatusInline" class="text" aria-live="polite">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="loginStatus">正在检测登录状态…</span>
+      </div>
+      <!-- <div class="meta"> -->
+        <div id="versionLocal">本地版本：<span id="verLocal">未知</span></div>
+        <div id="versionRemote">远端版本：<span id="verRemote">未知</span></div>
+      <!-- </div> -->
+    </div>
+
+    <footer>
+      <a class="link" id="openRepo" href="http://jx.7fa4.cn:9080/tools/submitter" target="_blank">打开仓库</a>
+      <div style="font-size:12px;color:#6b7280">© 7FA4</div>
+    </footer>
+  </div>
+
 	<script src="jquery-3.7.0.min.js"></script>
 	<script src="jquery.cookie.js"></script>
 	<script src="popup.js"></script>
+
+  <!-- 保留原有 update 脚本接口的调用位置（你的 update.js 已单独存在） -->
 </body>
 
 </html>
