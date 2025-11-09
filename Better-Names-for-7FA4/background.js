@@ -829,11 +829,203 @@ function patchJQueryGet() {
         const DEFAULT_IDLE_TEXT = '合并榜单';
         const RETRY_TEXT = '重新合并';
         const ERROR_RETRY_TEXT = '重试合并';
+        const MERGE_POS_STORAGE_KEY = 'bn.mergeControl.position';
+        const DEFAULT_CONTAINER_TOP = 86;
+        const DEFAULT_CONTAINER_RIGHT = 16;
+        const MERGE_VIEWPORT_PADDING = 12;
+        const mergePositionStorage = (() => {
+          try {
+            if (typeof window !== 'undefined' && window.localStorage) return window.localStorage;
+          } catch (_) { /* ignore */ }
+          return null;
+        })();
+
+        let mergeControlPosition = loadMergeControlPosition();
+        let mergeContainerRef = null;
+        let mergeDragState = null;
+        let mergePointerListenersBound = false;
+        let mergeResizeListenerBound = false;
+
+        function loadMergeControlPosition() {
+          if (!mergePositionStorage) return null;
+          try {
+            const raw = mergePositionStorage.getItem(MERGE_POS_STORAGE_KEY);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            if (!parsed || typeof parsed !== 'object') return null;
+            const top = Number(parsed.top);
+            const left = Number(parsed.left);
+            if (Number.isFinite(top) && Number.isFinite(left)) return { top, left };
+          } catch (err) {
+            console.warn('show-all: failed to parse merge control position', err);
+          }
+          return null;
+        }
+
+        const isValidMergePosition = (pos) => pos && Number.isFinite(pos.top) && Number.isFinite(pos.left);
+
+        function persistMergeControlPosition() {
+          if (!mergePositionStorage) return;
+          if (!isValidMergePosition(mergeControlPosition)) return;
+          try {
+            mergePositionStorage.setItem(MERGE_POS_STORAGE_KEY, JSON.stringify({
+              top: Math.round(mergeControlPosition.top),
+              left: Math.round(mergeControlPosition.left)
+            }));
+          } catch (err) {
+            console.warn('show-all: failed to store merge control position', err);
+          }
+        }
+
+        function clampMergeControlPosition(top, left, el) {
+          const docEl = (typeof document !== 'undefined' && document.documentElement) ? document.documentElement : null;
+          const body = (typeof document !== 'undefined') ? document.body : null;
+          const viewportWidth = Math.max(
+            typeof window !== 'undefined' ? window.innerWidth || 0 : 0,
+            docEl ? docEl.clientWidth || 0 : 0,
+            body ? body.clientWidth || 0 : 0,
+            0
+          ) || 1280;
+          const viewportHeight = Math.max(
+            typeof window !== 'undefined' ? window.innerHeight || 0 : 0,
+            docEl ? docEl.clientHeight || 0 : 0,
+            body ? body.clientHeight || 0 : 0,
+            0
+          ) || 720;
+          let width = 260;
+          let height = 160;
+          if (el) {
+            const rect = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+            width = (rect && rect.width) || el.offsetWidth || width;
+            height = (rect && rect.height) || el.offsetHeight || height;
+          }
+          const minLeft = MERGE_VIEWPORT_PADDING;
+          const minTop = MERGE_VIEWPORT_PADDING;
+          const maxLeft = Math.max(minLeft, viewportWidth - width - MERGE_VIEWPORT_PADDING);
+          const maxTop = Math.max(minTop, viewportHeight - height - MERGE_VIEWPORT_PADDING);
+          const clampedLeft = Math.min(Math.max(left, minLeft), maxLeft);
+          const clampedTop = Math.min(Math.max(top, minTop), maxTop);
+          return { top: clampedTop, left: clampedLeft };
+        }
+
+        function applyMergePositionStyles(el) {
+          if (!el) return;
+          if (isValidMergePosition(mergeControlPosition)) {
+            const next = clampMergeControlPosition(mergeControlPosition.top, mergeControlPosition.left, el);
+            mergeControlPosition = next;
+            el.style.top = `${next.top}px`;
+            el.style.left = `${next.left}px`;
+            el.style.right = 'auto';
+          } else {
+            el.style.top = `${DEFAULT_CONTAINER_TOP}px`;
+            el.style.right = `${DEFAULT_CONTAINER_RIGHT}px`;
+            el.style.left = 'auto';
+          }
+        }
+
+        function bindMergePointerListeners() {
+          if (mergePointerListenersBound) return;
+          if (typeof window === 'undefined') return;
+          mergePointerListenersBound = true;
+          window.addEventListener('pointermove', (event) => continueMergeDrag(event));
+          window.addEventListener('pointerup', (event) => finishMergeDrag(event));
+          window.addEventListener('pointercancel', (event) => finishMergeDrag(event));
+          window.addEventListener('blur', () => finishMergeDrag());
+        }
+
+        function handleMergeResize() {
+          if (!mergeContainerRef) return;
+          if (isValidMergePosition(mergeControlPosition)) {
+            const next = clampMergeControlPosition(mergeControlPosition.top, mergeControlPosition.left, mergeContainerRef);
+            mergeControlPosition = next;
+            mergeContainerRef.style.top = `${next.top}px`;
+            mergeContainerRef.style.left = `${next.left}px`;
+            mergeContainerRef.style.right = 'auto';
+            persistMergeControlPosition();
+          } else {
+            applyMergePositionStyles(mergeContainerRef);
+          }
+        }
+
+        function bindMergeResizeListener() {
+          if (mergeResizeListenerBound) return;
+          if (typeof window === 'undefined') return;
+          mergeResizeListenerBound = true;
+          window.addEventListener('resize', () => handleMergeResize());
+        }
+
+        function shouldIgnoreDragTarget(target) {
+          if (!target || typeof target.closest !== 'function') return false;
+          return !!target.closest('button, a, input, textarea, select');
+        }
+
+        function startMergeDrag(event, container) {
+          if (!container) return;
+          if (event.pointerType === 'mouse' && event.button !== 0) return;
+          if (typeof event.button === 'number' && event.pointerType !== 'touch' && event.pointerType !== 'pen' && event.button !== 0) return;
+          if (shouldIgnoreDragTarget(event.target)) return;
+          const rect = container.getBoundingClientRect ? container.getBoundingClientRect() : { top: DEFAULT_CONTAINER_TOP, left: DEFAULT_CONTAINER_RIGHT };
+          mergeDragState = {
+            pointerId: typeof event.pointerId === 'number' ? event.pointerId : null,
+            startX: event.clientX || 0,
+            startY: event.clientY || 0,
+            startTop: rect.top ?? DEFAULT_CONTAINER_TOP,
+            startLeft: rect.left ?? DEFAULT_CONTAINER_RIGHT,
+            container
+          };
+          container.style.cursor = 'grabbing';
+          container.style.userSelect = 'none';
+          if (typeof container.setPointerCapture === 'function' && mergeDragState.pointerId !== null) {
+            try { container.setPointerCapture(mergeDragState.pointerId); } catch (_) { /* ignore */ }
+          }
+          if (event.cancelable) event.preventDefault();
+        }
+
+        function continueMergeDrag(event) {
+          if (!mergeDragState) return;
+          if (mergeDragState.pointerId !== null && typeof event.pointerId === 'number' && event.pointerId !== mergeDragState.pointerId) return;
+          const container = mergeDragState.container;
+          if (!container) return;
+          const deltaX = (event.clientX || 0) - mergeDragState.startX;
+          const deltaY = (event.clientY || 0) - mergeDragState.startY;
+          const next = clampMergeControlPosition(mergeDragState.startTop + deltaY, mergeDragState.startLeft + deltaX, container);
+          mergeControlPosition = next;
+          container.style.top = `${next.top}px`;
+          container.style.left = `${next.left}px`;
+          container.style.right = 'auto';
+        }
+
+        function finishMergeDrag(event) {
+          if (!mergeDragState) return;
+          if (event && mergeDragState.pointerId !== null && typeof event.pointerId === 'number' && event.pointerId !== mergeDragState.pointerId) {
+            return;
+          }
+          const container = mergeDragState.container;
+          if (container) {
+            container.style.cursor = 'grab';
+            container.style.userSelect = '';
+            if (mergeDragState.pointerId !== null && typeof container.releasePointerCapture === 'function') {
+              try { container.releasePointerCapture(mergeDragState.pointerId); } catch (_) { /* ignore */ }
+            }
+          }
+          mergeDragState = null;
+          persistMergeControlPosition();
+        }
+
+        function enableMergeDrag(container) {
+          if (!container) return;
+          mergeContainerRef = container;
+          bindMergePointerListeners();
+          bindMergeResizeListener();
+          if (!container.__bnMergeDragInit) {
+            container.addEventListener('pointerdown', (event) => startMergeDrag(event, container));
+            container.__bnMergeDragInit = true;
+          }
+          applyMergePositionStyles(container);
+        }
 
         const applyContainerStyles = (el) => {
           el.style.position = 'fixed';
-          el.style.top = '86px';
-          el.style.right = '16px';
           el.style.zIndex = '2147483647';
           el.style.color = '#1f2933';
           el.style.padding = '14px 16px';
@@ -849,6 +1041,9 @@ function patchJQueryGet() {
           el.style.flexDirection = 'column';
           el.style.alignItems = 'stretch';
           el.style.gap = '8px';
+          el.style.cursor = 'grab';
+          el.style.touchAction = 'none';
+          applyMergePositionStyles(el);
         };
 
         const styleButton = (btn, isNew) => {
@@ -1051,6 +1246,7 @@ function patchJQueryGet() {
             statsRefs = ensureStats(container);
             container.appendChild(button);
             document.body.appendChild(container);
+            enableMergeDrag(container);
             updateStatsDisplay(lastStats);
             return { button, status: null };
           }
@@ -1058,6 +1254,7 @@ function patchJQueryGet() {
           ensureTitle(container);
           statsRefs = ensureStats(container);
           updateStatsDisplay(lastStats);
+          enableMergeDrag(container);
           let button = container.querySelector('#' + BUTTON_ID);
           if(!button){
             button = document.createElement('button');
