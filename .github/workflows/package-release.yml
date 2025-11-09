@@ -65,7 +65,6 @@ jobs:
           cd Better-Names-for-7FA4
           zip -r ../Better-Names-for-7FA4-${{ github.ref_name }}.zip .
 
-
       - name: Push tag to GitLab
         env:
           GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
@@ -73,25 +72,54 @@ jobs:
           set -euo pipefail
           git config --global user.name "yx"
           git config --global user.email "yx@7fa4.cn"
+          git remote remove gitlab 2>/dev/null || true
           git remote add gitlab http://oauth2:$GITLAB_TOKEN@jx.7fa4.cn:9080/yx/better-names-for-7fa4.git
           TAG_NAME="${GITHUB_REF#refs/tags/}"
           git push gitlab "refs/tags/$TAG_NAME:refs/tags/$TAG_NAME"
 
-      - name: Trigger GitLab pipeline (update version on default branch)
+      - name: Update version file in GitLab (no GitLab CI)
         env:
           GITLAB_URL: "http://jx.7fa4.cn:9080"
-          PROJECT_ID: "408" 
-          GITLAB_TRIGGER_TOKEN: ${{ secrets.GITLAB_TRIGGER_TOKEN }}
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          PROJECT_ID: ${{ secrets.GITLAB_PROJECT_ID }}          # 未设置则脚本里回退到 408
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}             # 需要 api 或 write_repository
+          DEFAULT_BRANCH: ${{ secrets.GITLAB_DEFAULT_BRANCH }}  # 未设置则脚本里回退到 main
         run: |
           set -euo pipefail
-          TAG_NAME="${GITHUB_REF#refs/tags/}"
 
-          curl -sS -X POST \
-            -F token="$GITLAB_TRIGGER_TOKEN" \
-            -F ref="$DEFAULT_BRANCH" \
-            -F "variables[RELEASE_TAG]=$TAG_NAME" \
-            "$GITLAB_URL/api/v4/projects/$PROJECT_ID/trigger/pipeline"
+          PROJECT_ID="${PROJECT_ID:-408}"
+          DEFAULT_BRANCH="${DEFAULT_BRANCH:-main}"
+          TAG="${GITHUB_REF#refs/tags/}"
+
+          # 解析版本号：纯数字点 或 取最后一个空格后的字段
+          if echo "$TAG" | grep -Eq '^[0-9]+(\.[0-9]+)*$'; then
+            VERSION="$TAG"
+          else
+            VERSION="${TAG##* }"
+          fi
+          echo "Will write version: $VERSION"
+
+          UPDATE_JSON="{\"branch\":\"${DEFAULT_BRANCH}\",\"commit_message\":\"chore: update version to ${VERSION} from GitHub Actions\",\"actions\":[{\"action\":\"update\",\"file_path\":\"version\",\"content\":\"${VERSION}\"}]}"
+          CREATE_JSON="{\"branch\":\"${DEFAULT_BRANCH}\",\"commit_message\":\"chore: add version ${VERSION} from GitHub Actions\",\"actions\":[{\"action\":\"create\",\"file_path\":\"version\",\"content\":\"${VERSION}\"}]}"
+
+          RESP=$(mktemp)
+          CODE=$(curl -sS -w '%{http_code}' -o "$RESP" -X POST \
+            -H "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data "$UPDATE_JSON" \
+            "${GITLAB_URL}/api/v4/projects/${PROJECT_ID}/repository/commits")
+          echo "update status=$CODE"; cat "$RESP" || true
+
+          if [ "$CODE" -lt 200 ] || [ "$CODE" -ge 300 ]; then
+            RESP2=$(mktemp)
+            CODE2=$(curl -sS -w '%{http_code}' -o "$RESP2" -X POST \
+              -H "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
+              -H "Content-Type: application/json" \
+              --data "$CREATE_JSON" \
+              "${GITLAB_URL}/api/v4/projects/${PROJECT_ID}/repository/commits")
+            echo "create status=$CODE2"; cat "$RESP2" || true
+            test "$CODE2" -ge 200 -a "$CODE2" -lt 300
+          fi
+
 
       - name: Create GitLab Release
         env:
@@ -120,11 +148,10 @@ jobs:
 
           echo "GitLab release created successfully!"
 
-          
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.ref_name }} 
+          tag_name: ${{ github.ref_name }}
           files: Better-Names-for-7FA4-${{ github.ref_name }}.zip
           name: Release ${{ github.ref_name }}
           generate_release_notes: true
