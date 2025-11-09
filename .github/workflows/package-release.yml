@@ -77,16 +77,21 @@ jobs:
           TAG_NAME="${GITHUB_REF#refs/tags/}"
           git push gitlab "refs/tags/$TAG_NAME:refs/tags/$TAG_NAME"
 
-      - name: Push default branch to GitLab (ensure .gitlab-ci.yml exists there)
+      - name: Trigger GitLab pipeline (update version on default branch)
         env:
-          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          GITLAB_URL: "http://jx.7fa4.cn:9080"
+          PROJECT_ID: "408" 
+          GITLAB_TRIGGER_TOKEN: ${{ secrets.GITLAB_TRIGGER_TOKEN }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           set -euo pipefail
-          git config --global user.name "yx"
-          git config --global user.email "yx@7fa4.cn"
-          git remote add gitlab http://oauth2:$GITLAB_TOKEN@jx.7fa4.cn:9080/yx/better-names-for-7fa4.git || true
-          git push gitlab "refs/heads/$DEFAULT_BRANCH:refs/heads/$DEFAULT_BRANCH"
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+
+          curl -sS -X POST \
+            -F token="$GITLAB_TRIGGER_TOKEN" \
+            -F ref="$DEFAULT_BRANCH" \
+            -F "variables[RELEASE_TAG]=$TAG_NAME" \
+            "$GITLAB_URL/api/v4/projects/$PROJECT_ID/trigger/pipeline"
 
       - name: Create GitLab Release
         env:
