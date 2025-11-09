@@ -2360,6 +2360,19 @@
     const normalizedPath = path ? path.replace(/\/+/g, '/').replace(/\/$/, '') : '';
     const isHomePath = normalizedPath === '' || normalizedPath === '/' || normalizedPath === '/index' || normalizedPath === '/index.html';
     if (isHomePath) return true;
+    if (normalizedPath === '/problems') {
+      const search = (location && typeof location.search === 'string') ? location.search : '';
+      let hasMyTemplates = false;
+      if (search) {
+        try {
+          const params = new URLSearchParams(search);
+          hasMyTemplates = params.has('my_templates');
+        } catch (e) {
+          hasMyTemplates = /\bmy_templates=/.test(search);
+        }
+      }
+      if (hasMyTemplates) return true;
+    }
     if (table.querySelector('tbody#announces')) return true;
     return false;
   }
