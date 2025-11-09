@@ -8,6 +8,62 @@ self.addEventListener('activate', (e) => {
 });
 
 const SUBMITTER_POPUP = 'submitter/popup.html';
+const AVATAR_BLOCK_RULE_ID = 1001;
+const AVATAR_BLOCK_URL_FILTER = '||gravatar.loli.net^';
+const AVATAR_BLOCK_RESOURCE_TYPES = [
+  'image',
+  'xmlhttprequest',
+  'media',
+  'font',
+  'stylesheet',
+  'script',
+  'sub_frame',
+  'other',
+  'ping'
+];
+
+async function updateAvatarBlockingRule(enabled) {
+  try {
+    if (!chrome?.declarativeNetRequest?.updateDynamicRules) return;
+    const addRules = enabled ? [{
+      id: AVATAR_BLOCK_RULE_ID,
+      priority: 1,
+      action: { type: 'block' },
+      condition: {
+        urlFilter: AVATAR_BLOCK_URL_FILTER,
+        resourceTypes: AVATAR_BLOCK_RESOURCE_TYPES
+      }
+    }] : [];
+    await chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: [AVATAR_BLOCK_RULE_ID],
+      addRules
+    });
+  } catch (error) {
+    console.warn('[BN] Failed to update avatar blocking rule', error);
+  }
+}
+
+function syncAvatarBlockingRuleFromStorage() {
+  try {
+    if (!chrome?.storage?.local) {
+      void updateAvatarBlockingRule(true);
+      return;
+    }
+    chrome.storage.local.get(['hideAvatar'], (items) => {
+      try {
+        const hasValue = items && Object.prototype.hasOwnProperty.call(items, 'hideAvatar');
+        const enabled = hasValue ? Boolean(items.hideAvatar) : true;
+        void updateAvatarBlockingRule(enabled);
+      } catch (error) {
+        console.warn('[BN] Failed to read hideAvatar for blocking rule', error);
+        void updateAvatarBlockingRule(true);
+      }
+    });
+  } catch (error) {
+    console.warn('[BN] Failed to sync avatar blocking rule', error);
+    void updateAvatarBlockingRule(true);
+  }
+}
 
 async function loadSubmittersConfig() {
   try {
@@ -72,17 +128,24 @@ async function ensureSubmitterStateFromStorage() {
 }
 
 ensureSubmitterStateFromStorage();
+syncAvatarBlockingRuleFromStorage();
 
 if (chrome && chrome.runtime && chrome.runtime.onStartup) {
-  chrome.runtime.onStartup.addListener(() => ensureSubmitterStateFromStorage());
+  chrome.runtime.onStartup.addListener(() => {
+    ensureSubmitterStateFromStorage();
+    syncAvatarBlockingRuleFromStorage();
+  });
 }
 if (chrome && chrome.runtime && chrome.runtime.onInstalled) {
-  chrome.runtime.onInstalled.addListener(() => ensureSubmitterStateFromStorage());
+  chrome.runtime.onInstalled.addListener(() => {
+    ensureSubmitterStateFromStorage();
+    syncAvatarBlockingRuleFromStorage();
+  });
 }
 if (chrome && chrome.storage && chrome.storage.onChanged) {
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== 'local') return;
-    
+
     if (Object.prototype.hasOwnProperty.call(changes, 'selectedSubmitter')) {
       const change = changes.selectedSubmitter;
       const selectedSubmitter = change && Object.prototype.hasOwnProperty.call(change, 'newValue')
@@ -90,6 +153,14 @@ if (chrome && chrome.storage && chrome.storage.onChanged) {
         : 'none';
       
       ensureSubmitterStateFromStorage();
+    }
+
+    if (Object.prototype.hasOwnProperty.call(changes, 'hideAvatar')) {
+      const change = changes.hideAvatar;
+      const newValue = (change && Object.prototype.hasOwnProperty.call(change, 'newValue'))
+        ? change.newValue
+        : true;
+      void updateAvatarBlockingRule(Boolean(newValue));
     }
   });
 }

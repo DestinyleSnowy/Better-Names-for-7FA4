@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Better Names for 7FA4",
-  "version": "6.1.5.4",
+  "version": "6.1.6",
   "description": "强大的 7FA4 用户名与颜色映射插件",
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
@@ -11,7 +11,8 @@
     "notifications",
     "clipboardWrite",
     "activeTab",
-    "scripting"
+    "scripting",
+    "declarativeNetRequest"
   ],
   "host_permissions": [
     "http://in.7fa4.cn:8888/*",
@@ -25,7 +26,9 @@
     "http://in.7fa4.cn:9080/*",
     "http://jx.7fa4.cn:9080/*",
     "http://10.210.57.10:9080/*",
-    "http://211.137.101.118:9080/*"
+    "http://211.137.101.118:9080/*",
+    "https://gravatar.loli.net/*",
+    "http://gravatar.loli.net/*"
   ],
   "background": {
     "service_worker": "background.js"

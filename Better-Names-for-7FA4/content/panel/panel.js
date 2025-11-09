@@ -21,7 +21,9 @@
   const storedUserUnits = GM_getValue('maxUserUnits', DEFAULT_MAX_UNITS);
   const maxTitleUnits = (storedTitleUnits === 'none') ? Infinity : parseInt(storedTitleUnits, 10);
   const maxUserUnits = (storedUserUnits === 'none') ? Infinity : parseInt(storedUserUnits, 10);
-  const hideAvatar = GM_getValue('hideAvatar', true);
+  let hideAvatar = GM_getValue('hideAvatar', true);
+  const AVATAR_BLOCK_HOST = 'gravatar.loli.net';
+  const AVATAR_PLACEHOLDER_SRC = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
   const enableCopy = GM_getValue('enableCopy', true);
   const enableDescCopy = GM_getValue('enableDescCopy', false);
   const hideOrig = GM_getValue('hideOrig', true);
@@ -86,6 +88,7 @@
   const widthMode = GM_getValue(WIDTH_MODE_KEY, 'visual');
   const BN_TABLE_ROWS_SELECTOR = 'table.ui.very.basic.center.aligned.table tbody tr';
   const MAX_LOCAL_BG_SIZE = 2 * 1024 * 1024;
+  installAvatarBlocker();
 
   const RENEW_PATH_RE = /^\/problems\/tag\/(\d+)\/?$/;
   const RENEW_SUFFIX_RE = /\/renew\/?$/;
@@ -110,6 +113,165 @@
     if (rounded < HI_TOILET_INTERVAL_MIN) return HI_TOILET_INTERVAL_MIN;
     if (rounded > HI_TOILET_INTERVAL_MAX) return HI_TOILET_INTERVAL_MAX;
     return rounded;
+  }
+  const isAvatarBlockingEnabled = () => !!hideAvatar;
+  // Prevent loading third-party avatar hosts whenever avatars are hidden.
+  function shouldBlockAvatarUrl(url) {
+    if (url === undefined || url === null) return false;
+    try {
+      const parsed = new URL(String(url), window.location.href);
+      return parsed.hostname && parsed.hostname.toLowerCase() === AVATAR_BLOCK_HOST;
+    } catch (_) {
+      return false;
+    }
+  }
+  function installAvatarBlocker() {
+    if (window.__BN_AVATAR_BLOCKER_INSTALLED__) return;
+    if (!document || typeof document.querySelectorAll !== 'function') return;
+    window.__BN_AVATAR_BLOCKER_INSTALLED__ = true;
+
+    const imgCtor = typeof HTMLImageElement === 'undefined' ? null : HTMLImageElement;
+    const nativeSrcDescriptor = imgCtor ? Object.getOwnPropertyDescriptor(imgCtor.prototype, 'src') : null;
+    const nativeSetAttribute = imgCtor ? imgCtor.prototype.setAttribute : null;
+    const nativeFetch = typeof window.fetch === 'function' ? window.fetch : null;
+    const nativeXhrOpen = (typeof XMLHttpRequest !== 'undefined' && XMLHttpRequest.prototype.open) ? XMLHttpRequest.prototype.open : null;
+    const nativeXhrSend = (typeof XMLHttpRequest !== 'undefined' && XMLHttpRequest.prototype.send) ? XMLHttpRequest.prototype.send : null;
+    const shouldBlockLoad = (value) => isAvatarBlockingEnabled() && shouldBlockAvatarUrl(value);
+
+    const assignSrc = (img, value) => {
+      if (!img) return;
+      if (nativeSrcDescriptor && typeof nativeSrcDescriptor.set === 'function') {
+        try {
+          nativeSrcDescriptor.set.call(img, value);
+          return;
+        } catch (_) { /* ignore */ }
+      }
+      if (nativeSetAttribute) nativeSetAttribute.call(img, 'src', value);
+    };
+    const applyPlaceholder = (img) => {
+      if (!img) return;
+      assignSrc(img, AVATAR_PLACEHOLDER_SRC);
+      try {
+        img.dataset.bnAvatarBlocked = 'true';
+      } catch (_) { /* ignore */ }
+    };
+
+    if (imgCtor && nativeSrcDescriptor && nativeSrcDescriptor.configurable !== false) {
+      Object.defineProperty(imgCtor.prototype, 'src', {
+        configurable: true,
+        enumerable: nativeSrcDescriptor ? nativeSrcDescriptor.enumerable : false,
+        get() {
+          if (nativeSrcDescriptor && typeof nativeSrcDescriptor.get === 'function') {
+            try {
+              return nativeSrcDescriptor.get.call(this);
+            } catch (_) { /* ignore */ }
+          }
+          return this.getAttribute('src') || '';
+        },
+        set(value) {
+          if (shouldBlockLoad(value)) {
+            if (isAvatarBlockingEnabled()) applyPlaceholder(this);
+            return;
+          }
+          assignSrc(this, value);
+        },
+      });
+    }
+
+    if (imgCtor && nativeSetAttribute) {
+      imgCtor.prototype.setAttribute = function (name, value) {
+        if (
+          typeof name === 'string' &&
+          name.toLowerCase() === 'src' &&
+          shouldBlockLoad(String(value || ''))
+        ) {
+          if (isAvatarBlockingEnabled()) applyPlaceholder(this);
+          return;
+        }
+        return nativeSetAttribute.call(this, name, value);
+      };
+    }
+
+    const sanitizeExistingImages = () => {
+      if (!isAvatarBlockingEnabled()) return;
+      document.querySelectorAll('img').forEach(img => {
+        const current = img.getAttribute('src') || img.currentSrc || img.src || '';
+        if (shouldBlockAvatarUrl(current)) applyPlaceholder(img);
+      });
+    };
+    window.__BN_FORCE_AVATAR_SANITIZE__ = sanitizeExistingImages;
+
+    const extractUrlFromFetchArgs = (input, init) => {
+      if (typeof input === 'string') return input;
+      if (input && typeof input === 'object') {
+        if (typeof input.url === 'string') return input.url;
+        if (typeof input.href === 'string') return input.href;
+      }
+      if (init && typeof init.url === 'string') return init.url;
+      return '';
+    };
+    const createBlockedFetchResponse = () => {
+      if (typeof Response === 'function') {
+        try {
+          return new Response('', { status: 204, statusText: 'BN Avatar blocked' });
+        } catch (_) { /* ignore */ }
+      }
+      return {
+        ok: true,
+        status: 204,
+        statusText: 'BN Avatar blocked',
+        text: () => Promise.resolve(''),
+        json: () => Promise.resolve(null),
+        blob: () => Promise.resolve((typeof Blob === 'function') ? new Blob() : ''),
+        arrayBuffer: () => Promise.resolve((typeof ArrayBuffer === 'function') ? new ArrayBuffer(0) : null),
+        clone() { return this; },
+      };
+    };
+
+    if (nativeFetch) {
+      window.fetch = function patchedFetch(input, init) {
+        try {
+          if (shouldBlockLoad(extractUrlFromFetchArgs(input, init))) {
+            return Promise.resolve(createBlockedFetchResponse());
+          }
+        } catch (_) { /* ignore */ }
+        return nativeFetch.call(this, input, init);
+      };
+    }
+
+    if (nativeXhrOpen && nativeXhrSend) {
+      XMLHttpRequest.prototype.open = function patchedOpen(method, url, async, user, password) {
+        this.__bnAvatarBlocked__ = shouldBlockLoad(url);
+        return nativeXhrOpen.call(this, method, url, async, user, password);
+      };
+      XMLHttpRequest.prototype.send = function patchedSend(body) {
+        if (this.__bnAvatarBlocked__) {
+          const errorEvent = (typeof ProgressEvent === 'function') ? new ProgressEvent('error') : new Event('error');
+          try { if (typeof this.onerror === 'function') this.onerror(errorEvent); } catch (_) { /* ignore */ }
+          try { this.dispatchEvent(errorEvent); } catch (_) { /* ignore */ }
+          const loadEndEvent = (typeof ProgressEvent === 'function') ? new ProgressEvent('loadend') : new Event('loadend');
+          try { if (typeof this.onloadend === 'function') this.onloadend(loadEndEvent); } catch (_) { /* ignore */ }
+          try { this.dispatchEvent(loadEndEvent); } catch (_) { /* ignore */ }
+          return;
+        }
+        return nativeXhrSend.call(this, body);
+      };
+    }
+
+    if (typeof document.addEventListener === 'function') {
+      document.addEventListener('beforeload', (event) => {
+        if (!isAvatarBlockingEnabled()) return;
+        const target = event.target;
+        const url = (target && (target.currentSrc || target.src || target.href)) || event.url;
+        if (!shouldBlockAvatarUrl(url)) return;
+        try { event.preventDefault(); } catch (_) { /* ignore */ }
+        if (target && target.tagName === 'IMG') applyPlaceholder(target);
+      }, true);
+    }
+
+    sanitizeExistingImages();
+    const mo = new MutationObserver(() => sanitizeExistingImages());
+    try { mo.observe(document, { childList: true, subtree: true }); } catch (_) { /* ignore */ }
   }
   function readManifestVersion() {
     try {
@@ -1234,7 +1396,16 @@
   titleInp.oninput = checkChanged;
   userInp.oninput = checkChanged;
 
-  chkAv.onchange = checkChanged;
+  chkAv.onchange = () => {
+    hideAvatar = chkAv.checked;
+    if (hideAvatar) {
+      installAvatarBlocker();
+      if (typeof window.__BN_FORCE_AVATAR_SANITIZE__ === 'function') {
+        try { window.__BN_FORCE_AVATAR_SANITIZE__(); } catch (_) { /* ignore */ }
+      }
+    }
+    checkChanged();
+  };
   chkCp.onchange = () => { checkChanged(); };
   chkDescCp.onchange = checkChanged;
   chkHo.onchange = checkChanged;
@@ -1284,6 +1455,13 @@
     GM_setValue(WIDTH_MODE_KEY, widthModeValue);
 
     GM_setValue('hideAvatar', chkAv.checked);
+    hideAvatar = chkAv.checked;
+    if (hideAvatar) {
+      installAvatarBlocker();
+      if (typeof window.__BN_FORCE_AVATAR_SANITIZE__ === 'function') {
+        try { window.__BN_FORCE_AVATAR_SANITIZE__(); } catch (_) { /* ignore */ }
+      }
+    }
     GM_setValue('enableCopy', chkCp.checked);
     GM_setValue('enableDescCopy', chkDescCp.checked);
     GM_setValue('hideOrig', chkHo.checked);
