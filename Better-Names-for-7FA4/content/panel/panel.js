@@ -88,7 +88,7 @@
   const widthMode = GM_getValue(WIDTH_MODE_KEY, 'visual');
   const BN_TABLE_ROWS_SELECTOR = 'table.ui.very.basic.center.aligned.table tbody tr';
   const MAX_LOCAL_BG_SIZE = 2 * 1024 * 1024;
-  installAvatarBlocker();
+  ensureAvatarBlockerInstalled();
 
   const RENEW_PATH_RE = /^\/problems\/tag\/(\d+)\/?$/;
   const RENEW_SUFFIX_RE = /\/renew\/?$/;
@@ -115,6 +115,32 @@
     return rounded;
   }
   const isAvatarBlockingEnabled = () => !!hideAvatar;
+  function runAvatarSanitizer() {
+    if (typeof window.__BN_FORCE_AVATAR_SANITIZE__ !== 'function') return;
+    try {
+      window.__BN_FORCE_AVATAR_SANITIZE__();
+    } catch (error) {
+      console.warn('[BN] Avatar sanitizer failed', error);
+    }
+  }
+  function ensureAvatarBlockerInstalled(forceRetry = false) {
+    if (window.__BN_AVATAR_BLOCKER_INSTALLED__) return true;
+    if (forceRetry) delete window.__BN_AVATAR_BLOCKER_FAILED__;
+    if (window.__BN_AVATAR_BLOCKER_FAILED__) return false;
+    try {
+      const ok = installAvatarBlocker();
+      if (!ok) {
+        window.__BN_AVATAR_BLOCKER_FAILED__ = true;
+        console.warn('[BN] Avatar blocker prerequisites unavailable; will retry later');
+        return false;
+      }
+      return true;
+    } catch (error) {
+      window.__BN_AVATAR_BLOCKER_FAILED__ = true;
+      console.warn('[BN] Failed to install avatar blocker', error);
+      return false;
+    }
+  }
   // Prevent loading third-party avatar hosts whenever avatars are hidden.
   function shouldBlockAvatarUrl(url) {
     if (url === undefined || url === null) return false;
@@ -126,152 +152,194 @@
     }
   }
   function installAvatarBlocker() {
-    if (window.__BN_AVATAR_BLOCKER_INSTALLED__) return;
-    if (!document || typeof document.querySelectorAll !== 'function') return;
-    window.__BN_AVATAR_BLOCKER_INSTALLED__ = true;
+    if (window.__BN_AVATAR_BLOCKER_INSTALLED__ || window.__BN_AVATAR_BLOCKER_INSTALLING__) return true;
+    if (!document || typeof document.querySelectorAll !== 'function') return false;
+    const imgCtor = (typeof HTMLImageElement === 'undefined') ? null : HTMLImageElement;
+    if (!imgCtor || !imgCtor.prototype) return false;
+    window.__BN_AVATAR_BLOCKER_INSTALLING__ = true;
+    try {
+      const nativeSrcDescriptor = Object.getOwnPropertyDescriptor(imgCtor.prototype, 'src');
+      const elementProto = (typeof Element !== 'undefined' && Element.prototype) ? Element.prototype : null;
+      const nativeSetAttribute = (imgCtor.prototype.setAttribute || (elementProto && elementProto.setAttribute));
+      if (!nativeSetAttribute) return false;
+      const nativeFetch = typeof window.fetch === 'function' ? window.fetch : null;
+      const nativeXhrOpen = (typeof XMLHttpRequest !== 'undefined' && XMLHttpRequest.prototype.open) ? XMLHttpRequest.prototype.open : null;
+      const nativeXhrSend = (typeof XMLHttpRequest !== 'undefined' && XMLHttpRequest.prototype.send) ? XMLHttpRequest.prototype.send : null;
+      const shouldBlockLoad = (value) => isAvatarBlockingEnabled() && shouldBlockAvatarUrl(value);
 
-    const imgCtor = typeof HTMLImageElement === 'undefined' ? null : HTMLImageElement;
-    const nativeSrcDescriptor = imgCtor ? Object.getOwnPropertyDescriptor(imgCtor.prototype, 'src') : null;
-    const nativeSetAttribute = imgCtor ? imgCtor.prototype.setAttribute : null;
-    const nativeFetch = typeof window.fetch === 'function' ? window.fetch : null;
-    const nativeXhrOpen = (typeof XMLHttpRequest !== 'undefined' && XMLHttpRequest.prototype.open) ? XMLHttpRequest.prototype.open : null;
-    const nativeXhrSend = (typeof XMLHttpRequest !== 'undefined' && XMLHttpRequest.prototype.send) ? XMLHttpRequest.prototype.send : null;
-    const shouldBlockLoad = (value) => isAvatarBlockingEnabled() && shouldBlockAvatarUrl(value);
-
-    const assignSrc = (img, value) => {
-      if (!img) return;
-      if (nativeSrcDescriptor && typeof nativeSrcDescriptor.set === 'function') {
+      const assignSrc = (img, value) => {
+        if (!img) return;
+        if (nativeSrcDescriptor && typeof nativeSrcDescriptor.set === 'function') {
+          try {
+            nativeSrcDescriptor.set.call(img, value);
+            return;
+          } catch (_) { /* ignore */ }
+        }
         try {
-          nativeSrcDescriptor.set.call(img, value);
-          return;
+          nativeSetAttribute.call(img, 'src', value);
+        } catch (error) {
+          console.warn('[BN] Failed to assign placeholder avatar', error);
+        }
+      };
+      const applyPlaceholder = (img) => {
+        if (!img) return;
+        assignSrc(img, AVATAR_PLACEHOLDER_SRC);
+        try {
+          img.dataset.bnAvatarBlocked = 'true';
         } catch (_) { /* ignore */ }
-      }
-      if (nativeSetAttribute) nativeSetAttribute.call(img, 'src', value);
-    };
-    const applyPlaceholder = (img) => {
-      if (!img) return;
-      assignSrc(img, AVATAR_PLACEHOLDER_SRC);
-      try {
-        img.dataset.bnAvatarBlocked = 'true';
-      } catch (_) { /* ignore */ }
-    };
+      };
 
-    if (imgCtor && nativeSrcDescriptor && nativeSrcDescriptor.configurable !== false) {
-      Object.defineProperty(imgCtor.prototype, 'src', {
-        configurable: true,
-        enumerable: nativeSrcDescriptor ? nativeSrcDescriptor.enumerable : false,
-        get() {
-          if (nativeSrcDescriptor && typeof nativeSrcDescriptor.get === 'function') {
-            try {
-              return nativeSrcDescriptor.get.call(this);
-            } catch (_) { /* ignore */ }
-          }
-          return this.getAttribute('src') || '';
-        },
-        set(value) {
-          if (shouldBlockLoad(value)) {
+      if (nativeSrcDescriptor && nativeSrcDescriptor.configurable !== false) {
+        try {
+          Object.defineProperty(imgCtor.prototype, 'src', {
+            configurable: true,
+            enumerable: nativeSrcDescriptor ? nativeSrcDescriptor.enumerable : false,
+            get() {
+              if (nativeSrcDescriptor && typeof nativeSrcDescriptor.get === 'function') {
+                try {
+                  return nativeSrcDescriptor.get.call(this);
+                } catch (_) { /* ignore */ }
+              }
+              return this.getAttribute('src') || '';
+            },
+            set(value) {
+              if (shouldBlockLoad(value)) {
+                if (isAvatarBlockingEnabled()) applyPlaceholder(this);
+                return;
+              }
+              assignSrc(this, value);
+            },
+          });
+        } catch (error) {
+          console.warn('[BN] Failed to patch HTMLImageElement.src', error);
+        }
+      }
+
+      try {
+        imgCtor.prototype.setAttribute = function (name, value) {
+          if (
+            typeof name === 'string' &&
+            name.toLowerCase() === 'src' &&
+            shouldBlockLoad(String(value || ''))
+          ) {
             if (isAvatarBlockingEnabled()) applyPlaceholder(this);
             return;
           }
-          assignSrc(this, value);
-        },
-      });
-    }
-
-    if (imgCtor && nativeSetAttribute) {
-      imgCtor.prototype.setAttribute = function (name, value) {
-        if (
-          typeof name === 'string' &&
-          name.toLowerCase() === 'src' &&
-          shouldBlockLoad(String(value || ''))
-        ) {
-          if (isAvatarBlockingEnabled()) applyPlaceholder(this);
-          return;
-        }
-        return nativeSetAttribute.call(this, name, value);
-      };
-    }
-
-    const sanitizeExistingImages = () => {
-      if (!isAvatarBlockingEnabled()) return;
-      document.querySelectorAll('img').forEach(img => {
-        const current = img.getAttribute('src') || img.currentSrc || img.src || '';
-        if (shouldBlockAvatarUrl(current)) applyPlaceholder(img);
-      });
-    };
-    window.__BN_FORCE_AVATAR_SANITIZE__ = sanitizeExistingImages;
-
-    const extractUrlFromFetchArgs = (input, init) => {
-      if (typeof input === 'string') return input;
-      if (input && typeof input === 'object') {
-        if (typeof input.url === 'string') return input.url;
-        if (typeof input.href === 'string') return input.href;
+          return nativeSetAttribute.call(this, name, value);
+        };
+      } catch (error) {
+        console.warn('[BN] Failed to patch image setAttribute', error);
       }
-      if (init && typeof init.url === 'string') return init.url;
-      return '';
-    };
-    const createBlockedFetchResponse = () => {
-      if (typeof Response === 'function') {
-        try {
-          return new Response('', { status: 204, statusText: 'BN Avatar blocked' });
-        } catch (_) { /* ignore */ }
-      }
-      return {
-        ok: true,
-        status: 204,
-        statusText: 'BN Avatar blocked',
-        text: () => Promise.resolve(''),
-        json: () => Promise.resolve(null),
-        blob: () => Promise.resolve((typeof Blob === 'function') ? new Blob() : ''),
-        arrayBuffer: () => Promise.resolve((typeof ArrayBuffer === 'function') ? new ArrayBuffer(0) : null),
-        clone() { return this; },
-      };
-    };
 
-    if (nativeFetch) {
-      window.fetch = function patchedFetch(input, init) {
-        try {
-          if (shouldBlockLoad(extractUrlFromFetchArgs(input, init))) {
-            return Promise.resolve(createBlockedFetchResponse());
-          }
-        } catch (_) { /* ignore */ }
-        return nativeFetch.call(this, input, init);
-      };
-    }
-
-    if (nativeXhrOpen && nativeXhrSend) {
-      XMLHttpRequest.prototype.open = function patchedOpen(method, url, async, user, password) {
-        this.__bnAvatarBlocked__ = shouldBlockLoad(url);
-        return nativeXhrOpen.call(this, method, url, async, user, password);
-      };
-      XMLHttpRequest.prototype.send = function patchedSend(body) {
-        if (this.__bnAvatarBlocked__) {
-          const errorEvent = (typeof ProgressEvent === 'function') ? new ProgressEvent('error') : new Event('error');
-          try { if (typeof this.onerror === 'function') this.onerror(errorEvent); } catch (_) { /* ignore */ }
-          try { this.dispatchEvent(errorEvent); } catch (_) { /* ignore */ }
-          const loadEndEvent = (typeof ProgressEvent === 'function') ? new ProgressEvent('loadend') : new Event('loadend');
-          try { if (typeof this.onloadend === 'function') this.onloadend(loadEndEvent); } catch (_) { /* ignore */ }
-          try { this.dispatchEvent(loadEndEvent); } catch (_) { /* ignore */ }
-          return;
-        }
-        return nativeXhrSend.call(this, body);
-      };
-    }
-
-    if (typeof document.addEventListener === 'function') {
-      document.addEventListener('beforeload', (event) => {
+      const sanitizeExistingImages = () => {
         if (!isAvatarBlockingEnabled()) return;
-        const target = event.target;
-        const url = (target && (target.currentSrc || target.src || target.href)) || event.url;
-        if (!shouldBlockAvatarUrl(url)) return;
-        try { event.preventDefault(); } catch (_) { /* ignore */ }
-        if (target && target.tagName === 'IMG') applyPlaceholder(target);
-      }, true);
-    }
+        try {
+          document.querySelectorAll('img').forEach(img => {
+            const current = img.getAttribute('src') || img.currentSrc || img.src || '';
+            if (shouldBlockAvatarUrl(current)) applyPlaceholder(img);
+          });
+        } catch (error) {
+          console.warn('[BN] Avatar sanitize iteration failed', error);
+        }
+      };
+      window.__BN_FORCE_AVATAR_SANITIZE__ = sanitizeExistingImages;
 
-    sanitizeExistingImages();
-    const mo = new MutationObserver(() => sanitizeExistingImages());
-    try { mo.observe(document, { childList: true, subtree: true }); } catch (_) { /* ignore */ }
+      const extractUrlFromFetchArgs = (input, init) => {
+        if (typeof input === 'string') return input;
+        if (input && typeof input === 'object') {
+          if (typeof input.url === 'string') return input.url;
+          if (typeof input.href === 'string') return input.href;
+        }
+        if (init && typeof init.url === 'string') return init.url;
+        return '';
+      };
+      const createBlockedFetchResponse = () => {
+        if (typeof Response === 'function') {
+          try {
+            return new Response('', { status: 204, statusText: 'BN Avatar blocked' });
+          } catch (_) { /* ignore */ }
+        }
+        return {
+          ok: true,
+          status: 204,
+          statusText: 'BN Avatar blocked',
+          text: () => Promise.resolve(''),
+          json: () => Promise.resolve(null),
+          blob: () => Promise.resolve((typeof Blob === 'function') ? new Blob() : ''),
+          arrayBuffer: () => Promise.resolve((typeof ArrayBuffer === 'function') ? new ArrayBuffer(0) : null),
+          clone() { return this; },
+        };
+      };
+
+      if (nativeFetch) {
+        try {
+          window.fetch = function patchedFetch(input, init) {
+            try {
+              if (shouldBlockLoad(extractUrlFromFetchArgs(input, init))) {
+                return Promise.resolve(createBlockedFetchResponse());
+              }
+            } catch (_) { /* ignore */ }
+            return nativeFetch.call(this, input, init);
+          };
+        } catch (error) {
+          console.warn('[BN] Failed to patch window.fetch', error);
+        }
+      }
+
+      if (nativeXhrOpen && nativeXhrSend) {
+        try {
+          XMLHttpRequest.prototype.open = function patchedOpen(method, url, async, user, password) {
+            this.__bnAvatarBlocked__ = shouldBlockLoad(url);
+            return nativeXhrOpen.call(this, method, url, async, user, password);
+          };
+          XMLHttpRequest.prototype.send = function patchedSend(body) {
+            if (this.__bnAvatarBlocked__) {
+              const errorEvent = (typeof ProgressEvent === 'function') ? new ProgressEvent('error') : new Event('error');
+              try { if (typeof this.onerror === 'function') this.onerror(errorEvent); } catch (_) { /* ignore */ }
+              try { this.dispatchEvent(errorEvent); } catch (_) { /* ignore */ }
+              const loadEndEvent = (typeof ProgressEvent === 'function') ? new ProgressEvent('loadend') : new Event('loadend');
+              try { if (typeof this.onloadend === 'function') this.onloadend(loadEndEvent); } catch (_) { /* ignore */ }
+              try { this.dispatchEvent(loadEndEvent); } catch (_) { /* ignore */ }
+              return;
+            }
+            return nativeXhrSend.call(this, body);
+          };
+        } catch (error) {
+          console.warn('[BN] Failed to patch XMLHttpRequest', error);
+        }
+      }
+
+      if (typeof document.addEventListener === 'function') {
+        try {
+          document.addEventListener('beforeload', (event) => {
+            if (!isAvatarBlockingEnabled()) return;
+            const target = event.target;
+            const url = (target && (target.currentSrc || target.src || target.href)) || event.url;
+            if (!shouldBlockAvatarUrl(url)) return;
+            try { event.preventDefault(); } catch (_) { /* ignore */ }
+            if (target && target.tagName === 'IMG') applyPlaceholder(target);
+          }, true);
+        } catch (error) {
+          console.warn('[BN] Failed to attach beforeload listener', error);
+        }
+      }
+
+      sanitizeExistingImages();
+      if (typeof MutationObserver === 'function') {
+        try {
+          const mo = new MutationObserver(() => sanitizeExistingImages());
+          mo.observe(document, { childList: true, subtree: true });
+          window.__BN_AVATAR_BLOCKER_MO__ = mo;
+        } catch (error) {
+          console.warn('[BN] Avatar blocker MutationObserver failed', error);
+        }
+      }
+
+      window.__BN_AVATAR_BLOCKER_INSTALLED__ = true;
+      return true;
+    } finally {
+      delete window.__BN_AVATAR_BLOCKER_INSTALLING__;
+    }
   }
   function readManifestVersion() {
     try {
@@ -1398,11 +1466,8 @@
 
   chkAv.onchange = () => {
     hideAvatar = chkAv.checked;
-    if (hideAvatar) {
-      installAvatarBlocker();
-      if (typeof window.__BN_FORCE_AVATAR_SANITIZE__ === 'function') {
-        try { window.__BN_FORCE_AVATAR_SANITIZE__(); } catch (_) { /* ignore */ }
-      }
+    if (hideAvatar && ensureAvatarBlockerInstalled(true)) {
+      runAvatarSanitizer();
     }
     checkChanged();
   };
@@ -1456,11 +1521,8 @@
 
     GM_setValue('hideAvatar', chkAv.checked);
     hideAvatar = chkAv.checked;
-    if (hideAvatar) {
-      installAvatarBlocker();
-      if (typeof window.__BN_FORCE_AVATAR_SANITIZE__ === 'function') {
-        try { window.__BN_FORCE_AVATAR_SANITIZE__(); } catch (_) { /* ignore */ }
-      }
+    if (hideAvatar && ensureAvatarBlockerInstalled(true)) {
+      runAvatarSanitizer();
     }
     GM_setValue('enableCopy', chkCp.checked);
     GM_setValue('enableDescCopy', chkDescCp.checked);
