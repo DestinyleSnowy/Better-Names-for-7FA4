@@ -32,6 +32,9 @@
   const SUBMITTERS_CONFIG_URL = 'submitter/submitters.json';
   const SUPPORTED_PORTS = new Set(['', '8888', '5283']);
   const SUPPORTED_HOSTS = new Set(['7fa4.cn', '10.210.57.10', '211.137.101.118']);
+  const REMOTE_VERSION_URL = 'http://jx.7fa4.cn:9080/yx/better-names-for-7fa4/-/raw/main/version';
+  const UPDATE_PAGE_URL = 'http://jx.7fa4.cn:9080/yx/better-names-for-7fa4';
+  const manifestVersion = normalizeVersionString(readManifestVersion());
   const isSupportedHostname = (host) => {
     if (typeof host !== 'string' || !host) return false;
     if (SUPPORTED_HOSTS.has(host)) return true;
@@ -107,6 +110,27 @@
     if (rounded < HI_TOILET_INTERVAL_MIN) return HI_TOILET_INTERVAL_MIN;
     if (rounded > HI_TOILET_INTERVAL_MAX) return HI_TOILET_INTERVAL_MAX;
     return rounded;
+  }
+  function readManifestVersion() {
+    try {
+      if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getManifest === 'function') {
+        const manifest = chrome.runtime.getManifest();
+        if (manifest && manifest.version) {
+          return String(manifest.version);
+        }
+      }
+    } catch (error) {
+      console.warn('[BN] 读取 manifest 版本失败', error);
+    }
+    return '';
+  }
+  function normalizeVersionString(value) {
+    if (typeof value !== 'string') return '';
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    const newlineIndex = trimmed.indexOf('\n');
+    const sliced = newlineIndex >= 0 ? trimmed.slice(0, newlineIndex) : trimmed;
+    return sliced.replace(/\r/g, '');
   }
   function normalizeHexColor(value, fallback = DEFAULT_THEME_COLOR) {
     const normalizedFallback = (() => {
@@ -429,10 +453,24 @@
   const hiToiletInput = document.getElementById('bn-bt-enabled');
   const hiToiletIntervalInput = document.getElementById('bn-bt-interval');
   const hiToiletIntervalValue = document.getElementById('bn-bt-interval-value');
+  const versionTextEl = document.getElementById('bn-version-text');
+  const updateNoticeEl = document.getElementById('bn-update-notice');
+  const updateVersionEl = document.getElementById('bn-update-version');
+  const updateLinkEl = document.getElementById('bn-update-link');
   if (!panel || !pinBtn || !trigger) {
     console.error('[BN] 面板初始化失败：缺少必要的 DOM 元素');
     container.remove();
     return;
+  }
+  if (versionTextEl && manifestVersion) {
+    const slogan = (versionTextEl.dataset && versionTextEl.dataset.slogan) ? String(versionTextEl.dataset.slogan).trim() : '';
+    versionTextEl.textContent = slogan ? `${manifestVersion} · ${slogan}` : manifestVersion;
+  }
+  if (updateLinkEl) {
+    updateLinkEl.href = UPDATE_PAGE_URL;
+  }
+  if (updateNoticeEl && manifestVersion) {
+    checkForPanelUpdates(updateNoticeEl, updateVersionEl);
   }
   let pinned = !!GM_getValue('panelPinned', false);
   const CORNER_KEY = 'bn.corner';
@@ -2522,6 +2560,55 @@
         badge.remove();
       }
     } catch (e) { }
+  }
+  async function checkForPanelUpdates(noticeEl, remoteVersionEl) {
+    try {
+      const remoteVersion = await fetchRemotePanelVersion();
+      if (!remoteVersion || remoteVersion === manifestVersion) return;
+      if (remoteVersionEl) remoteVersionEl.textContent = remoteVersion;
+      noticeEl.classList.add('bn-visible');
+      noticeEl.removeAttribute('hidden');
+    } catch (error) {
+      console.warn('[BN] 检测更新失败', error);
+    }
+  }
+  function fetchRemotePanelVersion() {
+    return new Promise((resolve, reject) => {
+      const url = `${REMOTE_VERSION_URL}?_=${Date.now()}`;
+      const handleText = (text) => {
+        const normalized = normalizeVersionString(typeof text === 'string' ? text : '');
+        if (!normalized) {
+          reject(new Error('空版本响应'));
+          return;
+        }
+        resolve(normalized);
+      };
+      if (typeof GM_xmlhttpRequest === 'function') {
+        GM_xmlhttpRequest({
+          url,
+          method: 'GET',
+          headers: { 'Cache-Control': 'no-cache' },
+          timeout: 8000,
+          onload: (resp) => {
+            if (resp && resp.status >= 200 && resp.status < 300) {
+              handleText(resp.responseText || '');
+            } else {
+              reject(new Error(resp ? `HTTP ${resp.status}` : 'GM_xmlhttpRequest empty response'));
+            }
+          },
+          onerror: (err) => reject(new Error((err && err.error) || 'GM_xmlhttpRequest failed')),
+          ontimeout: () => reject(new Error('GM_xmlhttpRequest timeout')),
+        });
+        return;
+      }
+      fetch(url, { cache: 'no-store', credentials: 'omit' })
+        .then(response => {
+          if (!response || !response.ok) throw new Error(`HTTP ${response ? response.status : '0'}`);
+          return response.text();
+        })
+        .then(handleText)
+        .catch(reject);
+    });
   }
   // 初次遍历
   document.querySelectorAll('a[href^="/user/"]').forEach(processUserLink);

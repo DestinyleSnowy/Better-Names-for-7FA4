@@ -695,10 +695,55 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .bn-version-text {
   text-align: center;
+}
+
+.bn-update-notice {
+  display: none;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 193, 7, 0.5);
+  background: rgba(255, 213, 79, 0.25);
+  color: #8a6d3b;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.bn-update-notice.bn-visible {
+  display: flex;
+}
+
+.bn-update-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f39c12;
+  box-shadow: 0 0 6px rgba(243, 156, 18, 0.8);
+}
+
+.bn-update-copy {
+  text-align: center;
+}
+
+.bn-update-copy a {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.bn-update-copy a:hover,
+.bn-update-copy a:focus-visible {
+  color: #d35400;
+  outline: none;
 }
 
 a[data-bn-quick-skip="1"],
