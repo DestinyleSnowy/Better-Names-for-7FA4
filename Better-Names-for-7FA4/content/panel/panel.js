@@ -35,6 +35,9 @@
   const SUPPORTED_PORTS = new Set(['', '8888', '5283']);
   const SUPPORTED_HOSTS = new Set(['7fa4.cn', '10.210.57.10', '211.137.101.118']);
   const REMOTE_VERSION_URL = 'http://jx.7fa4.cn:9080/yx/better-names-for-7fa4/-/raw/main/version';
+  const REMOTE_VERSION_FALLBACK_URL = 'http://in.7fa4.cn:9080/yx/better-names-for-7fa4/-/raw/main/version';
+  const REMOTE_VERSION_URLS = [REMOTE_VERSION_URL, REMOTE_VERSION_FALLBACK_URL];
+  const REMOTE_VERSION_PATTERN = /^\d+\.\d+\.\d+(?:\.\d+)?$/;
   const UPDATE_PAGE_URL = 'http://jx.7fa4.cn:9080/yx/better-names-for-7fa4';
   const manifestVersion = normalizeVersionString(readManifestVersion());
   const isSupportedHostname = (host) => {
@@ -2812,17 +2815,29 @@
       console.warn('[BN] 检测更新失败', error);
     }
   }
-  function fetchRemotePanelVersion() {
-    return new Promise((resolve, reject) => {
-      const url = `${REMOTE_VERSION_URL}?_=${Date.now()}`;
-      const handleText = (text) => {
-        const normalized = normalizeVersionString(typeof text === 'string' ? text : '');
-        if (!normalized) {
-          reject(new Error('空版本响应'));
-          return;
+  async function fetchRemotePanelVersion() {
+    let lastError = null;
+    for (const baseUrl of REMOTE_VERSION_URLS) {
+      if (!baseUrl) continue;
+      try {
+        const rawText = await fetchRemotePanelVersionText(baseUrl);
+        const normalized = normalizeVersionString(typeof rawText === 'string' ? rawText : '');
+        if (normalized && REMOTE_VERSION_PATTERN.test(normalized)) {
+          return normalized;
         }
-        resolve(normalized);
-      };
+      } catch (error) {
+        lastError = error;
+        continue;
+      }
+    }
+    if (lastError) throw lastError;
+    return '';
+  }
+
+  function fetchRemotePanelVersionText(baseUrl) {
+    const url = `${baseUrl}?_=${Date.now()}`;
+    return new Promise((resolve, reject) => {
+      const handleText = (text) => resolve(text || '');
       if (typeof GM_xmlhttpRequest === 'function') {
         GM_xmlhttpRequest({
           url,
