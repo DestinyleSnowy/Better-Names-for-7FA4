@@ -195,6 +195,238 @@ function patchJQueryGet() {
       return null;
     }
 
+    const GOLD_ROW_CLASS = 'bn-merge-gold-row';
+    const GOLD_STYLE_ID = 'bn-merge-gold-style';
+    const GOLD_KEYWORD_RE = /(省选|NOI|国赛)/i;
+
+    function ensureGoldRowStyle(){
+      if(document.getElementById(GOLD_STYLE_ID)) return;
+      const style = document.createElement('style');
+      style.id = GOLD_STYLE_ID;
+      style.textContent = `
+        .${GOLD_ROW_CLASS} {
+          background-image: linear-gradient(90deg, rgba(255, 215, 0, 0.18), rgba(255, 243, 205, 0.08)) !important;
+          box-shadow: inset 0 0 0 1px rgba(255, 215, 0, 0.35);
+          transition: background 0.25s ease, box-shadow 0.25s ease;
+        }
+        .${GOLD_ROW_CLASS} td {
+          background-color: transparent !important;
+        }
+      `;
+      const target = document.head || document.documentElement || document.body;
+      if(target) target.appendChild(style);
+    }
+
+    function extractNumericValue(value){
+      if(typeof value === 'number'){
+        return Number.isFinite(value) ? value : NaN;
+      }
+      if(typeof value === 'string'){
+        const normalized = value.replace(/[,，]/g, '');
+        const match = normalized.match(/-?\d+(\.\d+)?/);
+        return match ? Number(match[0]) : NaN;
+      }
+      return NaN;
+    }
+
+    function resolveUserId(user){
+      if(!user || typeof user !== 'object') return null;
+      const keys = ['id', 'uid', 'user_id', 'userId', 'userID'];
+      for(const key of keys){
+        if(Object.prototype.hasOwnProperty.call(user, key)){
+          const value = user[key];
+          if(value !== undefined && value !== null && String(value).trim() !== ''){
+            return String(value);
+          }
+        }
+      }
+      return null;
+    }
+
+    function buildUserLookup(users){
+      const map = new Map();
+      if(!Array.isArray(users)) return map;
+      for(const user of users){
+        const uid = resolveUserId(user);
+        if(uid) map.set(uid, user);
+      }
+      return map;
+    }
+
+    const SCORE_KEYS = [
+      'sum', 'total', 'score', 'total_score', 'sum_score', 'sumScore',
+      'totalScore', 'score_total', 'scoreTotal', 'sum_c', 'sumC',
+      'sum_r', 'sumR', 'score_c', 'scoreC', 'score_r', 'scoreR'
+    ];
+    const SCORE_KEY_HINT_RE = /(score|sum|total)/i;
+
+    function resolveUserScore(user, depth = 0, visited = null){
+      if(user === null || user === undefined) return NaN;
+      const valueType = typeof user;
+      if(valueType === 'number' || valueType === 'string'){
+        return extractNumericValue(user);
+      }
+      if(valueType !== 'object') return NaN;
+      const seen = visited || new WeakSet();
+      if(seen.has(user) || depth > 4) return NaN;
+      seen.add(user);
+
+      for(const key of SCORE_KEYS){
+        if(Object.prototype.hasOwnProperty.call(user, key)){
+          const num = extractNumericValue(user[key]);
+          if(Number.isFinite(num)) return num;
+        }
+      }
+
+      for(const [key, value] of Object.entries(user)){
+        if(value === null || value === undefined) continue;
+        const valType = typeof value;
+        if(valType === 'number' || valType === 'string'){
+          if(SCORE_KEY_HINT_RE.test(key)){
+            const num = extractNumericValue(value);
+            if(Number.isFinite(num)) return num;
+          }
+          continue;
+        }
+        if(valType === 'object'){
+          if(Array.isArray(value)){
+            for(const item of value){
+              const nested = resolveUserScore(item, depth + 1, seen);
+              if(Number.isFinite(nested)) return nested;
+            }
+          } else {
+            const nested = resolveUserScore(value, depth + 1, seen);
+            if(Number.isFinite(nested)) return nested;
+          }
+        }
+      }
+      return NaN;
+    }
+
+    function countNonZeroUsers(users){
+      if(!Array.isArray(users)) return 0;
+      let count = 0;
+      for(const user of users){
+        const score = resolveUserScore(user);
+        if(Number.isFinite(score) && score > 0) count++;
+      }
+      return count;
+    }
+
+    function resolveSumIndex(mapping){
+      if(!Array.isArray(mapping)) return -1;
+      for(let i = 0; i < mapping.length; i++){
+        const item = mapping[i];
+        if(item && item.kind === 'sum') return i;
+      }
+      return -1;
+    }
+
+    function findHeaderRow(tableId){
+      const direct = document.querySelector(`#title-${tableId}`);
+      if(direct) return direct;
+      const table = document.getElementById(`table-${tableId}`) || document.querySelector(`#table-${tableId}`);
+      if(table){
+        const headRow = table.querySelector('thead tr');
+        if(headRow) return headRow;
+      }
+      return null;
+    }
+
+    function resolveScoreColumnIndex(tableId, mapping){
+      const sumIndex = resolveSumIndex(mapping);
+      if(sumIndex >= 0) return sumIndex;
+      const headerRow = findHeaderRow(tableId);
+      if(!headerRow) return -1;
+      const cells = Array.from(headerRow.children || []);
+      if(!cells.length) return -1;
+      const explicitIndex = cells.findIndex(cell => /总分|成绩|total|score/i.test((cell.textContent || '').trim()));
+      if(explicitIndex >= 0) return explicitIndex;
+      if(cells.length >= 5) return 4;
+      return cells.length - 1;
+    }
+
+    function readScoreFromRow(row, scoreIndex){
+      if(!row || scoreIndex < 0) return NaN;
+      const cells = row.querySelectorAll ? row.querySelectorAll('td') : null;
+      if(!cells || !cells.length || !cells[scoreIndex]) return NaN;
+      const cell = cells[scoreIndex];
+      return extractNumericValue((cell.textContent || cell.innerText || '').trim());
+    }
+
+    function determineRowScore(row, scoreIndex, userLookup){
+      if(!row) return 0;
+      const domScore = readScoreFromRow(row, scoreIndex);
+      if(Number.isFinite(domScore)) return domScore;
+      const rowId = row.id || '';
+      let uid = null;
+      if(row.dataset && row.dataset.uid){
+        uid = String(row.dataset.uid);
+      } else {
+        const parts = rowId.split('-');
+        uid = parts.length >= 3 ? parts[2] : null;
+      }
+      if(uid && userLookup && userLookup.size){
+        const user = userLookup.get(String(uid));
+        const userScore = resolveUserScore(user);
+        if(Number.isFinite(userScore)) return userScore;
+      }
+      return 0;
+    }
+
+    function computeHighlightRatio(tableId){
+      let ratio = 0.2;
+      try {
+        const anchor = document.querySelector(`#table-${tableId} > div > h1 > a`);
+        const text = anchor ? (anchor.textContent || '').trim() : '';
+        if(text && GOLD_KEYWORD_RE.test(text)) ratio = 0.5;
+      } catch(_) {
+        /* ignore */
+      }
+      return ratio;
+    }
+
+    function applyGoldHighlightForTable(tableId, users, mapping){
+      try {
+        const table = document.getElementById(`table-${tableId}`) || document.querySelector(`#table-${tableId}`);
+        if(!table) return;
+        const rows = Array.from(table.querySelectorAll(`tr[id^="line-${tableId}-"]`));
+        if(!rows.length) return;
+        const ratio = computeHighlightRatio(tableId);
+        rows.forEach(row => row.classList.remove(GOLD_ROW_CLASS));
+        if(!(ratio > 0)) return;
+        const userLookup = buildUserLookup(users);
+        const scoreIndex = resolveScoreColumnIndex(tableId, mapping);
+        const domNonZeroRows = [];
+        for(const row of rows){
+          const score = determineRowScore(row, scoreIndex, userLookup);
+          if(score > 0) domNonZeroRows.push(row);
+        }
+        if(!domNonZeroRows.length) return;
+        ensureGoldRowStyle();
+        const baseTotal = countNonZeroUsers(users);
+        const totalNonZero = baseTotal > 0 ? baseTotal : domNonZeroRows.length;
+        const highlightCount = Math.min(
+          domNonZeroRows.length,
+          Math.max(0, Math.ceil(totalNonZero * ratio))
+        );
+        if(!highlightCount) return;
+        const scoredRows = domNonZeroRows.map((row, order) => ({
+          row,
+          score: determineRowScore(row, scoreIndex, userLookup),
+          order
+        }));
+        scoredRows.sort((a, b) => {
+          if(b.score !== a.score) return b.score - a.score;
+          return a.order - b.order;
+        });
+        const selected = scoredRows.slice(0, Math.min(highlightCount, scoredRows.length));
+        selected.forEach(({ row }) => row.classList.add(GOLD_ROW_CLASS));
+      } catch(err) {
+        console.warn('show-all: applyGoldHighlight error', err);
+      }
+    }
+
   async function ensureRowsForUsers(originalUrlStr, users){
     try {
       const u = parseUrl(originalUrlStr);
@@ -384,6 +616,8 @@ function patchJQueryGet() {
         console.log('show-all: ensureRowsForUsers completed; all missing school/grade handled for table_id=', table_id);
       }
 
+      applyGoldHighlightForTable(table_id, Array.isArray(users) ? users : [], mapping);
+
     } catch(e){
       console.error('show-all: ensureRowsForUsers unexpected error', e);
     }
@@ -515,7 +749,14 @@ function patchJQueryGet() {
       console.log('show-all: gatherAllPages done. total merged users =', mergedUsers.length);
       emit({ text: `合并完成，共 ${mergedUsers.length} 条数据`, stage: 'done', tone: 'success' });
 
-      try { await ensureRowsForUsers(originalUrlStr, mergedUsers); } catch(e){ console.warn('show-all: ensure rows error', e); }
+      emit({ text: '正在渲染榜单...', stage: 'render', tone: 'info' });
+      try {
+        await ensureRowsForUsers(originalUrlStr, mergedUsers);
+        emit({ text: '渲染完成', stage: 'render-done', tone: 'success' });
+      } catch(e){
+        console.warn('show-all: ensure rows error', e);
+        emit({ text: '渲染阶段出现问题，请检查控制台', stage: 'render-error', tone: 'warning' });
+      }
       return out;
     }
 

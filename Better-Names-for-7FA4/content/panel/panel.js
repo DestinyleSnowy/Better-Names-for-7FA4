@@ -442,7 +442,6 @@
   let dragPending = false;
   let dragStartX = 0;
   let dragStartY = 0;
-  let wasPinned = false;
   let gearW = 48, gearH = 48;
   let __bn_trail = [];
   let __bn_raf = null;
@@ -664,11 +663,133 @@
     disableNeedWarn();
   }
 
-  pinBtn.classList.toggle('bn-pinned', pinned);
-  if (pinned) {
+  const WAKE_REASON_PIN = 'pin';
+  const WAKE_REASON_TRIGGER = 'hover:trigger';
+  const WAKE_REASON_PANEL = 'hover:panel';
+  const WAKE_REASON_FOCUS = 'focus';
+  const PANEL_HIDE_DELAY = 300;
+  const HOVER_SUPPRESS_MS = 600;
+  const wakeReasons = new Set();
+  let pointerMovedSinceLoad = false;
+  const hoverSuppressUntil = (() => {
+    if (typeof performance !== 'undefined' && performance.now) return performance.now() + HOVER_SUPPRESS_MS;
+    return Date.now() + HOVER_SUPPRESS_MS;
+  })();
+  const nowTs = () => {
+    if (typeof performance !== 'undefined' && performance.now) return performance.now();
+    return Date.now();
+  };
+
+  window.addEventListener('pointermove', () => { pointerMovedSinceLoad = true; }, { once: true, passive: true });
+  const canHonorHoverWake = () => pointerMovedSinceLoad && nowTs() >= hoverSuppressUntil;
+
+  let hideTimer = null;
+  let initialRevealPending = true;
+  let initialRevealFrame = null;
+
+  const cancelPendingReveal = () => {
+    if (initialRevealFrame != null) {
+      cancelAnimationFrame(initialRevealFrame);
+      initialRevealFrame = null;
+    }
+  };
+  const shouldRevealPanel = () => pinned || wakeReasons.size > 0;
+
+  const cancelHide = () => {
+    if (hideTimer != null) {
+      clearTimeout(hideTimer);
+      hideTimer = null;
+    }
+  };
+
+  const showPanel = () => {
+    if (isDragging || container.classList.contains('bn-dragging')) return;
     bringContainerToFront();
-    panel.classList.add('bn-show');
-  }
+    if (panel.classList.contains('bn-show')) {
+      cancelPendingReveal();
+      panel.classList.add('bn-show');
+      updateContainerState();
+      return;
+    }
+    const commitReveal = () => {
+      initialRevealFrame = null;
+      if (!shouldRevealPanel()) return;
+      panel.classList.add('bn-show');
+      updateContainerState();
+    };
+    if (initialRevealPending) {
+      initialRevealPending = false;
+      initialRevealFrame = requestAnimationFrame(() => {
+        initialRevealFrame = requestAnimationFrame(commitReveal);
+      });
+    } else {
+      commitReveal();
+    }
+  };
+  const hidePanel = () => {
+    if (pinned) return;
+    cancelPendingReveal();
+    panel.classList.remove('bn-show');
+    if (panel.contains(document.activeElement)) document.activeElement.blur();
+    updateContainerState();
+  };
+  const detectHoverReason = () => {
+    try {
+      if (panel.matches(':hover')) return WAKE_REASON_PANEL;
+      if (trigger.matches(':hover')) return WAKE_REASON_TRIGGER;
+    } catch (_) { /* ignore */ }
+    return null;
+  };
+
+  const requestWake = (reason) => {
+    if (reason) wakeReasons.add(reason);
+    cancelHide();
+    showPanel();
+  };
+  const scheduleHide = () => {
+    cancelHide();
+    if (wakeReasons.size || pinned) return;
+    hideTimer = setTimeout(() => {
+      if (pinned || wakeReasons.size) return;
+      const hoverReason = detectHoverReason();
+      if (hoverReason) {
+        if (canHonorHoverWake()) {
+          requestWake(hoverReason);
+        }
+        return;
+      }
+      const activeElement = document.activeElement;
+      if (activeElement && container.contains(activeElement)) {
+        if (panel.classList.contains('bn-show') || canHonorHoverWake()) {
+          requestWake(WAKE_REASON_FOCUS);
+        }
+        return;
+      }
+      hidePanel();
+    }, PANEL_HIDE_DELAY);
+  };
+  const releaseWake = (reason) => {
+    if (!reason) return;
+    if (!wakeReasons.delete(reason)) return;
+    if (!wakeReasons.size && !pinned) scheduleHide();
+  };
+
+  const attachHoverWake = (element, reason) => {
+    if (!element) return;
+    element.addEventListener('mouseenter', () => {
+      if (!canHonorHoverWake()) return;
+      requestWake(reason);
+    });
+    element.addEventListener('mouseleave', () => releaseWake(reason));
+  };
+
+  const syncPinnedState = () => {
+    pinBtn.classList.toggle('bn-pinned', pinned);
+    if (pinned) requestWake(WAKE_REASON_PIN);
+    else releaseWake(WAKE_REASON_PIN);
+  };
+
+  syncPinnedState();
   updateContainerState();
 
   titleInp.disabled = !originalConfig.titleTruncate;
@@ -757,39 +878,17 @@
     colorSidebar.classList.add('bn-show');
   }
 
-  let hideTimer = null;
-  const cancelHide = () => {
-    if (hideTimer != null) {
-      clearTimeout(hideTimer);
-      hideTimer = null;
-    }
-  };
-  const showPanel = () => {
-    if (isDragging || container.classList.contains('bn-dragging')) return;
-    cancelHide();
-    bringContainerToFront();
-    panel.classList.add('bn-show');
-    updateContainerState();
-  };
-  const hidePanel = () => {
-    if (pinned) return;
-    panel.classList.remove('bn-show');
-    if (panel.contains(document.activeElement)) document.activeElement.blur();
-    updateContainerState();
-  };
-  trigger.addEventListener('mouseenter', showPanel);
-  const maybeHidePanel = () => {
-    cancelHide();
-    hideTimer = setTimeout(() => {
-      if (!pinned && !trigger.matches(':hover') && !panel.matches(':hover') && !container.matches(':hover')) {
-        hidePanel();
-      }
-    }, 300);
-  };
-  trigger.addEventListener('mouseleave', maybeHidePanel);
-  panel.addEventListener('mouseleave', maybeHidePanel);
-  panel.addEventListener('mouseenter', showPanel);
-  container.addEventListener('mouseenter', showPanel);
+  attachHoverWake(trigger, WAKE_REASON_TRIGGER);
+  attachHoverWake(panel, WAKE_REASON_PANEL);
+  container.addEventListener('focusin', () => {
+    if (!panel.classList.contains('bn-show') && !canHonorHoverWake()) return;
+    requestWake(WAKE_REASON_FOCUS);
+  });
+  container.addEventListener('focusout', (event) => {
+    const next = event.relatedTarget;
+    if (next && container.contains(next)) return;
+    releaseWake(WAKE_REASON_FOCUS);
+  });
 
   const __bn_lagMs = 100;
   const __bn_trailWindow = 400;
@@ -819,7 +918,6 @@
   function __bn_beginDrag(e) {
     dragPending = false;
     isDragging = true;
-    wasPinned = pinned;
     panel.classList.remove('bn-show');
 
     const rect = trigger.getBoundingClientRect();
@@ -920,10 +1018,7 @@
 
       applyCorner(best);
       container.classList.remove('bn-dragging');
-      if (wasPinned) {
-        bringContainerToFront();
-        panel.classList.add('bn-show');
-      }
+      if (wakeReasons.size) showPanel();
       updateContainerState();
       __bn_cleanupPointer();
     };
@@ -974,9 +1069,7 @@
   pinBtn.addEventListener('click', () => {
     pinned = !pinned;
     GM_setValue('panelPinned', pinned);
-    pinBtn.classList.toggle('bn-pinned', pinned);
-    if (pinned) showPanel();
-    else if (!trigger.matches(':hover') && !panel.matches(':hover')) hidePanel();
+    syncPinnedState();
     updateContainerState();
   });
 
