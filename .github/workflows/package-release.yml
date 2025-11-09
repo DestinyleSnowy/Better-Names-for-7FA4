@@ -77,6 +77,17 @@ jobs:
           TAG_NAME="${GITHUB_REF#refs/tags/}"
           git push gitlab "refs/tags/$TAG_NAME:refs/tags/$TAG_NAME"
 
+      - name: Push default branch to GitLab (ensure .gitlab-ci.yml exists there)
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          git config --global user.name "yx"
+          git config --global user.email "yx@7fa4.cn"
+          git remote add gitlab http://oauth2:$GITLAB_TOKEN@jx.7fa4.cn:9080/yx/better-names-for-7fa4.git || true
+          git push gitlab "refs/heads/$DEFAULT_BRANCH:refs/heads/$DEFAULT_BRANCH"
+
       - name: Create GitLab Release
         env:
           GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
