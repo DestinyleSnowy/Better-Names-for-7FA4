@@ -944,6 +944,18 @@ window.getCurrentUserId = getCurrentUserId;
     $$(SEL.rows).forEach(r => { r.classList.remove('padder-selected'); r.querySelector('td.padder-cell')?.remove(); });
     updatePlanToggleLabel();
   }
+  function ensurePlanModeAfterRefresh() {
+    if (!modeOn) return;
+    const run = () => {
+      if (!modeOn) return;
+      enterMode();
+    };
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', run, { once: true });
+    } else {
+      run();
+    }
+  }
 
   /* ========= 启动 ========= */
   patchDatePicker();
@@ -951,7 +963,7 @@ window.getCurrentUserId = getCurrentUserId;
   (function start() {
     if (enablePlanAdder && onTagPage) {
       toggleButton();
-      if (modeOn) enterMode();
+      if (modeOn) ensurePlanModeAfterRefresh();
     } else {
       modeOn = false; GM_setValue(KEY.mode, false);
     }
