@@ -123,8 +123,19 @@ window.getCurrentUserId = getCurrentUserId;
   const pendingProblemMetaFetches = new Map();
   const PID_PLACEHOLDER_RE = /^#?\s*(\d+)\s*$/;
   const CODE_TOKEN_RE = /^[A-Za-z][A-Za-z0-9_.-]{1,20}\.?$/;
+  const SKIP_NODE_SELECTOR = 'a[href*="/skip"], button[data-action*="skip"], button[data-problem-id][data-action], .bn-quick-skip, .bn-plan-quick-skip';
 
   const normalizeProblemMetaText = text => (typeof text === 'string' ? text.replace(/\s+/g, ' ').trim() : '');
+
+  const textWithoutSkipNodes = (node) => {
+    if (!node) return '';
+    if (typeof node.cloneNode === 'function') {
+      const clone = node.cloneNode(true);
+      clone.querySelectorAll?.(SKIP_NODE_SELECTOR)?.forEach(el => el.remove());
+      return normalizeProblemMetaText(clone.textContent || '');
+    }
+    return normalizeProblemMetaText(node.textContent || '');
+  };
 
   const isPlaceholderCode = (value, pid) => {
     if (!value) return true;
@@ -737,7 +748,7 @@ window.getCurrentUserId = getCurrentUserId;
   function extractProblemMetaTitle(doc) {
     for (const selector of PROBLEM_TITLE_SELECTORS) {
       const el = doc.querySelector(selector);
-      const text = normalizeProblemMetaText(el?.textContent);
+      const text = textWithoutSkipNodes(el);
       if (text) return text;
     }
     return normalizeProblemMetaText(doc.title || '');
@@ -756,16 +767,17 @@ window.getCurrentUserId = getCurrentUserId;
       });
       const parser = new DOMParser();
       const doc = parser.parseFromString(response.responseText || '', 'text/html');
+      doc.querySelectorAll(SKIP_NODE_SELECTOR).forEach(el => el.remove());
       const rawTitle = extractProblemMetaTitle(doc);
       if (!rawTitle) return null;
       let { code, name } = splitProblemTitle(rawTitle, Number(pid));
       if (!name) {
         const alt = doc.querySelector('.problem-title-text, .ui.header h2, .ui.header .content');
-        name = normalizeProblemMetaText(alt?.textContent) || rawTitle;
+        name = textWithoutSkipNodes(alt) || rawTitle;
       }
       if (!code) {
         const codeEl = doc.querySelector('[data-problem-code], .problem-id, .problem-code, .problem-header b');
-        code = sanitizeProblemCode(codeEl?.textContent, Number(pid));
+        code = sanitizeProblemCode(textWithoutSkipNodes(codeEl), Number(pid));
       }
       const meta = { code, name: name || rawTitle };
       problemMetaCache.set(pid, meta);
