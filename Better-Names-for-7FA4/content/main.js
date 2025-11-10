@@ -24,11 +24,20 @@ window.getCurrentUserId = getCurrentUserId;
     DELIM: '|'
   };
 
+  const ON_TAG_PAGE = /\/problems\/tag\//.test(location.pathname);
+  const ON_FOREIGN_PAGE = /^\/foreign_list\/html(?:\/|$)/.test(location.pathname);
+  const TABLE_SELECTOR = ON_FOREIGN_PAGE
+    ? 'table.ui.celled.small.very.compact.data.table'
+    : 'table.ui.very.basic.center.aligned.table';
+  const HEADER_SELECTOR = `${TABLE_SELECTOR} thead > tr, ${TABLE_SELECTOR} tbody > tr:first-child`;
+  const TBODY_SELECTOR = `${TABLE_SELECTOR} tbody`;
+  const ROW_SELECTOR = `${TBODY_SELECTOR} > tr`;
+
   const SEL = {
-    table: 'table.ui.very.basic.center.aligned.table',
-    thead: 'table.ui.very.basic.center.aligned.table thead > tr',
-    tbody: 'table.ui.very.basic.center.aligned.table tbody',
-    rows: 'table.ui.very.basic.center.aligned.table tbody > tr',
+    table: TABLE_SELECTOR,
+    thead: HEADER_SELECTOR,
+    tbody: TBODY_SELECTOR,
+    rows: ROW_SELECTOR,
     linkIn: 'a[href^="/problem/"]:not([href*="/skip"])'
   };
 
@@ -40,6 +49,9 @@ window.getCurrentUserId = getCurrentUserId;
     autoExit: 'planAdder.autoExit',
     pending: 'planAdder.pending.v1'
   };
+
+  const CODE_COL_KEYWORDS = ['编号', '题号', '外站题号'];
+  const FOREIGN_TITLE_KEYWORDS = ['标题', '题目', '题名'];
 
   const enablePlanAdder = GM_getValue('enablePlanAdder', true);
   let modeOn = !!GM_getValue(KEY.mode, false);
@@ -307,11 +319,63 @@ window.getCurrentUserId = getCurrentUserId;
   let _codeColIdx = null; // 缓存编号列索引
   function codeColIndex() {
     if (_codeColIdx != null) return _codeColIdx;
-    const ths = $$(SEL.thead + ' > th');
-    for (let i = 0; i < ths.length; i++) {
-      if (txt(ths[i]).replace(/\s+/g, '').includes('编号')) { _codeColIdx = i + 1; return _codeColIdx; }
+    const headerRow = $(SEL.thead);
+    if (!headerRow) { _codeColIdx = null; return null; }
+    const cells = Array.from(headerRow.children || []);
+    let colIndex = 0;
+    for (const cell of cells) {
+      if (!cell || !/^(TH|TD)$/i.test(cell.tagName || '')) continue;
+      colIndex += 1;
+      if (cell.id === 'padder-th') continue;
+      const normalized = txt(cell).replace(/\s+/g, '');
+      if (CODE_COL_KEYWORDS.some(keyword => normalized.includes(keyword))) {
+        _codeColIdx = colIndex;
+        return _codeColIdx;
+      }
+    }
+    if (ON_FOREIGN_PAGE) {
+      _codeColIdx = 4;
+      return _codeColIdx;
     }
     _codeColIdx = null; return null;
+    _foreignTitleColIdx = null;
+
+  }
+
+  let _foreignTitleColIdx = null;
+  function foreignTitleColIndex() {
+    if (!ON_FOREIGN_PAGE) return null;
+    if (_foreignTitleColIdx != null) return _foreignTitleColIdx;
+    const headerRow = $(SEL.thead);
+    if (headerRow) {
+      const cells = Array.from(headerRow.children || []);
+      let colIndex = 0;
+      for (const cell of cells) {
+        if (!cell || !/^(TH|TD)$/i.test(cell.tagName || '')) continue;
+        colIndex += 1;
+        if (cell.id === 'padder-th') continue;
+        const normalized = txt(cell).replace(/\s+/g, '');
+        if (FOREIGN_TITLE_KEYWORDS.some(keyword => normalized.includes(keyword))) {
+          _foreignTitleColIdx = colIndex;
+          return _foreignTitleColIdx;
+        }
+      }
+    }
+    _foreignTitleColIdx = 4;
+    return _foreignTitleColIdx;
+  }
+
+  function extractForeignTitleText(row) {
+    if (!ON_FOREIGN_PAGE || !row) return '';
+    const idx = foreignTitleColIndex();
+    const cell = idx ? row.querySelector(`td:nth-child(${idx})`) : null;
+    const scope = (cell || row).cloneNode(true);
+    scope.querySelectorAll('.show_tag_controled, script, style').forEach(el => el.remove());
+    const anchor = findPrimaryProblemAnchor(scope);
+    if (anchor) return normalizeSpaces(anchor.textContent || '');
+    const fallback = scope.querySelector('a[href^="/problem/"]');
+    if (fallback) return normalizeSpaces(fallback.textContent || '');
+    return normalizeSpaces(scope.textContent || '');
   }
   const pidFromRow = r => (r.querySelector(SEL.linkIn)?.href.match(/\/problem\/(\d+)/) || [])[1] || null;
   const codeFromRow = r => {
@@ -343,6 +407,17 @@ window.getCurrentUserId = getCurrentUserId;
     if (cb) cb.checked = !!on;
     row.classList.toggle('padder-selected', !!(cb && cb.checked));
     if (cb) animateSelection(row);
+  }
+
+  const PRIMARY_PROBLEM_HREF_RE = /^\/problem\/\d+\/?(?:[?#].*)?$/;
+  function findPrimaryProblemAnchor(root) {
+    if (!root) return null;
+    const anchors = root.querySelectorAll('a[href^="/problem/"]');
+    for (const anchor of anchors) {
+      const href = anchor.getAttribute('href') || '';
+      if (PRIMARY_PROBLEM_HREF_RE.test(href)) return anchor;
+    }
+    return null;
   }
 
   function applyPlanSelections(ids, { replace = false } = {}) {
@@ -400,18 +475,52 @@ window.getCurrentUserId = getCurrentUserId;
   const PLAN_TOGGLE_ON_LABEL = '退出【添加计划】模式';
   const PLAN_TOGGLE_OFF_LABEL = '进入【添加计划】模式';
   const PLAN_TOGGLE_HOST_SELECTORS = [
+    '#bn-plan-toggle-host',
     '.ui.grid .row .four.wide.right.aligned.column',
     '.ui.grid .row .right.aligned.column',
     '.ui.grid .row .column:last-child',
     '.ui.grid'
   ];
+  function ensureForeignToggleHost() {
+    if (!ON_FOREIGN_PAGE) return null;
+    let host = document.getElementById('bn-plan-toggle-host');
+    if (host) return host;
+    const container =
+      document.querySelector('#submit .fields') ||
+      document.querySelector('.padding .fields') ||
+      document.querySelector('.padding');
+    if (!container) return null;
+    host = document.createElement('div');
+    host.id = 'bn-plan-toggle-host';
+    if (container.classList?.contains?.('fields')) {
+      host.className = 'field';
+      host.style.display = 'flex';
+      host.style.justifyContent = 'flex-end';
+      host.style.alignItems = 'center';
+      host.style.flex = '0 0 auto';
+    } else {
+      host.style.display = 'flex';
+      host.style.justifyContent = 'flex-end';
+      host.style.alignItems = 'center';
+      host.style.margin = '8px 0';
+      host.style.gap = '8px';
+    }
+    container.appendChild(host);
+    return host;
+  }
   let toggleButtonRetryTimer = null;
   let toggleButtonReadyListenerAttached = false;
   function resolveToggleHost() {
+    let waitForForeignHost = false;
+    if (ON_FOREIGN_PAGE) {
+      const host = ensureForeignToggleHost();
+      if (!host) waitForForeignHost = true;
+    }
     for (const selector of PLAN_TOGGLE_HOST_SELECTORS) {
       const el = $(selector);
       if (el) return el;
     }
+    if (waitForForeignHost) return null;
     return document.body || null;
   }
   function scheduleToggleButtonRetry() {
@@ -458,10 +567,14 @@ window.getCurrentUserId = getCurrentUserId;
 
   function insertSelectColumn() {
     _codeColIdx = null; // 表头可能变化，先失效缓存
+    _foreignTitleColIdx = null;
+
+
 
     const tr = $(SEL.thead);
     if (tr && !$('#padder-th', tr)) {
-      const th = document.createElement('th');
+      const prefersTd = (tr.firstElementChild?.tagName || '').toLowerCase() === 'td';
+      const th = document.createElement(prefersTd ? 'td' : 'th');
       th.id = 'padder-th'; th.className = 'collapsing'; th.style.whiteSpace = 'nowrap';
       th.innerHTML = `<label title="本页全选"><input id="padder-all" type="checkbox" style="vertical-align:middle;"><span style="margin-left:4px;font-weight:normal;">全选</span></label>`;
       tr.prepend(th);
@@ -832,8 +945,9 @@ window.getCurrentUserId = getCurrentUserId;
     if (meta?.name) return meta.name;
     const row = findRowByPid(pid);
     if (row) {
-      const anchor = row.querySelector(SEL.linkIn);
-      let text = normalizeSpaces(anchor ? anchor.textContent : '');
+      const anchor = findPrimaryProblemAnchor(row);
+      let text = ON_FOREIGN_PAGE ? extractForeignTitleText(row) : '';
+      if (!text) text = normalizeSpaces(anchor ? anchor.textContent : '');
       if (!text) text = normalizeSpaces(row.textContent || '');
       if (text && code) {
         const escaped = escapeRegExp(code);
@@ -1226,9 +1340,9 @@ window.getCurrentUserId = getCurrentUserId;
 
   /* ========= 启动 ========= */
   patchDatePicker();
-  const onTagPage = /\/problems\/tag\//.test(location.pathname);
+  const onPlanCapablePage = ON_TAG_PAGE || ON_FOREIGN_PAGE;
   (function start() {
-    if (enablePlanAdder && onTagPage) {
+    if (enablePlanAdder && onPlanCapablePage) {
       toggleButton();
       if (modeOn) ensurePlanModeAfterRefresh();
     } else {
