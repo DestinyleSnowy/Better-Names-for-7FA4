@@ -191,7 +191,7 @@ window.getCurrentUserId = getCurrentUserId;
     if (!message) return;
     if (!planToastStyleInjected) {
       GM_addStyle(`
-        #bn-plan-toast-container{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;align-items:flex-end;gap:8px;z-index:99999;pointer-events:none;}
+        #bn-plan-toast-container{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;align-items:flex-end;gap:8px;z-index:2147483647;pointer-events:none;}
         .bn-plan-toast{background:rgba(33,133,208,.92);color:#fff;padding:10px 14px;border-radius:10px;font-size:14px;line-height:1.45;box-shadow:0 12px 28px rgba(0,0,0,.18);max-width:320px;opacity:0;transform:translateY(14px);transition:opacity .24s ease,transform .24s ease;pointer-events:auto;word-break:break-word;white-space:pre-line;}
         .bn-plan-toast.bn-plan-toast-visible{opacity:1;transform:translateY(0);}
       `);
@@ -689,7 +689,17 @@ window.getCurrentUserId = getCurrentUserId;
       .split(/[|,\s]+/)
       .map(x => Number(x))
       .filter(Boolean);
-    return { id: up.id || up.plan_id || '', problemIds: arr };
+    const normalizePlanField = (value) => (value === undefined || value === null ? '' : String(value));
+    const planText = normalizePlanField(up.plan);
+    const resultText = normalizePlanField(up.result);
+    const tweakText = normalizePlanField(up.tweak);
+    return {
+      id: up.id || up.plan_id || '',
+      problemIds: arr,
+      plan: planText,
+      result: resultText,
+      tweak: tweakText
+    };
   }
 
   async function syncExistingPlan(dateIso, { force = false, silent = false } = {}) {
@@ -714,13 +724,14 @@ window.getCurrentUserId = getCurrentUserId;
     return meta;
   }
 
-  function buildBody({ id, epoch, uid, values }) {
+  function buildBody({ id, epoch, uid, values, plan, result, tweak }) {
     const p = new URLSearchParams();
     if (id) p.set('id', String(id));
     p.set('type', 'day');
     p.set('date', String(epoch));
     p.set('user_id', String(uid));
-    p.set('plan', ''); p.set('result', ''); p.set('tweak', '');
+    const ensureText = (value) => (value === undefined || value === null ? '' : String(value));
+    p.set('plan', ensureText(plan)); p.set('result', ensureText(result)); p.set('tweak', ensureText(tweak));
     p.set('problem_ids', values.join(CFG.DELIM));  // 用 | 分隔的数字ID
     return p.toString();
   }
@@ -785,7 +796,7 @@ window.getCurrentUserId = getCurrentUserId;
     }
 
     try {
-      const body = buildBody({ id: meta.id, epoch, uid, values: [] });
+      const body = buildBody({ id: meta.id, epoch, uid, values: [], plan: meta.plan, result: meta.result, tweak: meta.tweak });
       await postPlan(body, uid);
       const after = await fetchPlanJSON({ uid, epoch });
       planCache.set(iso, { ...after, epoch });
@@ -853,7 +864,7 @@ window.getCurrentUserId = getCurrentUserId;
     const planId = meta.id;
 
     try {
-      const body = buildBody({ id: planId, epoch, uid, values: desired });
+      const body = buildBody({ id: planId, epoch, uid, values: desired, plan: meta.plan, result: meta.result, tweak: meta.tweak });
       await postPlan(body, uid);
       const after = await fetchPlanJSON({ uid, epoch });
       planCache.set(iso, { ...after, epoch });
@@ -883,7 +894,7 @@ window.getCurrentUserId = getCurrentUserId;
       for (const id of removedList) {
         if (!workingSet.has(id)) continue;
         workingSet.delete(id);
-        const body2 = buildBody({ id: workingPlanId, epoch, uid, values: [...workingSet] });
+        const body2 = buildBody({ id: workingPlanId, epoch, uid, values: [...workingSet], plan: latest.plan, result: latest.result, tweak: latest.tweak });
         await postPlan(body2, uid);
         latest = await fetchPlanJSON({ uid, epoch });
         workingSet = new Set(latest.problemIds || []);
@@ -893,14 +904,14 @@ window.getCurrentUserId = getCurrentUserId;
       for (const id of desired) {
         if (workingSet.has(id)) continue;
         workingSet.add(id);
-        const body3 = buildBody({ id: workingPlanId, epoch, uid, values: [...workingSet] });
+        const body3 = buildBody({ id: workingPlanId, epoch, uid, values: [...workingSet], plan: latest.plan, result: latest.result, tweak: latest.tweak });
         await postPlan(body3, uid);
         latest = await fetchPlanJSON({ uid, epoch });
         workingSet = new Set(latest.problemIds || []);
         workingPlanId = latest.id || workingPlanId;
       }
 
-      const bodyFinal = buildBody({ id: latest.id || workingPlanId, epoch, uid, values: desired });
+      const bodyFinal = buildBody({ id: latest.id || workingPlanId, epoch, uid, values: desired, plan: latest.plan, result: latest.result, tweak: latest.tweak });
       await postPlan(bodyFinal, uid);
       const final = await fetchPlanJSON({ uid, epoch });
       planCache.set(iso, { ...final, epoch });
