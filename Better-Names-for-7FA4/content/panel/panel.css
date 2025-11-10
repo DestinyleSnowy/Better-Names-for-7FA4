@@ -11,8 +11,8 @@
   --bn-text-muted: #6c757d;
   --bn-btn-bg: #fff;
   --bn-btn-text:#495057;
-  --bn-shadow: 0 8px 32px rgba(0,0,0,0.12);
-  --bn-panel-shadow: 0 8px 32px rgba(0,0,0,0.12);
+  --bn-shadow: 0 8px 18px rgba(15,23,42,0.06);
+  --bn-panel-shadow: 0 14px 30px rgba(15,23,42,0.06);
   --bn-trigger-shadow: 0 4px 12px rgba(0,0,0,0.1);
   --bn-hover-bg:#f8f9fa;
   --bn-savebar-h: 48px;

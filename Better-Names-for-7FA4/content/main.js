@@ -29,7 +29,7 @@ window.getCurrentUserId = getCurrentUserId;
     thead: 'table.ui.very.basic.center.aligned.table thead > tr',
     tbody: 'table.ui.very.basic.center.aligned.table tbody',
     rows: 'table.ui.very.basic.center.aligned.table tbody > tr',
-    linkIn: 'a[href^="/problem/"]'
+    linkIn: 'a[href^="/problem/"]:not([href*="/skip"])'
   };
 
   const KEY = {
@@ -112,6 +112,67 @@ window.getCurrentUserId = getCurrentUserId;
   let currentDateIso = null;
   const planCache = new Map();
   let planRequestToken = 0;
+  const PROBLEM_TITLE_SELECTORS = [
+    '.problem-title',
+    '.problem-header h1',
+    'h1.ui.header',
+    'h1',
+    'title'
+  ];
+  const problemMetaCache = new Map();
+  const pendingProblemMetaFetches = new Map();
+  const PID_PLACEHOLDER_RE = /^#?\s*(\d+)\s*$/;
+  const CODE_TOKEN_RE = /^[A-Za-z][A-Za-z0-9_.-]{1,20}\.?$/;
+
+  const normalizeProblemMetaText = text => (typeof text === 'string' ? text.replace(/\s+/g, ' ').trim() : '');
+
+  const isPlaceholderCode = (value, pid) => {
+    if (!value) return true;
+    const match = PID_PLACEHOLDER_RE.exec(value.trim());
+    if (!match) return false;
+    if (!Number.isFinite(pid)) return true;
+    return Number(match[1]) === pid;
+  };
+
+  const sanitizeProblemCode = (value, pid) => {
+    const trimmed = normalizeProblemMetaText(value).replace(/^#/, '');
+    if (!trimmed || isPlaceholderCode(trimmed, pid)) return '';
+    return trimmed;
+  };
+
+  const splitProblemTitle = (rawTitle, pid) => {
+    const trimmed = normalizeProblemMetaText(rawTitle);
+    if (!trimmed) return { code: '', name: '' };
+    const dashMatch = trimmed.match(/^(.+?)\s*[-–—·:：]+\s*(.+)$/);
+    if (dashMatch && dashMatch[2]) {
+      return { code: sanitizeProblemCode(dashMatch[1], pid), name: normalizeProblemMetaText(dashMatch[2]) };
+    }
+    const tokens = trimmed.split(/\s+/);
+    if (tokens.length > 2) {
+      const first = tokens[0];
+      const second = tokens[1];
+      if (PID_PLACEHOLDER_RE.test(first) && CODE_TOKEN_RE.test(second)) {
+        const code = sanitizeProblemCode(second.replace(/\.$/, ''), pid);
+        const name = normalizeProblemMetaText(tokens.slice(2).join(' '));
+        if (code && name) return { code, name };
+      }
+    }
+    const codeFirstMatch = trimmed.match(/^([A-Za-z][A-Za-z0-9_.-]{1,20}\.?)\s+(.+)$/);
+    if (codeFirstMatch && codeFirstMatch[2]) {
+      return {
+        code: sanitizeProblemCode(codeFirstMatch[1].replace(/\.$/, ''), pid),
+        name: normalizeProblemMetaText(codeFirstMatch[2])
+      };
+    }
+    return { code: '', name: trimmed };
+  };
+
+  const bestDisplayCode = (pid, rawCode) => {
+    const meta = problemMetaCache.get(pid);
+    if (meta?.code && !isPlaceholderCode(meta.code, pid)) return meta.code;
+    if (rawCode && !isPlaceholderCode(rawCode, pid)) return rawCode.replace(/^#/, '').trim();
+    return '题目编号待获取';
+  };
   const normalizePendingEntry = (o) => {
     if (!o || typeof o !== 'object') return null;
     const pid = Number(o.pid);
@@ -159,6 +220,16 @@ window.getCurrentUserId = getCurrentUserId;
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const log = (...a) => CFG.DEBUG && console.log('[PlanAdder]', ...a);
   const txt = el => (el ? el.textContent.trim() : '');
+  const normalizeSpaces = text => (typeof text === 'string' ? text.replace(/\s+/g, ' ').trim() : '');
+  const escapeRegExp = value => (typeof value === 'string' ? value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '');
+  const codeCollator = (typeof Intl !== 'undefined' && typeof Intl.Collator === 'function')
+    ? new Intl.Collator(undefined, { numeric: false, sensitivity: 'base' })
+    : null;
+  const compareCodes = (left, right) => {
+    const a = typeof left === 'string' ? left : String(left ?? '');
+    const b = typeof right === 'string' ? right : String(right ?? '');
+    return codeCollator ? codeCollator.compare(a, b) : a.localeCompare(b);
+  };
 
   const tomorrowISO = () => {
     const d = new Date(); d.setDate(d.getDate() + 1);
@@ -564,6 +635,27 @@ window.getCurrentUserId = getCurrentUserId;
       .padder-selected{background:rgba(0,150,255,.06)!important;transition:background-color .24s ease;}
       .padder-animate{animation:padder-pulse .45s ease;}
       @keyframes padder-pulse{0%{box-shadow:0 0 0 0 rgba(0,150,255,0);transform:scale(1);}40%{box-shadow:0 0 0 6px rgba(0,150,255,.18);transform:scale(1.01);}100%{box-shadow:0 0 0 0 rgba(0,150,255,0);transform:scale(1);}}
+      #plan-preview{position:fixed;top:72px;right:16px;z-index:9999;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;box-shadow:0 10px 30px rgba(15,23,42,.12);width:320px;max-height:65vh;overflow:auto;font-size:13px;line-height:1.45;cursor:default;}
+      #plan-preview .plan-preview-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:2px;font-weight:600;color:#0f172a;cursor:default;user-select:none;}
+      #plan-preview .plan-preview-date{font-size:12px;color:#475569;}
+      #plan-preview .plan-preview-subtitle{font-size:12px;color:#94a3b8;margin-bottom:8px;}
+      #plan-preview .plan-preview-empty{font-size:13px;color:#94a3b8;padding:6px 0;}
+      #plan-preview .plan-preview-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;}
+      #plan-preview .plan-preview-item{border:1px solid #f1f5f9;border-radius:8px;padding:6px 8px;background:#f8fafc;}
+      #plan-preview .plan-preview-code{font-weight:600;color:#2563eb;font-size:13px;}
+      #plan-preview .plan-preview-name{color:#334155;font-size:12px;margin-top:2px;word-break:break-word;}
+      #plan-preview .plan-preview-count-wrap{font-size:12px;color:#64748b;}
+      @media (prefers-color-scheme: dark){
+        #plan-preview{background:#fff;border-color:#e5e7eb;box-shadow:0 10px 32px rgba(15,23,42,.18);}
+        #plan-preview .plan-preview-header{color:#0f172a;}
+        #plan-preview .plan-preview-date{color:#475569;}
+        #plan-preview .plan-preview-subtitle{color:#94a3b8;}
+        #plan-preview .plan-preview-empty{color:#94a3b8;}
+        #plan-preview .plan-preview-item{background:#f8fafc;border-color:#f1f5f9;}
+        #plan-preview .plan-preview-code{color:#2563eb;}
+        #plan-preview .plan-preview-name{color:#334155;}
+        #plan-preview .plan-preview-count-wrap{color:#64748b;}
+      }
     `);
 
     const date = $('#pad-date');
@@ -641,7 +733,167 @@ window.getCurrentUserId = getCurrentUserId;
     if (pos) { bar.style.left = pos.left; bar.style.top = pos.top; bar.style.right = 'auto'; bar.style.bottom = 'auto'; }
     drag(bar, $('#pad-handle'));
   }
-  function count() { const el = $('#pad-count'); if (el) el.textContent = selected.size; }
+
+  function extractProblemMetaTitle(doc) {
+    for (const selector of PROBLEM_TITLE_SELECTORS) {
+      const el = doc.querySelector(selector);
+      const text = normalizeProblemMetaText(el?.textContent);
+      if (text) return text;
+    }
+    return normalizeProblemMetaText(doc.title || '');
+  }
+
+  async function fetchProblemMeta(pid) {
+    if (!pid) return null;
+    try {
+      const response = await gmFetch({
+        url: `${CFG.base}/problem/${pid}`,
+        method: 'GET',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'text/html'
+        }
+      });
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(response.responseText || '', 'text/html');
+      const rawTitle = extractProblemMetaTitle(doc);
+      if (!rawTitle) return null;
+      let { code, name } = splitProblemTitle(rawTitle, Number(pid));
+      if (!name) {
+        const alt = doc.querySelector('.problem-title-text, .ui.header h2, .ui.header .content');
+        name = normalizeProblemMetaText(alt?.textContent) || rawTitle;
+      }
+      if (!code) {
+        const codeEl = doc.querySelector('[data-problem-code], .problem-id, .problem-code, .problem-header b');
+        code = sanitizeProblemCode(codeEl?.textContent, Number(pid));
+      }
+      const meta = { code, name: name || rawTitle };
+      problemMetaCache.set(pid, meta);
+      return meta;
+    } catch {
+      return null;
+    }
+  }
+
+  function queueProblemMetaFetch(pid) {
+    if (!pid) return;
+    if (problemMetaCache.has(pid) || pendingProblemMetaFetches.has(pid)) return;
+    const job = fetchProblemMeta(pid)
+      .catch(() => null)
+      .finally(() => {
+        pendingProblemMetaFetches.delete(pid);
+        if (typeof requestAnimationFrame === 'function') {
+          requestAnimationFrame(() => renderPlanPreview());
+        } else {
+          renderPlanPreview();
+        }
+      });
+    pendingProblemMetaFetches.set(pid, job);
+  }
+
+  function ensurePlanPreview() {
+    if (!modeOn) return null;
+    let preview = $('#plan-preview');
+    if (preview) return preview;
+    preview = document.createElement('div');
+    preview.id = 'plan-preview';
+    preview.innerHTML = `
+      <div class="plan-preview-header">
+        <span>计划预览</span>
+        <div class="plan-preview-count-wrap">共 <span id="plan-preview-count">0</span> 题</div>
+      </div>
+      <div class="plan-preview-date" id="plan-preview-date"></div>
+      <div class="plan-preview-empty" id="plan-preview-empty">今日暂无计划</div>
+      <ul class="plan-preview-list" id="plan-preview-list"></ul>
+    `;
+    document.body.appendChild(preview);
+    return preview;
+  }
+
+  function destroyPlanPreview() {
+    $('#plan-preview')?.remove();
+  }
+
+  function resolveProblemName(pid, code) {
+    if (!Number.isFinite(pid)) return '';
+    const meta = problemMetaCache.get(pid);
+    if (meta?.name) return meta.name;
+    const row = findRowByPid(pid);
+    if (row) {
+      const anchor = row.querySelector(SEL.linkIn);
+      let text = normalizeSpaces(anchor ? anchor.textContent : '');
+      if (!text) text = normalizeSpaces(row.textContent || '');
+      if (text && code) {
+        const escaped = escapeRegExp(code);
+        if (escaped) {
+          const pattern = new RegExp(`^${escaped}\s*[-–—·:：]*\s*`, 'i');
+          const stripped = text.replace(pattern, '').trim();
+          if (stripped) text = stripped;
+        }
+      }
+      if (text) {
+        if (isPlaceholderCode(code, pid)) queueProblemMetaFetch(pid);
+        return text;
+      }
+    }
+    queueProblemMetaFetch(pid);
+    return meta?.name || '题目名称待加载';
+  }
+
+  function collectPlanPreviewEntries() {
+    const entries = [];
+    for (const [pidKey, rawCode] of selected) {
+      const code = typeof rawCode === 'string' ? rawCode.trim() : '';
+      if (!code) continue;
+      const pidNum = Number(pidKey);
+      const pid = Number.isFinite(pidNum) ? pidNum : NaN;
+      if (!problemMetaCache.has(pid) && (isPlaceholderCode(code, pid) || !findRowByPid(pid))) {
+        queueProblemMetaFetch(pid);
+      }
+      const name = resolveProblemName(pid, code) || '题目名称待加载';
+      const displayCode = bestDisplayCode(pid, code);
+      const meta = problemMetaCache.get(pid);
+      const sortCode = meta?.code || code;
+      entries.push({ sortCode: sortCode || displayCode, displayCode, name });
+    }
+    entries.sort((a, b) => compareCodes(a.sortCode || a.displayCode, b.sortCode || b.displayCode));
+    return entries;
+  }
+
+  function renderPlanPreview() {
+    if (!modeOn) {
+      destroyPlanPreview();
+      return;
+    }
+    const preview = ensurePlanPreview();
+    if (!preview) return;
+    const dateEl = $('#plan-preview-date', preview);
+    if (dateEl) dateEl.textContent = currentDateIso || '--';
+    const listEl = $('#plan-preview-list', preview);
+    const emptyEl = $('#plan-preview-empty', preview);
+    const countEl = $('#plan-preview-count', preview);
+    if (!listEl) return;
+    listEl.innerHTML = '';
+    const entries = collectPlanPreviewEntries();
+    entries.forEach(({ displayCode, name }) => {
+      const li = document.createElement('li');
+      li.className = 'plan-preview-item';
+      li.innerHTML = `
+        <span class="plan-preview-code">${displayCode}</span>
+        <span class="plan-preview-name">${name}</span>
+      `;
+      listEl.appendChild(li);
+    });
+    listEl.style.display = entries.length ? 'flex' : 'none';
+    if (emptyEl) emptyEl.style.display = entries.length ? 'none' : 'block';
+    if (countEl) countEl.textContent = String(entries.length);
+  }
+
+  function count() {
+    const el = $('#pad-count');
+    if (el) el.textContent = selected.size;
+    renderPlanPreview();
+  }
   function drag(el, handle) {
     let sx, sy, sl, st, d = false;
     handle.onmousedown = e => {
@@ -936,12 +1188,15 @@ window.getCurrentUserId = getCurrentUserId;
   /* ========= 模式切换 ========= */
   function enterMode() {
     modeOn = true; GM_setValue(KEY.mode, true); insertSelectColumn(); toolbar(); observe();
+    ensurePlanPreview();
+    renderPlanPreview();
     updatePlanToggleLabel();
   }
   function exitMode() {
     modeOn = false; GM_setValue(KEY.mode, false);
     $('#plan-bar')?.remove(); $('#padder-th')?.remove();
     $$(SEL.rows).forEach(r => { r.classList.remove('padder-selected'); r.querySelector('td.padder-cell')?.remove(); });
+    destroyPlanPreview();
     updatePlanToggleLabel();
   }
   function ensurePlanModeAfterRefresh() {
