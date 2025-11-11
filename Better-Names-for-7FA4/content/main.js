@@ -2326,8 +2326,11 @@ td.bn-plan-quick-skip-target .bn-plan-quick-skip-wrap {
       cell.innerHTML = '&nbsp;';
       cell.classList.remove('bn-plan-quick-skip-target');
     }
+    const SKIPPED_STATUS_HTML = '<font color="Purple"><i class="coffee icon" aria-hidden="true"></i>已跳过</font>';
     function markRowAsQuickSkipped(row) {
       if (!row) return;
+      const statusCell = row.cells?.[1] || row.querySelector('td:nth-child(2)');
+      if (statusCell) statusCell.innerHTML = SKIPPED_STATUS_HTML;
       updateEvalIconToCoffee(row);
       clearQuickSkipCell(row);
     }
