@@ -97,6 +97,30 @@
   font-size: 16px; font-weight: 600; color: var(--bn-text);
   margin: 0; display: flex; align-items: center; gap: 12px;
 }
+
+.bn-panel-title-text {
+  font-size: 16px;
+  font-weight: 600;
+  display: inline-block;
+  line-height: 1;
+
+  background: linear-gradient(90deg,#0090F7 8%,#BA62FC,#F2416B,#F55600);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+
+  letter-spacing: -0.03em;
+  font-stretch: condensed; 
+}
+
+.bn-panel-title-text--squash {
+  transform-origin: left center;
+  transform: scaleX(0.96); 
+  display: inline-block;   
+}
+
+
 .bn-panel-repo-icons {
   display: inline-flex;
   align-items: center;
