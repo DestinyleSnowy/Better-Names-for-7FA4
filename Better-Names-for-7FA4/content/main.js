@@ -2268,7 +2268,9 @@ td.bn-plan-quick-skip-target .bn-plan-quick-skip-wrap {
           location.href = targetUrl;
           return;
         }
-        location.reload();
+        delete btn.dataset.bnQuickSkipPending;
+        const row = btn.closest('tr');
+        if (row) markRowAsQuickSkipped(row);
       });
 
       return btn;
@@ -2303,6 +2305,31 @@ td.bn-plan-quick-skip-target .bn-plan-quick-skip-wrap {
         }
       }
       delete row.__bnPlanQuickSkipApplied;
+    }
+
+    function updateEvalIconToCoffee(row) {
+      if (!row) return;
+      const evalCell = row.cells?.[0] || row.querySelector('td:first-child');
+      if (!evalCell) return;
+      const iconEl = evalCell.querySelector('i.question.icon');
+      if (!iconEl) return;
+      iconEl.classList.remove('question');
+      iconEl.classList.add('coffee');
+      iconEl.setAttribute('aria-hidden', 'true');
+      const fontEl = iconEl.closest('font');
+      if (fontEl) fontEl.setAttribute('color', 'Purple');
+    }
+    function clearQuickSkipCell(row) {
+      if (!row) return;
+      const cell = row.querySelector('td[data-bn-quick-skip-cell="1"]');
+      if (!cell) return;
+      cell.innerHTML = '&nbsp;';
+      cell.classList.remove('bn-plan-quick-skip-target');
+    }
+    function markRowAsQuickSkipped(row) {
+      if (!row) return;
+      updateEvalIconToCoffee(row);
+      clearQuickSkipCell(row);
     }
 
     function ensureButtonForRow(row) {

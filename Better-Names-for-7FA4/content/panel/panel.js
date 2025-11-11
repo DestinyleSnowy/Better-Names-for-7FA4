@@ -91,7 +91,6 @@
   const widthMode = GM_getValue(WIDTH_MODE_KEY, 'visual');
   const BN_TABLE_ROWS_SELECTOR = 'table.ui.very.basic.center.aligned.table tbody tr';
   const MAX_LOCAL_BG_SIZE = 2 * 1024 * 1024;
-  ensureAvatarBlockerInstalled();
 
   const RENEW_PATH_RE = /^\/problems\/tag\/(\d+)\/?$/;
   const RENEW_SUFFIX_RE = /\/renew\/?$/;
@@ -2593,6 +2592,31 @@
     if (!/^\d+$/.test(pidStr)) return null;
     return `/problem/${pidStr}/skip`;
   }
+  ensureAvatarBlockerInstalled();
+  function updatePanelEvalIconToCoffee(tr) {
+    if (!tr) return;
+    const evalCell = tr.cells?.[0] || tr.querySelector('td:first-child');
+    if (!evalCell) return;
+    const iconEl = evalCell.querySelector('i.question.icon');
+    if (!iconEl) return;
+    iconEl.classList.remove('question');
+    iconEl.classList.add('coffee');
+    iconEl.setAttribute('aria-hidden', 'true');
+    const fontEl = iconEl.closest('font');
+    if (fontEl) fontEl.setAttribute('color', 'Purple');
+  }
+  function clearPanelQuickSkipCell(tr) {
+    if (!tr) return;
+    const cell = tr.querySelector('td[data-bn-quick-skip-cell="1"]');
+    if (!cell) return;
+    cell.innerHTML = '&nbsp;';
+    cell.classList.remove('bn-plan-quick-skip-target');
+  }
+  function markPanelRowAsQuickSkipped(tr) {
+    if (!tr) return;
+    updatePanelEvalIconToCoffee(tr);
+    clearPanelQuickSkipCell(tr);
+  }
 
   function createQuickSkipButton(problemId) {
     const btn = document.createElement('a');
@@ -2629,7 +2653,9 @@
         location.href = targetUrl;
         return;
       }
-      location.reload();
+      delete btn.dataset.bnQuickSkipPending;
+      const row = btn.closest('tr');
+      if (row) markPanelRowAsQuickSkipped(row);
     };
     btn.addEventListener('click', handleClick);
     return btn;
