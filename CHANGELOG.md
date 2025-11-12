@@ -2,7 +2,9 @@
 
 ### 6.1.6.3
 > 版本代号：雨小鱼
-- GitHub Actions 自动推送 CHANGELOG 到 Gitlab
+- GitHub Actions 自动推送 CHANGELOG 到 Gitlab。
+- 修复无用的正则表达式字符转义。
+- 修复 DOM 文本被重新解释为 HTML 的问题。
 - 修复存在的部分问题。
 
 ### 6.1.6.2
