@@ -269,6 +269,36 @@ function patchJQueryGet() {
     const GOLD_ROW_CLASS = 'bn-merge-gold-row';
     const GOLD_STYLE_ID = 'bn-merge-gold-style';
     const GOLD_KEYWORD_RE = /(省选|NOI|国赛)/i;
+    const SUM_C_SORT_TOKEN = 'sort":"sum_c';
+
+    function containsSumCSortToken(text) {
+      if (!text) return false;
+      if (text.includes(SUM_C_SORT_TOKEN)) return true;
+      try {
+        const decoded = decodeURIComponent(text);
+        if (decoded.includes(SUM_C_SORT_TOKEN)) return true;
+      } catch (_) {
+        // ignore decode errors
+      }
+      return false;
+    }
+
+    function isSortedBySumC() {
+      try {
+        const href = (typeof location === 'object' && location && location.href) ? location.href : '';
+        if (containsSumCSortToken(href)) return true;
+        const search = (typeof location === 'object' && location && location.search) ? location.search : '';
+        if (search) {
+          const params = new URLSearchParams(search);
+          for (const value of params.values()) {
+            if (containsSumCSortToken(value)) return true;
+          }
+        }
+      } catch (err) {
+        console.warn('show-all: unable to inspect location info for gold highlight check', err);
+      }
+      return false;
+    }
 
     function ensureGoldRowStyle(){
       if(document.getElementById(GOLD_STYLE_ID)) return;
@@ -446,6 +476,7 @@ function patchJQueryGet() {
     }
 
     function computeHighlightRatio(tableId){
+      if(!isSortedBySumC()) return 0;
       let ratio = 0.2;
       try {
         const anchor = document.querySelector(`#table-${tableId} > div > h1 > a`);
