@@ -1004,10 +1004,14 @@ window.getCurrentUserId = getCurrentUserId;
     entries.forEach(({ displayCode, name }) => {
       const li = document.createElement('li');
       li.className = 'plan-preview-item';
-      li.innerHTML = `
-        <span class="plan-preview-code">${displayCode}</span>
-        <span class="plan-preview-name">${name}</span>
-      `;
+      const codeSpan = document.createElement('span');
+      codeSpan.className = 'plan-preview-code';
+      codeSpan.textContent = displayCode;
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'plan-preview-name';
+      nameSpan.textContent = name;
+      li.appendChild(codeSpan);
+      li.appendChild(nameSpan);
       listEl.appendChild(li);
     });
     listEl.style.display = entries.length ? 'flex' : 'none';
