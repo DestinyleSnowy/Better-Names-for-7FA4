@@ -318,6 +318,24 @@ function patchJQueryGet() {
       if(target) target.appendChild(style);
     }
 
+    let latestGoldContext = null;
+    let goldHighlightReapplyTimer = null;
+    const GOLD_REAPPLY_DELAY_MS = 420;
+
+    function scheduleGoldHighlightReapply(delay = GOLD_REAPPLY_DELAY_MS){
+      if(!latestGoldContext) return;
+      if(goldHighlightReapplyTimer){
+        clearTimeout(goldHighlightReapplyTimer);
+        goldHighlightReapplyTimer = null;
+      }
+      goldHighlightReapplyTimer = window.setTimeout(() => {
+        goldHighlightReapplyTimer = null;
+        const ctx = latestGoldContext;
+        if(!ctx) return;
+        applyGoldHighlightForTable(ctx.tableId, ctx.users, ctx.mapping);
+      }, typeof delay === 'number' && delay >= 0 ? delay : GOLD_REAPPLY_DELAY_MS);
+    }
+
     function extractNumericValue(value){
       if(typeof value === 'number'){
         return Number.isFinite(value) ? value : NaN;
@@ -497,6 +515,11 @@ function patchJQueryGet() {
         const ratio = computeHighlightRatio(tableId);
         rows.forEach(row => row.classList.remove(GOLD_ROW_CLASS));
         if(!(ratio > 0)) return;
+        latestGoldContext = {
+          tableId,
+          users: Array.isArray(users) ? users : [],
+          mapping
+        };
         const userLookup = buildUserLookup(users);
         const scoreIndex = resolveScoreColumnIndex(tableId, mapping);
         const domNonZeroRows = [];
@@ -522,8 +545,21 @@ function patchJQueryGet() {
           if(b.score !== a.score) return b.score - a.score;
           return a.order - b.order;
         });
-        const selected = scoredRows.slice(0, Math.min(highlightCount, scoredRows.length));
-        selected.forEach(({ row }) => row.classList.add(GOLD_ROW_CLASS));
+        if(highlightCount){
+          const capped = Math.min(highlightCount, scoredRows.length);
+          const finiteRows = scoredRows.filter(({ score }) => Number.isFinite(score));
+          if(!finiteRows.length) return;
+          const candidates = Math.min(capped, finiteRows.length);
+          if(!candidates) return;
+          const cutoffScore = finiteRows[candidates - 1].score;
+          if(!Number.isFinite(cutoffScore)) return;
+          let lastIndex = candidates - 1;
+          while(lastIndex + 1 < finiteRows.length && finiteRows[lastIndex + 1].score === cutoffScore){
+            lastIndex++;
+          }
+          const selected = finiteRows.slice(0, lastIndex + 1);
+          selected.forEach(({ row }) => row.classList.add(GOLD_ROW_CLASS));
+        }
       } catch(err) {
         console.warn('show-all: applyGoldHighlight error', err);
       }
@@ -1521,6 +1557,7 @@ function patchJQueryGet() {
                 setButtonIdle(RETRY_TEXT);
                 setStatus('合并完成，可重新执行合并', 'success');
                 triggerFilterReload();
+                scheduleGoldHighlightReapply();
                 deferred.resolve(merged);
               } catch(err){
                 console.error('show-all: gatherAllPages error', err);
