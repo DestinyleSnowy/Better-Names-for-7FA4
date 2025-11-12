@@ -952,7 +952,7 @@ window.getCurrentUserId = getCurrentUserId;
       if (text && code) {
         const escaped = escapeRegExp(code);
         if (escaped) {
-          const pattern = new RegExp(`^${escaped}\s*[-–—·:：]*\s*`, 'i');
+          const pattern = new RegExp(`^${escaped}\\s*[-–—·:：]*\\s*`, 'i');
           const stripped = text.replace(pattern, '').trim();
           if (stripped) text = stripped;
         }
