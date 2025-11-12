@@ -80,9 +80,9 @@ jobs:
       - name: Update version file in GitLab (no GitLab CI)
         env:
           GITLAB_URL: "http://jx.7fa4.cn:9080"
-          PROJECT_ID: ${{ secrets.GITLAB_PROJECT_ID }}          # 未设置则脚本里回退到 408
-          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}             # 需要 api 或 write_repository
-          DEFAULT_BRANCH: ${{ secrets.GITLAB_DEFAULT_BRANCH }}  # 未设置则脚本里回退到 main
+          PROJECT_ID: ${{ secrets.GITLAB_PROJECT_ID }}         
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}            
+          DEFAULT_BRANCH: ${{ secrets.GITLAB_DEFAULT_BRANCH }} 
         run: |
           set -euo pipefail
 
@@ -90,7 +90,6 @@ jobs:
           DEFAULT_BRANCH="${DEFAULT_BRANCH:-main}"
           TAG="${GITHUB_REF#refs/tags/}"
 
-          # 解析版本号：纯数字点 或 取最后一个空格后的字段
           if echo "$TAG" | grep -Eq '^[0-9]+(\.[0-9]+)*$'; then
             VERSION="$TAG"
           else
@@ -120,6 +119,64 @@ jobs:
             test "$CODE2" -ge 200 -a "$CODE2" -lt 300
           fi
 
+      - name: Push CHANGELOG to GitLab
+        env:
+          GITLAB_URL: "http://jx.7fa4.cn:9080"
+          PROJECT_ID: ${{ secrets.GITLAB_PROJECT_ID }}
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          DEFAULT_BRANCH: ${{ secrets.GITLAB_DEFAULT_BRANCH }}
+        run: |
+          set -euo pipefail
+          PROJECT_ID="${PROJECT_ID:-408}"
+          DEFAULT_BRANCH="${DEFAULT_BRANCH:-main}"
+          TAG="${GITHUB_REF#refs/tags/}"
+
+          if [ -f CHANGELOG.md ]; then
+            CHANGELOG_PATH="CHANGELOG.md"
+          elif [ -f Better-Names-for-7FA4/CHANGELOG.md ]; then
+            CHANGELOG_PATH="Better-Names-for-7FA4/CHANGELOG.md"
+          else
+            echo "No CHANGELOG found in repository; skipping CHANGELOG push."
+            exit 0
+          fi
+
+          FILE_NAME=$(basename "$CHANGELOG_PATH")
+
+          sudo apt-get update -y
+          sudo apt-get install -y jq
+
+          CONTENT=$(cat "$CHANGELOG_PATH")
+
+          UPDATE_JSON=$(jq -n --arg branch "$DEFAULT_BRANCH" \
+                              --arg cm "chore: update $FILE_NAME for $TAG from GitHub Actions" \
+                              --arg file "$FILE_NAME" \
+                              --arg content "$CONTENT" \
+                              '{branch:$branch, commit_message:$cm, actions:[{action:"update", file_path:$file, content:$content}]}')
+
+          RESP=$(mktemp)
+          CODE=$(curl -sS -w '%{http_code}' -o "$RESP" -X POST \
+            -H "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data "$UPDATE_JSON" \
+            "${GITLAB_URL}/api/v4/projects/${PROJECT_ID}/repository/commits")
+          echo "update CHANGELOG status=$CODE"; cat "$RESP" || true
+
+          if [ "$CODE" -lt 200 ] || [ "$CODE" -ge 300 ]; then
+            CREATE_JSON=$(jq -n --arg branch "$DEFAULT_BRANCH" \
+                                --arg cm "chore: add $FILE_NAME $TAG from GitHub Actions" \
+                                --arg file "$FILE_NAME" \
+                                --arg content "$CONTENT" \
+                                '{branch:$branch, commit_message:$cm, actions:[{action:"create", file_path:$file, content:$content}]}')
+
+            RESP2=$(mktemp)
+            CODE2=$(curl -sS -w '%{http_code}' -o "$RESP2" -X POST \
+              -H "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
+              -H "Content-Type: application/json" \
+              --data "$CREATE_JSON" \
+              "${GITLAB_URL}/api/v4/projects/${PROJECT_ID}/repository/commits")
+            echo "create CHANGELOG status=$CODE2"; cat "$RESP2" || true
+            test "$CODE2" -ge 200 -a "$CODE2" -lt 300
+          fi
 
       - name: Create GitLab Release
         env:
