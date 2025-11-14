@@ -27,6 +27,7 @@
   const enableCopy = GM_getValue('enableCopy', true);
   const enableDescCopy = GM_getValue('enableDescCopy', false);
   const hideOrig = GM_getValue('hideOrig', true);
+  const showUserNickname = GM_getValue('showUserNickname', false);
   const enableMenu = GM_getValue('enableUserMenu', true);
   const enablePlanAdder = GM_getValue('enablePlanAdder', true);
   const enableGuard = GM_getValue('enableGuard', false);
@@ -606,7 +607,7 @@
   const useCustomColors = GM_getValue('useCustomColors', false);
 
   const palettes = {
-    light: { x4: '#5a5a5a', x5: '#92800b', x6: '#77dd02', c1: '#ff0000', c2: '#ff6629', c3: '#ffbb00', g1: '#ca00ca', g2: '#62ca00', g3: '#13c2c2', d1: '#9900ff', d2: '#000cff', d3: '#597ef7', d4: '#896e00', by: '#8c8c8c', jl: '#ff85c0', uk: '#5e6e5e' }
+    light: { x4: '#5a5a5a', x5: '#92800b', x6: '#b2ad2a', c1: '#ff0000', c2: '#ff6629', c3: '#ffbb00', g1: '#ca00ca', g2: '#62ca00', g3: '#13c2c2', d1: '#9900ff', d2: '#000cff', d3: '#597ef7', d4: '#186334', by: '#8c8c8c', jl: '#ff85c0', uk: '#5e6e5e' }
   };
 
   const palette = Object.assign({}, palettes.light, useCustomColors ? storedPalette : {});
@@ -797,6 +798,7 @@
   const chkCp = document.getElementById('bn-enable-copy');
   const chkDescCp = document.getElementById('bn-enable-desc-copy');
   const chkHo = document.getElementById('bn-hide-orig');
+  const chkShowNickname = document.getElementById('bn-show-user-nickname');
 
   const chkMenu = document.getElementById('bn-enable-user-menu');
   const chkPlan = document.getElementById('bn-enable-plan');
@@ -828,6 +830,7 @@
   chkCp.checked = enableCopy;
   chkDescCp.checked = enableDescCopy;
   chkHo.checked = hideOrig;
+  chkShowNickname.checked = showUserNickname;
   chkMenu.checked = enableMenu;
   chkPlan.checked = enablePlanAdder;
   chkAutoRenew.checked = enableAutoRenew;
@@ -903,6 +906,7 @@
     enableCopy,
     enableDescCopy,
     hideOrig,
+    showUserNickname,
     enableMenu,
     enablePlanAdder,
     enableAutoRenew,
@@ -1388,6 +1392,7 @@
       (document.getElementById('bn-enable-copy').checked !== originalConfig.enableCopy) ||
       (document.getElementById('bn-enable-desc-copy').checked !== originalConfig.enableDescCopy) ||
       (document.getElementById('bn-hide-orig').checked !== originalConfig.hideOrig) ||
+      (document.getElementById('bn-show-user-nickname').checked !== originalConfig.showUserNickname) ||
       (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) ||
       (document.getElementById('bn-enable-plan').checked !== originalConfig.enablePlanAdder) ||
       (document.getElementById('bn-enable-renew').checked !== originalConfig.enableAutoRenew) ||
@@ -1476,6 +1481,7 @@
   chkCp.onchange = () => { checkChanged(); };
   chkDescCp.onchange = checkChanged;
   chkHo.onchange = checkChanged;
+  chkShowNickname.onchange = checkChanged;
   chkMenu.onchange = checkChanged;
   chkVj.onchange = checkChanged;
   chkHideDoneSkip.onchange = () => { applyHideDoneSkip(chkHideDoneSkip.checked); checkChanged(); };
@@ -1529,6 +1535,7 @@
     GM_setValue('enableCopy', chkCp.checked);
     GM_setValue('enableDescCopy', chkDescCp.checked);
     GM_setValue('hideOrig', chkHo.checked);
+    GM_setValue('showUserNickname', chkShowNickname.checked);
     GM_setValue('hideDoneSkip', chkHideDoneSkip.checked);
     GM_setValue('enableQuickSkip', chkQuickSkip.checked);
     GM_setValue('enableTitleOptimization', chkTitleOpt.checked);
@@ -1612,6 +1619,7 @@
     chkCp.checked = originalConfig.enableCopy;
     chkDescCp.checked = originalConfig.enableDescCopy;
     chkHo.checked = originalConfig.hideOrig;
+    chkShowNickname.checked = originalConfig.showUserNickname;
     chkMenu.checked = originalConfig.enableMenu;
     chkVj.checked = originalConfig.enableVjLink;
     chkHideDoneSkip.checked = originalConfig.hideDoneSkip;
@@ -2388,6 +2396,31 @@
     }, true);
   }
 
+  function extractOriginalNickname(rawText) {
+    if (typeof rawText !== 'string') return '';
+    let normalized = rawText.replace(/[\u00A0\s]+/g, ' ');
+    normalized = normalized.trim();
+    if (!normalized) return '';
+    const fullIdx = normalized.indexOf('（');
+    const halfIdx = normalized.indexOf('(');
+    let firstParenIdx = -1;
+    if (fullIdx >= 0 && halfIdx >= 0) {
+      firstParenIdx = Math.min(fullIdx, halfIdx);
+    } else {
+      firstParenIdx = Math.max(fullIdx, halfIdx);
+    }
+    if (firstParenIdx > 0) {
+      const prefix = normalized.slice(0, firstParenIdx).trim();
+      if (prefix) return prefix;
+    }
+    const match = normalized.match(/[（(]\s*([^（）()]+?)\s*[）)]/);
+    if (match && match[1]) {
+      const inner = match[1].trim();
+      if (inner) return inner;
+    }
+    return '';
+  }
+
   function processUserLink(a) {
     if (!a || !a.matches('a[href^="/user/"]')) return;
     if (!markOnce(a, 'UserDone')) return;
@@ -2414,17 +2447,21 @@
     let baseText = '';
     a.childNodes.forEach(n => { if (n.nodeType === Node.TEXT_NODE) baseText += n.textContent; });
     baseText = baseText.trim();
+    const defaultSource = baseText || (a.textContent || '').trim();
+    const originalNickname = (showUserNickname && info) ? extractOriginalNickname(baseText) : '';
 
-    let finalText = '';
+    let combinedName = defaultSource;
     if (info) {
-      // If info.name could potentially contain unsafe chars, escape it as well:
-      finalText = (img ? '\u00A0' : '') + escapeHtml(info.name);
+      combinedName = typeof info.name === 'string' ? info.name : (defaultSource || '');
+      if (showUserNickname && originalNickname) {
+        combinedName += `（${originalNickname}）`;
+      }
       const c = palette[info.colorKey];
       if (c) a.style.color = c;
-    } else {
-      const safeTruncated = escapeHtml(truncateByUnits(baseText || a.textContent.trim(), maxUserUnits));
-      finalText = (img ? '\u00A0' : '') + safeTruncated;
     }
+
+    const limitedName = truncateByUnits(combinedName || '', maxUserUnits);
+    const finalText = (img ? '\u00A0' : '') + escapeHtml(limitedName);
 
     Array.from(a.childNodes).forEach(n => { if (n.nodeType === Node.TEXT_NODE) n.remove(); });
     a.insertAdjacentHTML('beforeend', finalText);
