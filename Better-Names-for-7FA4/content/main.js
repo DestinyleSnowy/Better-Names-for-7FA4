@@ -47,7 +47,8 @@ window.getCurrentUserId = getCurrentUserId;
     date: 'planAdder.date',
     barPos: 'planAdder.barPos',
     autoExit: 'planAdder.autoExit',
-    pending: 'planAdder.pending.v1'
+    pending: 'planAdder.pending.v1',
+    meta: 'planAdder.meta.v1'
   };
 
   const CODE_COL_KEYWORDS = ['编号', '题号', '外站题号'];
@@ -132,6 +133,35 @@ window.getCurrentUserId = getCurrentUserId;
     'title'
   ];
   const problemMetaCache = new Map();
+  // Persisted meta store for cross-page availability
+  function loadProblemMetaStore() {
+    const raw = GM_getValue(KEY.meta, {});
+    return (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
+  }
+  function persistProblemMetaStore(store) {
+    GM_setValue(KEY.meta, store || {});
+  }
+  let problemMetaStore = loadProblemMetaStore();
+  // Hydrate in-memory cache from store
+  for (const [k, v] of Object.entries(problemMetaStore)) {
+    const pid = Number(k);
+    if (!pid || !v || typeof v !== 'object') continue;
+    const code = typeof v.code === 'string' ? v.code.trim() : '';
+    const name = typeof v.name === 'string' ? v.name.trim() : '';
+    if (code || name) problemMetaCache.set(pid, { code, name });
+  }
+  function upsertProblemMeta(pid, meta) {
+    const num = Number(pid);
+    if (!num || !meta || typeof meta !== 'object') return;
+    const prev = problemMetaCache.get(num) || {};
+    const next = {
+      code: typeof meta.code === 'string' ? meta.code.trim() : (prev.code || ''),
+      name: typeof meta.name === 'string' ? meta.name.trim() : (prev.name || '')
+    };
+    problemMetaCache.set(num, next);
+    problemMetaStore[String(num)] = { code: next.code || '', name: next.name || '' };
+    persistProblemMetaStore(problemMetaStore);
+  }
   const pendingProblemMetaFetches = new Map();
   const PID_PLACEHOLDER_RE = /^#?\s*(\d+)\s*$/;
   const CODE_TOKEN_RE = /^[A-Za-z][A-Za-z0-9_.-]{1,20}\.?$/;
@@ -377,8 +407,42 @@ window.getCurrentUserId = getCurrentUserId;
     if (fallback) return normalizeSpaces(fallback.textContent || '');
     return normalizeSpaces(scope.textContent || '');
   }
-  const pidFromRow = r => (r.querySelector(SEL.linkIn)?.href.match(/\/problem\/(\d+)/) || [])[1] || null;
+  const pidFromRow = r => {
+    if (!r) return null;
+    // 1) Standard problem link
+    const a = r.querySelector(SEL.linkIn);
+    const href = a && (a.getAttribute ? a.getAttribute('href') : a.href) || '';
+    const m1 = href && href.match(/\/problem\/(\d+)/);
+    if (m1) return m1[1];
+    // 2) Foreign list specific fallbacks
+    if (ON_FOREIGN_PAGE) {
+      // Try status cell id: <td id="res-7381">...
+      const statusCell = r.querySelector('td[id^="res-"], [id^="res-"]');
+      const m2 = statusCell && String(statusCell.id || '').match(/^res-(\d+)/i);
+      if (m2) return m2[1];
+      // Try trailing code like F7381 in any cell
+      const text = (r.textContent || '').trim();
+      const m3 = text.match(/\bF(\d+)\b/i);
+      if (m3) return m3[1];
+      // Try any foreign related href carrying id
+      const a2 = r.querySelector('a[href*="foreign"], a[href*="problem"], a[href*="fid="], a[href*="problem_id="]');
+      const href2 = a2 && (a2.getAttribute ? a2.getAttribute('href') : a2.href) || '';
+      const m4 = href2.match(/(?:fid|problem_id|id)=(\d+)/i) || href2.match(/(?:foreign|problem)\/(\d+)/i);
+      if (m4) return m4[1];
+    }
+    return null;
+  };
   const codeFromRow = r => {
+    if (!r) return '';
+    if (ON_FOREIGN_PAGE) {
+      // Compose foreign code as: "cf 1P" (site + external id)
+      const cells = Array.from(r.children || []).filter(el => String(el.tagName).toUpperCase() === 'TD' && !el.classList.contains('padder-cell'));
+      // Expected order: [user, site, externalId, title, ...]
+      const site = normalizeSpaces(txt(cells[1]));
+      const externalId = normalizeSpaces(txt(cells[2]));
+      const composite = [site, externalId].filter(Boolean).join(' ').trim();
+      return composite || externalId || site || '';
+    }
     const idx = codeColIndex();
     if (!idx) return null;
     const td = r.querySelector(`td:nth-child(${idx})`);
@@ -667,6 +731,11 @@ window.getCurrentUserId = getCurrentUserId;
     const key = pidNum || pid;
     const code = codeFromRow(row) || `#${pidNum || pid}`;
     if (on) selected.set(key, code); else selected.delete(key);
+    if (on && ON_FOREIGN_PAGE && Number.isFinite(pidNum)) {
+      // Capture code and title for cross-page use
+      const nameCandidate = extractForeignTitleText(row) || '';
+      upsertProblemMeta(pidNum, { code, name: nameCandidate });
+    }
     if (pidNum) {
       if (on) pendingSelected.set(pidNum, code);
       else pendingSelected.delete(pidNum);
@@ -765,9 +834,9 @@ window.getCurrentUserId = getCurrentUserId;
       #plan-preview .plan-preview-subtitle{font-size:12px;color:#94a3b8;margin-bottom:8px;}
       #plan-preview .plan-preview-empty{font-size:13px;color:#94a3b8;padding:6px 0;}
       #plan-preview .plan-preview-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;}
-      #plan-preview .plan-preview-item{border:1px solid #f1f5f9;border-radius:8px;padding:6px 8px;background:#f8fafc;}
+      #plan-preview .plan-preview-item{border:1px solid #f1f5f9;border-radius:8px;padding:6px 8px;background:#f8fafc;white-space:pre-wrap;}
       #plan-preview .plan-preview-code{font-weight:600;color:#2563eb;font-size:13px;}
-      #plan-preview .plan-preview-name{color:#334155;font-size:12px;margin-top:2px;word-break:break-word;}
+      #plan-preview .plan-preview-name{color:#000;font-size:12px;margin-top:2px;word-break:break-word;}
       #plan-preview .plan-preview-count-wrap{font-size:12px;color:#64748b;}
       @media (prefers-color-scheme: dark){
         #plan-preview{background:#fff;border-color:#e5e7eb;box-shadow:0 10px 32px rgba(15,23,42,.18);}
@@ -777,7 +846,7 @@ window.getCurrentUserId = getCurrentUserId;
         #plan-preview .plan-preview-empty{color:#94a3b8;}
         #plan-preview .plan-preview-item{background:#f8fafc;border-color:#f1f5f9;}
         #plan-preview .plan-preview-code{color:#2563eb;}
-        #plan-preview .plan-preview-name{color:#334155;}
+        #plan-preview .plan-preview-name{color:#000;}
         #plan-preview .plan-preview-count-wrap{color:#64748b;}
       }
     `);
@@ -893,7 +962,7 @@ window.getCurrentUserId = getCurrentUserId;
         code = sanitizeProblemCode(textWithoutSkipNodes(codeEl), Number(pid));
       }
       const meta = { code, name: name || rawTitle };
-      problemMetaCache.set(pid, meta);
+      upsertProblemMeta(pid, meta);
       return meta;
     } catch {
       return null;
@@ -1011,6 +1080,7 @@ window.getCurrentUserId = getCurrentUserId;
       nameSpan.className = 'plan-preview-name';
       nameSpan.textContent = name;
       li.appendChild(codeSpan);
+      li.appendChild(document.createTextNode('  '));
       li.appendChild(nameSpan);
       listEl.appendChild(li);
     });
