@@ -48,6 +48,7 @@
   };
   const storedSelectedSubmitter = GM_getValue('selectedSubmitter', 'none');
   const enableRankingFilterSetting = GM_getValue('rankingFilter.enabled', false);
+  const enableColumnSwitchSetting = GM_getValue('rankingFilter.columnSwitch.enabled', true) !== false;
   const enableVjLink = GM_getValue('enableVjLink', true);
   const hideDoneSkip = GM_getValue('hideDoneSkip', false);
   let rawQuickSkip;
@@ -804,6 +805,7 @@
   const chkPlan = document.getElementById('bn-enable-plan');
   const chkAutoRenew = document.getElementById('bn-enable-renew');
   const chkRankingFilter = document.getElementById('bn-enable-ranking-filter');
+  const chkColumnSwitch = document.getElementById('bn-enable-column-switch');
   const submitterSelect = document.getElementById('bn-submitter-select');
   const submitterDescription = document.getElementById('bn-submitter-description');
   const planOpts = document.getElementById('bn-plan-options');
@@ -835,6 +837,7 @@
   chkPlan.checked = enablePlanAdder;
   chkAutoRenew.checked = enableAutoRenew;
   chkRankingFilter.checked = enableRankingFilterSetting;
+  if (chkColumnSwitch) chkColumnSwitch.checked = enableColumnSwitchSetting;
   planOpts.style.display = enablePlanAdder ? 'block' : 'none';
 
   chkUseColor.checked = useCustomColors;
@@ -911,6 +914,7 @@
     enablePlanAdder,
     enableAutoRenew,
     enableRankingFilter: enableRankingFilterSetting,
+    columnSwitchEnabled: enableColumnSwitchSetting,
     selectedSubmitter: storedSelectedSubmitter,
     useCustomColors,
     themeColor,
@@ -1397,6 +1401,7 @@
       (document.getElementById('bn-enable-plan').checked !== originalConfig.enablePlanAdder) ||
       (document.getElementById('bn-enable-renew').checked !== originalConfig.enableAutoRenew) ||
       (document.getElementById('bn-enable-ranking-filter').checked !== originalConfig.enableRankingFilter) ||
+      (document.getElementById('bn-enable-column-switch').checked !== originalConfig.columnSwitchEnabled) ||
       (document.getElementById('bn-enable-vj').checked !== originalConfig.enableVjLink) ||
       (document.getElementById('bn-hide-done-skip').checked !== originalConfig.hideDoneSkip) ||
       (document.getElementById('bn-enable-quick-skip').checked !== originalConfig.enableQuickSkip) ||
@@ -1490,6 +1495,7 @@
   chkPlan.onchange = () => { toggleOption(chkPlan, planOpts); checkChanged(); };
   chkAutoRenew.onchange = checkChanged;
   chkRankingFilter.onchange = checkChanged;
+  if (chkColumnSwitch) chkColumnSwitch.onchange = checkChanged;
   if (widthModeSel) widthModeSel.onchange = checkChanged;
 
   document.getElementById('bn-color-reset').onclick = () => {
@@ -1544,6 +1550,7 @@
     GM_setValue('enablePlanAdder', chkPlan.checked);
     GM_setValue('enableAutoRenew', chkAutoRenew.checked);
     GM_setValue('rankingFilter.enabled', chkRankingFilter.checked);
+    if (chkColumnSwitch) GM_setValue('rankingFilter.columnSwitch.enabled', chkColumnSwitch.checked);
 
     const obj = {};
     COLOR_KEYS.forEach(k => { if (colorPickers[k]) obj[k] = colorPickers[k].value; });
@@ -1630,6 +1637,7 @@
     chkPlan.checked = originalConfig.enablePlanAdder;
     chkAutoRenew.checked = originalConfig.enableAutoRenew;
     chkRankingFilter.checked = originalConfig.enableRankingFilter;
+    if (chkColumnSwitch) chkColumnSwitch.checked = originalConfig.columnSwitchEnabled;
     chkUseColor.checked = originalConfig.useCustomColors;
     if (submitterSelect) {
       submitterSelect.value = originalConfig.selectedSubmitter;

@@ -1478,6 +1478,31 @@ window.getCurrentUserId = getCurrentUserId;
     'table.ui.table',
     'table.table'
   ];
+  const COLUMN_DROPDOWN_SELECTORS = [
+    '#table-0 > div > div.ui.left.floated.button.dropdown',
+    '#table-0 .ui.left.floated.button.dropdown',
+    '.progress-table .ui.left.floated.button.dropdown',
+    '.progress-container .ui.left.floated.button.dropdown',
+    '.contest-table .ui.left.floated.button.dropdown'
+  ];
+  const COLUMN_TITLE_SELECTORS = [
+    'h1.page-title',
+    'h2.page-title',
+    '.page-title',
+    '.progress-title',
+    '.contest-title',
+    'h1.ui.header',
+    'h2.ui.header',
+    '#table-0 h1',
+    '#table-0 h2',
+    '#table-0 .ui.header',
+    '.progress-table h1',
+    '.progress-table h2',
+    '.progress-container h1',
+    '.progress-container h2',
+    '.contest-table h1',
+    '.contest-table h2'
+  ];
 
   const collator = (typeof Intl !== 'undefined' && typeof Intl.Collator === 'function')
     ? new Intl.Collator(['zh-Hans-CN', 'zh-CN', 'zh', 'zh-Hans'], { sensitivity: 'base', usage: 'sort' })
@@ -1490,6 +1515,13 @@ window.getCurrentUserId = getCurrentUserId;
   const RANKING_FILTER_ENABLED_KEY = 'rankingFilter.enabled';
   const RANKING_FILTER_SELECTED_KEY = 'rankingFilter.selected';
   const RANKING_FILTER_GRADE_KEY = 'rankingFilter.grade.selected';
+  const COLUMN_SWITCH_PREF_KEY = 'rankingFilter.columnSwitch.enabled';
+  let columnSwitchRequested = true;
+  try {
+    columnSwitchRequested = GM_getValue(COLUMN_SWITCH_PREF_KEY, true) !== false;
+  } catch (err) {
+    columnSwitchRequested = true;
+  }
 
   function injectCSS() {
     if (cssInjected) return;
@@ -1509,6 +1541,13 @@ window.getCurrentUserId = getCurrentUserId;
     .bn-filter-actions { margin-top: .75em; display: flex; gap: .5em; flex-wrap: wrap; }
     .bn-filter-actions .ui.button { flex-shrink: 0; }
     .bn-filter-hide { display: none !important; }
+    .bn-column-switch { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: .35em .6em; margin: .75em 0 1.25em; text-align: left; }
+    .bn-column-switch-label { font-weight: 600; color: rgba(0,0,0,.6); margin-right: .25em; }
+    .bn-column-switch-options { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: .35em .6em; }
+    .bn-column-switch .ui.button { display: inline-flex; align-items: center; gap: .35em; padding: .35em .7em; }
+    .bn-column-switch .ui.button .icon { margin: 0 !important; }
+    .bn-column-switch .ui.button.primary { box-shadow: none; }
+    .bn-original-dropdown-hidden { display: none !important; }
     @media (max-width: 640px) {
       .bn-filter-options { flex-direction: column; align-items: flex-start; }
       .bn-filter-actions { flex-direction: column; align-items: stretch; }
@@ -1555,6 +1594,183 @@ window.getCurrentUserId = getCurrentUserId;
         resolve(findTable());
       }, timeout);
     });
+  }
+
+  function findColumnDropdowns(root = document) {
+    const nodes = [];
+    const seen = new Set();
+    for (const selector of COLUMN_DROPDOWN_SELECTORS) {
+      const list = root.querySelectorAll(selector);
+      list.forEach(node => {
+        if (!node || seen.has(node)) return;
+        seen.add(node);
+        nodes.push(node);
+      });
+    }
+    return nodes;
+  }
+
+  function waitForColumnDropdown(timeout = 12000) {
+    const existing = findColumnDropdowns();
+    if (existing.length) return Promise.resolve(existing[0]);
+    return new Promise(resolve => {
+      const observer = new MutationObserver(() => {
+        const found = findColumnDropdowns();
+        if (found.length) {
+          observer.disconnect();
+          resolve(found[0]);
+        }
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      setTimeout(() => {
+        observer.disconnect();
+        const fallback = findColumnDropdowns();
+        resolve(fallback[0] || null);
+      }, timeout);
+    });
+  }
+
+  function findColumnTitleElement(dropdown) {
+    const containers = [];
+    if (dropdown) {
+      const rootCandidates = [
+        dropdown.closest('#table-0'),
+        dropdown.closest('.progress-table'),
+        dropdown.closest('.progress-container'),
+        dropdown.closest('.contest-table')
+      ].filter(Boolean);
+      containers.push(...rootCandidates);
+    }
+    containers.push(document);
+    for (const container of containers) {
+      for (const selector of COLUMN_TITLE_SELECTORS) {
+        const node = container.querySelector(selector);
+        if (node) return node;
+      }
+    }
+    return null;
+  }
+
+  function extractDropdownOptions(dropdown) {
+    if (!dropdown) return [];
+    const anchors = dropdown.querySelectorAll('a.item[href]');
+    return Array.from(anchors)
+      .map(anchor => {
+        const href = anchor.getAttribute('href') || anchor.href || '';
+        const label = getText(anchor);
+        const icon = anchor.querySelector('i.icon');
+        const active = icon ? icon.classList.contains('check') : anchor.classList.contains('active');
+        return { href, label, active };
+      })
+      .filter(option => option.href && option.label);
+  }
+
+  function enhanceSingleDropdown(dropdown) {
+    if (!dropdown || dropdown.dataset.bnColumnEnhanced === '1' || !columnSwitchRequested) return false;
+    const options = extractDropdownOptions(dropdown);
+    if (!options.length) return false;
+    const wrapper = document.createElement('div');
+    wrapper.className = 'bn-column-switch';
+    const label = document.createElement('div');
+    label.className = 'bn-column-switch-label';
+    label.textContent = '显示列';
+    wrapper.appendChild(label);
+    const optionsWrap = document.createElement('div');
+    optionsWrap.className = 'bn-column-switch-options';
+    wrapper.appendChild(optionsWrap);
+    options.forEach(option => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'ui mini button';
+      button.classList.add(option.active ? 'primary' : 'basic');
+      button.setAttribute('aria-pressed', option.active ? 'true' : 'false');
+      button.dataset.href = option.href;
+      const icon = document.createElement('i');
+      icon.className = `${option.active ? 'check' : 'times'} icon`;
+      icon.setAttribute('aria-hidden', 'true');
+      const text = document.createElement('span');
+      text.textContent = option.label;
+      button.append(icon, text);
+      button.title = option.active ? '当前显示该列，点击以隐藏或切换' : '当前隐藏该列，点击以显示';
+      button.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const targetHref = button.dataset.href;
+        if (targetHref) {
+          try {
+            window.location.assign(targetHref);
+          } catch (_) {
+            window.location.href = targetHref;
+          }
+        }
+      });
+      optionsWrap.appendChild(button);
+    });
+    const heading = findColumnTitleElement(dropdown);
+    if (heading && heading.parentElement) {
+      heading.insertAdjacentElement('afterend', wrapper);
+    } else if (dropdown.parentElement && dropdown.parentElement.insertBefore) {
+      dropdown.parentElement.insertBefore(wrapper, dropdown);
+    } else {
+      dropdown.insertAdjacentElement('beforebegin', wrapper);
+    }
+    dropdown.classList.add('bn-original-dropdown-hidden');
+    dropdown.dataset.bnColumnEnhanced = '1';
+    return true;
+  }
+
+  async function enhanceColumnDropdowns() {
+    const dropdown = await waitForColumnDropdown();
+    if (!dropdown || !columnSwitchRequested) return;
+    injectCSS();
+    const nodes = findColumnDropdowns();
+    nodes.forEach(node => {
+      try {
+        if (!columnSwitchRequested) return;
+        enhanceSingleDropdown(node);
+      } catch (err) {
+        console.warn('[BN] Failed to enhance column selector', err);
+      }
+    });
+  }
+
+  function removeColumnDropdownEnhancement() {
+    const wrappers = document.querySelectorAll('.bn-column-switch');
+    wrappers.forEach(wrapper => {
+      if (wrapper && wrapper.parentElement) {
+        wrapper.parentElement.removeChild(wrapper);
+      }
+    });
+    const dropdowns = document.querySelectorAll('.bn-original-dropdown-hidden');
+    dropdowns.forEach(node => {
+      node.classList.remove('bn-original-dropdown-hidden');
+      if (node.dataset) delete node.dataset.bnColumnEnhanced;
+    });
+  }
+
+  function syncColumnDropdownEnhancement() {
+    if (columnSwitchRequested) {
+      enhanceColumnDropdowns().catch(err => console.warn('[BN] Column dropdown enhancement failed', err));
+    } else {
+      removeColumnDropdownEnhancement();
+    }
+  }
+
+  function setColumnSwitchPreference(enabled) {
+    const next = enabled !== false;
+    if (columnSwitchRequested === next) return;
+    columnSwitchRequested = next;
+    syncColumnDropdownEnhancement();
+  }
+
+  if (typeof GM_addValueChangeListener === 'function') {
+    try {
+      GM_addValueChangeListener(COLUMN_SWITCH_PREF_KEY, (_key, _oldValue, newValue) => {
+        setColumnSwitchPreference(newValue);
+      });
+    } catch (_) {
+      // ignore
+    }
   }
 
   function getCellValue(row, index) {
@@ -2065,6 +2281,7 @@ window.getCurrentUserId = getCurrentUserId;
     reloadRankingFilter();
   });
 
+  syncColumnDropdownEnhancement();
   init().catch(err => console.error('[BN] Ranking enhancement failed', err));
 })();
 

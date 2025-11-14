@@ -240,6 +240,23 @@
 }
 .bn-section:hover { background: rgba(248, 249, 250, 0.04); }
 
+.bn-ranking-options {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--bn-text-sub);
+}
+.bn-ranking-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.bn-ranking-options input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+}
+
 .bn-analysis-grid {
   display: contents;
 }
