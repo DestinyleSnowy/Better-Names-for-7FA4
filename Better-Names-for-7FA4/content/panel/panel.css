@@ -240,6 +240,29 @@
 }
 .bn-section:hover { background: rgba(248, 249, 250, 0.04); }
 
+.bn-section-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--bn-text-sub);
+  margin-top: 4px;
+}
+.bn-section-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.bn-section-plan,
+.bn-section-color-theme {
+  padding-bottom: 8px;
+}
+.bn-section-plan .bn-section-toggle,
+.bn-section-color-theme .bn-section-toggle {
+  margin-top: 0;
+}
+
 .bn-ranking-options {
   margin-top: 8px;
   display: flex;
@@ -547,10 +570,6 @@
   opacity: 1; pointer-events: auto; transform: translateY(0);
 }
 
-#bn-plan-options {
-  margin-left: 24px;
-  display: none;
-}
 .bn-truncate-row {
   display: flex;
   align-items: center;

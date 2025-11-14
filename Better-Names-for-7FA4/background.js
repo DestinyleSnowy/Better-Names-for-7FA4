@@ -22,6 +22,30 @@ const AVATAR_BLOCK_RESOURCE_TYPES = [
   'ping'
 ];
 
+const RANKING_MERGE_STORAGE_KEY = 'rankingMerge.enabled';
+let rankingMergeEnabled = true;
+
+function refreshRankingMergePreference() {
+  try {
+    if (!chrome?.storage?.local) {
+      rankingMergeEnabled = true;
+      return;
+    }
+    chrome.storage.local.get([RANKING_MERGE_STORAGE_KEY], (items) => {
+      try {
+        const hasValue = items && Object.prototype.hasOwnProperty.call(items, RANKING_MERGE_STORAGE_KEY);
+        rankingMergeEnabled = hasValue ? Boolean(items[RANKING_MERGE_STORAGE_KEY]) : true;
+      } catch (error) {
+        console.warn('[BN] Failed to read ranking merge preference', error);
+        rankingMergeEnabled = true;
+      }
+    });
+  } catch (error) {
+    console.warn('[BN] Failed to refresh ranking merge preference', error);
+    rankingMergeEnabled = true;
+  }
+}
+
 async function updateAvatarBlockingRule(enabled) {
   try {
     if (!chrome?.declarativeNetRequest?.updateDynamicRules) return;
@@ -129,17 +153,20 @@ async function ensureSubmitterStateFromStorage() {
 
 ensureSubmitterStateFromStorage();
 syncAvatarBlockingRuleFromStorage();
+refreshRankingMergePreference();
 
 if (chrome && chrome.runtime && chrome.runtime.onStartup) {
   chrome.runtime.onStartup.addListener(() => {
     ensureSubmitterStateFromStorage();
     syncAvatarBlockingRuleFromStorage();
+    refreshRankingMergePreference();
   });
 }
 if (chrome && chrome.runtime && chrome.runtime.onInstalled) {
   chrome.runtime.onInstalled.addListener(() => {
     ensureSubmitterStateFromStorage();
     syncAvatarBlockingRuleFromStorage();
+    refreshRankingMergePreference();
   });
 }
 if (chrome && chrome.storage && chrome.storage.onChanged) {
@@ -161,6 +188,12 @@ if (chrome && chrome.storage && chrome.storage.onChanged) {
         ? change.newValue
         : true;
       void updateAvatarBlockingRule(Boolean(newValue));
+    }
+
+    if (Object.prototype.hasOwnProperty.call(changes, RANKING_MERGE_STORAGE_KEY)) {
+      const change = changes[RANKING_MERGE_STORAGE_KEY];
+      const hasNewValue = change && Object.prototype.hasOwnProperty.call(change, 'newValue');
+      rankingMergeEnabled = hasNewValue ? Boolean(change.newValue) : true;
     }
   });
 }
@@ -246,8 +279,13 @@ function isRankingUrl(url) {
 }
 
 // 注入到页面主世界的函数（会被 chrome.scripting.executeScript 注入）
-function patchJQueryGet() {
+function patchJQueryGet(options) {
   try {
+    const prefEnabled = !options || options.enabled !== false;
+    if (!prefEnabled) {
+      console.log('show-all: merge assistant disabled via settings');
+      return;
+    }
     if (window.__fa4_patch_installed) return;
     window.__fa4_patch_installed = true;
     console.log('show-all: patchJQueryGet running in page context');
@@ -1591,9 +1629,14 @@ function patchJQueryGet() {
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   try {
     if (changeInfo && changeInfo.status === 'complete' && tab && tab.url && isRankingUrl(tab.url)) {
+      if (!rankingMergeEnabled) {
+        console.log('show-all: merge assistant disabled globally; skip injection for', tab.url);
+        return;
+      }
       chrome.scripting.executeScript({
         target: { tabId: tabId },
         func: patchJQueryGet,
+        args: [{ enabled: rankingMergeEnabled }],
         world: 'MAIN'
       }).then(() => {
         console.log('show-all: patchJQueryGet injected to', tab.url);
