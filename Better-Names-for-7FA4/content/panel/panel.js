@@ -14,6 +14,8 @@
   const storedBgImageDataName = GM_getValue('bg_imageDataName', '');
   const storedBgSourceTypeRaw = GM_getValue('bg_imageSourceType', '');
   const storedBgOpacity = GM_getValue('bg_opacity', '0.1');
+  const DEFAULT_THEME_MODE = 'light';
+  const storedThemeModeRaw = GM_getValue('panelThemeMode', DEFAULT_THEME_MODE);
   const DEFAULT_THEME_COLOR = '#007bff';
   const storedThemeColorRaw = GM_getValue('themeColor', DEFAULT_THEME_COLOR);
   const DEFAULT_MAX_UNITS = 10;
@@ -385,6 +387,10 @@
     }
     return normalizedFallback;
   }
+  function normalizeThemeMode(value) {
+    if (typeof value === 'string' && value.toLowerCase() === 'dark') return 'dark';
+    return 'light';
+  }
   function ensureBody(callback) {
     if (document.body) {
       callback();
@@ -605,6 +611,7 @@
     } catch { return fallback; }
   }
   const themeColor = normalizeHexColor(storedThemeColorRaw, DEFAULT_THEME_COLOR);
+  const themeMode = normalizeThemeMode(storedThemeModeRaw);
   const storedPalette = safeGetJSON('userPalette', {});
   const useCustomColors = GM_getValue('useCustomColors', false);
 
@@ -613,6 +620,7 @@
   };
 
   const palette = Object.assign({}, palettes.light, useCustomColors ? storedPalette : {});
+  let currentThemeMode = themeMode;
 
   const runtimeApi = (typeof browser !== 'undefined' && browser.runtime && typeof browser.runtime.getURL === 'function')
     ? browser.runtime
@@ -657,6 +665,7 @@
   container.id = 'bn-container';
   container.innerHTML = panelTemplate;
   container.style.setProperty('--bn-theme-color', themeColor);
+  applyThemeMode(currentThemeMode);
 
   const colorGrid = container.querySelector('#bn-color-grid');
   if (colorGrid) {
@@ -676,6 +685,7 @@
   const trigger = document.getElementById('bn-trigger');
   const themeColorInput = document.getElementById('bn-theme-color');
   const themeColorHexInput = document.getElementById('bn-theme-color-hex');
+  const themeModeRadios = container.querySelectorAll('input[name="bn-theme-mode"]');
   const bgEnabledInput = document.getElementById('bn-bg-enabled');
   const bgUrlInput = document.getElementById('bn-bg-image-url');
   const bgOpacityInput = document.getElementById('bn-bg-opacity');
@@ -707,6 +717,8 @@
   if (updateNoticeEl && manifestVersion) {
     checkForPanelUpdates(updateNoticeEl, updateVersionEl);
   }
+  syncThemeModeUI(currentThemeMode);
+  applyThemeMode(currentThemeMode);
   let pinned = !!GM_getValue('panelPinned', false);
   const CORNER_KEY = 'bn.corner';
   const SNAP_MARGIN = 20;
@@ -725,6 +737,23 @@
   let currentBgImageDataName = normalizedBgFileName;
 
   initSubmittersSelector();
+
+  function applyThemeMode(mode) {
+    const nextMode = (mode === 'dark') ? 'dark' : 'light';
+    currentThemeMode = nextMode;
+    container.classList.toggle('bn-theme-dark', nextMode === 'dark');
+  }
+  function syncThemeModeUI(mode) {
+    if (!themeModeRadios || !themeModeRadios.length) return;
+    themeModeRadios.forEach(radio => {
+      radio.checked = radio.value === mode;
+    });
+  }
+  function getSelectedThemeMode() {
+    if (!themeModeRadios || !themeModeRadios.length) return currentThemeMode;
+    const active = Array.from(themeModeRadios).find(radio => radio.checked);
+    return active && active.value === 'dark' ? 'dark' : 'light';
+  }
 
   function bringContainerToFront() {
     try {
@@ -920,6 +949,7 @@
     selectedSubmitter: storedSelectedSubmitter,
     useCustomColors,
     themeColor,
+    themeMode: currentThemeMode,
     palette: Object.assign({}, palette),
     enableVjLink,
     hideDoneSkip,
@@ -1084,6 +1114,15 @@
       checkChanged();
     });
   }
+  if (themeModeRadios && themeModeRadios.length) {
+    themeModeRadios.forEach(radio => {
+      radio.addEventListener('change', () => {
+        const nextMode = getSelectedThemeMode();
+        applyThemeMode(nextMode);
+        checkChanged();
+      });
+    });
+  }
   if (themeColorHexInput) {
     themeColorHexInput.value = themeColor;
     const syncThemeColorFromHex = (value) => {
@@ -1158,6 +1197,17 @@
 
   attachHoverWake(trigger, WAKE_REASON_TRIGGER);
   attachHoverWake(panel, WAKE_REASON_PANEL);
+  trigger.addEventListener('click', (event) => {
+    if (isDragging || container.classList.contains('bn-dragging')) return;
+    event.preventDefault();
+    if (panel.classList.contains('bn-show')) {
+      releaseWake(WAKE_REASON_TRIGGER);
+      hidePanel();
+    } else {
+      requestWake(WAKE_REASON_TRIGGER);
+      showPanel();
+    }
+  });
   container.addEventListener('focusin', () => {
     if (!panel.classList.contains('bn-show') && !canHonorHoverWake()) return;
     requestWake(WAKE_REASON_FOCUS);
@@ -1415,6 +1465,7 @@
       (document.getElementById('bn-bt-enabled').checked !== originalConfig.btEnabled) ||
       (submitterInitialized && submitterSelect.value !== originalConfig.selectedSubmitter) ||
       (hiToiletIntervalInput && clampHiToiletInterval(hiToiletIntervalInput.value) !== originalConfig.btInterval) ||
+      (getSelectedThemeMode() !== originalConfig.themeMode) ||
       themeColorChanged ||
       paletteChanged;
 
@@ -1557,6 +1608,10 @@
     if (themeColorInput) themeColorInput.value = themeColorValue;
     if (themeColorHexInput) themeColorHexInput.value = themeColorValue;
     originalConfig.themeColor = themeColorValue;
+    const nextThemeMode = getSelectedThemeMode();
+    GM_setValue('panelThemeMode', nextThemeMode);
+    originalConfig.themeMode = nextThemeMode;
+    applyThemeMode(nextThemeMode);
 
     const bgEnabled = bgEnabledInput ? bgEnabledInput.checked : false;
     const rawBgUrl = bgUrlInput ? bgUrlInput.value.trim() : '';
@@ -1659,6 +1714,8 @@
     if (themeColorInput) themeColorInput.value = originalConfig.themeColor;
     if (themeColorHexInput) themeColorHexInput.value = originalConfig.themeColor;
     container.style.setProperty('--bn-theme-color', originalConfig.themeColor);
+    syncThemeModeUI(originalConfig.themeMode);
+    applyThemeMode(originalConfig.themeMode);
     if (bgEnabledInput) bgEnabledInput.checked = originalConfig.bgEnabled;
     if (bgUrlInput) bgUrlInput.value = originalConfig.bgImageUrl;
     currentBgSourceType = originalConfig.bgSourceType;
