@@ -67,6 +67,7 @@
       "resources": [
         "content/jquery.min.js",
         "data/users.json",
+        "data/special_users.json",
         "content/panel/panel.html",
         "submitter/submitters.json"
       ],

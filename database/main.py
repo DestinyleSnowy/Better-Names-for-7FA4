@@ -6,13 +6,14 @@ import os
 import re
 import time
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple
 from bs4 import BeautifulSoup
 
 BASE = "http://jx.7fa4.cn:8888"
 
 UID_START = 1
 DATA_DIR = Path(__file__).resolve().parents[1] / 'Better-Names-for-7FA4' / 'data'
+SPECIAL_RULES_PATH = DATA_DIR / 'special_users.json'
 
 # 并发、超时、重试
 CONCURRENCY = 20
@@ -243,6 +244,91 @@ def apply_special_colorkeys(users: Dict[int, Dict[str, str]]) -> None:
         else:
             users[uid] = dict(override)
 
+def load_special_rules() -> Dict[str, Any]:
+    if not SPECIAL_RULES_PATH.exists():
+        return {"users": {}, "tags": {"definitions": {}, "assignments": {}}}
+    try:
+        with SPECIAL_RULES_PATH.open("r", encoding="utf-8") as f:
+            raw = json.load(f)
+    except Exception:
+        return {"users": {}, "tags": {"definitions": {}, "assignments": {}}}
+    if not isinstance(raw, dict):
+        return {"users": {}, "tags": {"definitions": {}, "assignments": {}}}
+    users = raw.get("users")
+    tags = raw.get("tags", {})
+    definitions = tags.get("definitions") if isinstance(tags, dict) else {}
+    assignments = tags.get("assignments") if isinstance(tags, dict) else {}
+    return {
+        "users": users if isinstance(users, dict) else {},
+        "tags": {
+            "definitions": definitions if isinstance(definitions, dict) else {},
+            "assignments": assignments if isinstance(assignments, dict) else {},
+        },
+    }
+
+def apply_configured_overrides(users: Dict[int, Dict[str, str]], rules: Dict[str, Any]) -> None:
+    overrides = rules.get("users", {})
+    if isinstance(overrides, dict):
+        for key, override in overrides.items():
+            try:
+                uid = int(key)
+            except (TypeError, ValueError):
+                continue
+            if not isinstance(override, dict):
+                continue
+            info = users.setdefault(uid, {"name": "", "colorKey": "uk"})
+            name = override.get("name")
+            if isinstance(name, str) and name.strip():
+                info["name"] = name
+            color = override.get("colorKey")
+            if isinstance(color, str) and color.strip():
+                info["colorKey"] = color.strip()
+
+def build_tag_payloads(definitions: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
+    payloads: Dict[str, Dict[str, str]] = {}
+    if not isinstance(definitions, dict):
+        return payloads
+    for key, data in definitions.items():
+        if not isinstance(data, dict):
+            continue
+        tag_id = str(data.get("id", key))
+        name = str(data.get("name", tag_id)).strip() or tag_id
+        color = str(data.get("color", "")).strip()
+        payload = {"id": tag_id, "name": name, "color": color}
+        payloads[str(key)] = payload
+        payloads[tag_id] = payload
+    return payloads
+
+def apply_user_tags(users: Dict[int, Dict[str, str]], rules: Dict[str, Any]) -> None:
+    tags = rules.get("tags", {})
+    definitions = tags.get("definitions") if isinstance(tags, dict) else {}
+    assignments = tags.get("assignments") if isinstance(tags, dict) else {}
+    payloads = build_tag_payloads(definitions)
+    if not isinstance(assignments, dict) or not payloads:
+        return
+    for key, tag_ids in assignments.items():
+        if not isinstance(tag_ids, list):
+            continue
+        try:
+            uid = int(key)
+        except (TypeError, ValueError):
+            continue
+        resolved: List[Dict[str, str]] = []
+        seen: Set[Tuple[str, str, str]] = set()
+        for tag_id in tag_ids:
+            payload = payloads.get(str(tag_id))
+            if not payload:
+                continue
+            # prevent duplicates if configuration accidentally repeats ids
+            dedup_key = payload["id"], payload["name"], payload["color"]
+            if dedup_key in seen:
+                continue
+            seen.add(dedup_key)
+            resolved.append(dict(payload))
+        if resolved:
+            info = users.setdefault(uid, {"name": "", "colorKey": "uk"})
+            info["tags"] = resolved
+
 def write_outputs(users: Dict[int, Dict[str, str]]) -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     out_path = DATA_DIR / "users.json"
@@ -265,7 +351,10 @@ async def main():
     print(f"姓名抓取完成：{len(names)} 条。")
 
     users = to_users_object(names, colorkeys)
+    special_rules = load_special_rules()
     apply_special_colorkeys(users)
+    apply_configured_overrides(users, special_rules)
+    apply_user_tags(users, special_rules)
     write_outputs(users)
 
 if __name__ == "__main__":

@@ -2080,7 +2080,115 @@
     return {};
   }
 
-  const users = await loadUsersData();
+  function normalizeSpecialRules(raw) {
+    if (!raw || typeof raw !== 'object') {
+      return { users: {}, tags: { definitions: {}, assignments: {} } };
+    }
+    const users = (raw.users && typeof raw.users === 'object' && !Array.isArray(raw.users)) ? raw.users : {};
+    const tags = (raw.tags && typeof raw.tags === 'object') ? raw.tags : {};
+    const definitions = (tags.definitions && typeof tags.definitions === 'object' && !Array.isArray(tags.definitions))
+      ? tags.definitions : {};
+    const assignments = (tags.assignments && typeof tags.assignments === 'object' && !Array.isArray(tags.assignments))
+      ? tags.assignments : {};
+    return { users, tags: { definitions, assignments } };
+  }
+
+  async function loadSpecialRules() {
+    const urls = [];
+    if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function') {
+      try {
+        urls.push(chrome.runtime.getURL('data/special_users.json'));
+      } catch (err) {
+        // ignore
+      }
+    }
+    urls.push('data/special_users.json');
+    for (const url of urls) {
+      try {
+        const resp = await fetch(url, { cache: 'no-store' });
+        if (resp && resp.ok) {
+          const data = await resp.json();
+          return normalizeSpecialRules(data);
+        }
+      } catch (err) {
+        // ignore
+      }
+    }
+    return normalizeSpecialRules(null);
+  }
+
+  function applySpecialRules(users, rules) {
+    if (!users || typeof users !== 'object') return;
+    const normalized = normalizeSpecialRules(rules);
+    const overrides = normalized.users;
+    const tagDefs = normalized.tags.definitions;
+    const tagAssignments = normalized.tags.assignments;
+
+    const ensureUser = (uid) => {
+      const key = String(uid);
+      let info = users[key];
+      if (!info || typeof info !== 'object') {
+        info = { name: '', colorKey: 'uk' };
+        users[key] = info;
+      }
+      if (typeof info.name !== 'string') info.name = String(info.name || '');
+      if (typeof info.colorKey !== 'string' || !info.colorKey) info.colorKey = 'uk';
+      return info;
+    };
+
+    if (overrides && typeof overrides === 'object') {
+      for (const [uid, override] of Object.entries(overrides)) {
+        if (!override || typeof override !== 'object') continue;
+        const info = ensureUser(uid);
+        if (typeof override.name === 'string' && override.name.trim()) {
+          info.name = override.name;
+        }
+        if (typeof override.colorKey === 'string' && override.colorKey.trim()) {
+          info.colorKey = override.colorKey.trim();
+        }
+      }
+    }
+
+    Object.values(users).forEach(info => {
+      if (info && typeof info === 'object' && 'tags' in info) delete info.tags;
+    });
+
+    if (!tagDefs || !tagAssignments) return;
+    const tagPayloads = {};
+    for (const [key, data] of Object.entries(tagDefs)) {
+      if (!data || typeof data !== 'object') continue;
+      const tagId = String(data.id || key);
+      const name = String(data.name || tagId).trim() || tagId;
+      const color = typeof data.color === 'string' ? data.color.trim() : '';
+      const payload = { id: tagId, name, color };
+      tagPayloads[String(key)] = payload;
+      tagPayloads[tagId] = payload;
+    }
+
+    for (const [uid, tagIds] of Object.entries(tagAssignments || {})) {
+      if (!Array.isArray(tagIds) || !tagIds.length) continue;
+      const resolved = [];
+      const seen = new Set();
+      for (const tid of tagIds) {
+        const payload = tagPayloads[String(tid)];
+        if (!payload) continue;
+        const key = `${payload.id}|${payload.name}|${payload.color}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        resolved.push({ id: payload.id, name: payload.name, color: payload.color });
+      }
+      if (resolved.length) {
+        const info = ensureUser(uid);
+        info.tags = resolved;
+      }
+    }
+  }
+
+  const [users, specialRules] = await Promise.all([
+    loadUsersData(),
+    loadSpecialRules(),
+  ]);
+  applySpecialRules(users, specialRules);
 
   function firstVisibleCharOfTitle() {
     const h1 = document.querySelector('body > div:nth-child(2) > div > div.ui.center.aligned.grid > div > h1');
@@ -2422,6 +2530,69 @@
     return '';
   }
 
+  function parseColorToRgb(color) {
+    if (typeof color !== 'string') return null;
+    const value = color.trim();
+    if (!value) return null;
+    const hex = value.replace(/^#/, '');
+    if (/^[0-9a-f]{3}$/i.test(hex)) {
+      const r = parseInt(hex[0] + hex[0], 16);
+      const g = parseInt(hex[1] + hex[1], 16);
+      const b = parseInt(hex[2] + hex[2], 16);
+      return { r, g, b };
+    }
+    if (/^[0-9a-f]{6}$/i.test(hex)) {
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return { r, g, b };
+    }
+    const rgbMatch = value.match(/^rgb\s*\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/i);
+    if (rgbMatch) {
+      const r = Math.max(0, Math.min(255, parseInt(rgbMatch[1], 10)));
+      const g = Math.max(0, Math.min(255, parseInt(rgbMatch[2], 10)));
+      const b = Math.max(0, Math.min(255, parseInt(rgbMatch[3], 10)));
+      return { r, g, b };
+    }
+    return null;
+  }
+
+  function pickTagTextColor(color) {
+    const rgb = parseColorToRgb(color);
+    if (!rgb) return '#fff';
+    const luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+    return luminance > 0.6 ? '#222' : '#fff';
+  }
+
+  function renderUserTags(anchor, tags) {
+    if (!anchor) return;
+    anchor.querySelectorAll('.bn-user-tags').forEach(el => el.remove());
+    if (!Array.isArray(tags) || !tags.length) return;
+    const container = document.createElement('span');
+    container.className = 'bn-user-tags';
+    tags.forEach(tag => {
+      if (!tag || typeof tag !== 'object') return;
+      const label = typeof tag.name === 'string' ? tag.name.trim() : '';
+      if (!label) return;
+      const el = document.createElement('span');
+      el.className = 'bn-user-tag';
+      el.textContent = label;
+      if (tag.id) {
+        el.dataset.tagId = String(tag.id);
+      }
+      const color = typeof tag.color === 'string' ? tag.color.trim() : '';
+      if (color) {
+        el.style.backgroundColor = color;
+        el.style.borderColor = color;
+        el.style.color = pickTagTextColor(color);
+      }
+      container.appendChild(el);
+    });
+    if (container.childNodes.length) {
+      anchor.appendChild(container);
+    }
+  }
+
   function processUserLink(a) {
     if (!a || !a.matches('a[href^="/user/"]')) return;
     if (!markOnce(a, 'UserDone')) return;
@@ -2444,6 +2615,7 @@
     if (img && hideAvatar) img.remove();
 
     a.querySelectorAll('.bn-icon').forEach(el => el.remove());
+    a.querySelectorAll('.bn-user-tags').forEach(el => el.remove());
 
     let baseText = '';
     a.childNodes.forEach(n => { if (n.nodeType === Node.TEXT_NODE) baseText += n.textContent; });
@@ -2466,6 +2638,7 @@
 
     Array.from(a.childNodes).forEach(n => { if (n.nodeType === Node.TEXT_NODE) n.remove(); });
     a.insertAdjacentHTML('beforeend', finalText);
+    renderUserTags(a, info?.tags);
   }
 
   function processProblemTitle(span) {
