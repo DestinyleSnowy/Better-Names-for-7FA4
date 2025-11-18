@@ -2,13 +2,21 @@
 (async function () {
   'use strict';
   if (typeof window.__GM_ready === 'function') await window.__GM_ready();
-
+  const backgroundStyles = [
+    "center/cover no-repeat",
+    "center/contain no-repeat",
+    "center/100% 100% no-repeat",
+    "repeat",
+    "center no-repeat",
+  ];
   const btEnabled = GM_getValue('bt_enabled', false);
   const DEFAULT_BT_INTERVAL = 2000;
   const HI_TOILET_INTERVAL_MIN = 10;
   const HI_TOILET_INTERVAL_MAX = 2000;
   const storedBtInterval = clampHiToiletInterval(GM_getValue('bt_interval', DEFAULT_BT_INTERVAL));
   const storedBgEnabled = GM_getValue('bg_enabled', false);
+  const storedBgfillway = GM_getValue('bg_fillway', 2);
+  console.log(storedBgfillway);
   const storedBgImageUrl = GM_getValue('bg_imageUrl', '');
   const storedBgImageData = GM_getValue('bg_imageData', '');
   const storedBgImageDataName = GM_getValue('bg_imageDataName', '');
@@ -403,7 +411,7 @@
     requestAnimationFrame(callback);
   }
 
-  function applyBackgroundOverlay(enabled, url, opacity) {
+  function applyBackgroundOverlay(enabled,fillway,url, opacity) {
     ensureBody(() => {
       let layer = document.getElementById('bn-background-image');
       const trimmedUrl = typeof url === 'string' ? url.trim() : '';
@@ -422,18 +430,18 @@
           height: '100%',
           zIndex: '9999',
           pointerEvents: 'none',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          backgroundSize: 'cover'
         });
         document.body.insertAdjacentElement('afterbegin', layer);
       }
       layer.style.opacity = String(clampOpacity(opacity));
-      layer.style.backgroundImage = `url("${trimmedUrl}")`;
+      layer.style.background = `url("${trimmedUrl}") ${backgroundStyles[fillway]}`;
     });
   }
   const normalizedBgData = typeof storedBgImageData === 'string' ? storedBgImageData.trim() : '';
+  const normalizedBgfillway = storedBgfillway;
   const normalizedBgUrl = typeof storedBgImageUrl === 'string' ? storedBgImageUrl.trim() : '';
+  console.log(normalizedBgUrl);
+  console.log(normalizedBgfillway);
   const normalizedBgSourceType = (() => {
     if (storedBgSourceTypeRaw === 'local' && normalizedBgData) return 'local';
     if (storedBgSourceTypeRaw === 'remote') return 'remote';
@@ -444,7 +452,7 @@
   const initialBackgroundSource = (normalizedBgSourceType === 'local' && normalizedBgData)
     ? normalizedBgData
     : normalizedBgUrl;
-  applyBackgroundOverlay(storedBgEnabled, initialBackgroundSource, normalizedBgOpacity);
+  applyBackgroundOverlay(storedBgEnabled,storedBgfillway, initialBackgroundSource, normalizedBgOpacity);
 
   function readAutoRenewMemory() {
     try {
@@ -687,6 +695,7 @@
   const themeColorHexInput = document.getElementById('bn-theme-color-hex');
   const themeModeRadios = container.querySelectorAll('input[name="bn-theme-mode"]');
   const bgEnabledInput = document.getElementById('bn-bg-enabled');
+  const bgfillwayInput = document.getElementById('bn-bg-fillway');
   const bgUrlInput = document.getElementById('bn-bg-image-url');
   const bgOpacityInput = document.getElementById('bn-bg-opacity');
   const bgOpacityValueSpan = document.getElementById('bn-bg-opacity-value');
@@ -929,7 +938,6 @@
 
   const colorPickers = {};
   const hexInputs = {};
-
   const originalConfig = {
     titleTruncate: isFinite(maxTitleUnits),
     userTruncate: isFinite(maxUserUnits),
@@ -957,6 +965,7 @@
     enableTitleOptimization,
     widthMode,
     bgEnabled: storedBgEnabled,
+    bgfillway:normalizedBgfillway,
     bgImageUrl: normalizedBgUrl,
     bgImageData: normalizedBgData,
     bgImageDataName: normalizedBgFileName,
@@ -1422,6 +1431,7 @@
       ? currentThemeColor.toLowerCase() !== (originalConfig.themeColor || '').toLowerCase()
       : false;
     const currentBgEnabled = bgEnabledInput ? bgEnabledInput.checked : originalConfig.bgEnabled;
+    const currentBgfillway = bgfillwayInput ? bgfillwayInput.value : originalConfig.bgfillway;
     const currentBgOpacity = bgOpacityInput ? bgOpacityInput.value : originalConfig.bgOpacity;
     const currentBgUrl = bgUrlInput ? bgUrlInput.value.trim() : '';
     let bgSourceChanged = false;
@@ -1460,7 +1470,7 @@
       (document.getElementById('bn-use-custom-color').checked !== originalConfig.useCustomColors) ||
       ((document.getElementById('bn-width-mode')?.value ?? originalConfig.widthMode) !== originalConfig.widthMode) ||
       (currentBgEnabled !== originalConfig.bgEnabled) ||
-      bgSourceChanged ||
+      bgSourceChanged ||(currentBgfillway != originalConfig.bgfillway)||
       (currentBgOpacity !== originalConfig.bgOpacity) ||
       (document.getElementById('bn-bt-enabled').checked !== originalConfig.btEnabled) ||
       (submitterInitialized && submitterSelect.value !== originalConfig.selectedSubmitter) ||
@@ -1612,8 +1622,8 @@
     GM_setValue('panelThemeMode', nextThemeMode);
     originalConfig.themeMode = nextThemeMode;
     applyThemeMode(nextThemeMode);
-
     const bgEnabled = bgEnabledInput ? bgEnabledInput.checked : false;
+    const bgfillway = bgfillwayInput.value ;
     const rawBgUrl = bgUrlInput ? bgUrlInput.value.trim() : '';
     const bgOpacityRaw = bgOpacityInput ? bgOpacityInput.value : normalizedBgOpacity;
     const bgOpacity = String(clampOpacity(bgOpacityRaw));
@@ -1633,6 +1643,8 @@
       : bgImageUrlToSave;
     
     GM_setValue('bg_enabled', bgEnabled);
+    GM_setValue('bg_fillway', bgfillway);
+    console.log(bgfillway);
     GM_setValue('bg_imageSourceType', bgImageSourceType);
     GM_setValue('bg_imageUrl', bgImageUrlToSave);
     GM_setValue('bg_imageData', bgImageDataToSave);
@@ -1653,7 +1665,7 @@
     currentBgImageDataName = bgImageDataNameToSave;
 
     updateBgSourceUI();
-    applyBackgroundOverlay(bgEnabled, overlaySource, bgOpacity);
+    applyBackgroundOverlay(bgEnabled,bgfillway, overlaySource, bgOpacity);
     if (bgOpacityInput) bgOpacityInput.value = bgOpacity;
     if (bgOpacityValueSpan) bgOpacityValueSpan.textContent = formatOpacityText(bgOpacity);
 
@@ -1717,6 +1729,7 @@
     syncThemeModeUI(originalConfig.themeMode);
     applyThemeMode(originalConfig.themeMode);
     if (bgEnabledInput) bgEnabledInput.checked = originalConfig.bgEnabled;
+    if (bgfillwayInput) bgfillwayInput.value = originalConfig.bgfillway;
     if (bgUrlInput) bgUrlInput.value = originalConfig.bgImageUrl;
     currentBgSourceType = originalConfig.bgSourceType;
     currentBgImageData = originalConfig.bgImageData;
@@ -1728,7 +1741,7 @@
     const restoreSource = (originalConfig.bgSourceType === 'local' && originalConfig.bgImageData)
       ? originalConfig.bgImageData
       : originalConfig.bgImageUrl;
-    applyBackgroundOverlay(originalConfig.bgEnabled, restoreSource, originalConfig.bgOpacity);
+    applyBackgroundOverlay(originalConfig.bgEnabled,originalConfig.bgfillway, restoreSource, originalConfig.bgOpacity);
     checkChanged();
   }
   restoreOriginalConfig();
@@ -1739,7 +1752,8 @@
   if (bgEnabledInput && bgOpacityInput && bgOpacityValueSpan) {
     const updateBackgroundPreview = () => {
       bgOpacityValueSpan.textContent = formatOpacityText(bgOpacityInput.value);
-      applyBackgroundOverlay(bgEnabledInput.checked, getEffectiveBackgroundUrl(), bgOpacityInput.value);
+      applyBackgroundOverlay(bgEnabledInput.checked, bgfillwayInput.value,getEffectiveBackgroundUrl(), bgOpacityInput.value);
+      console.log(bgfillwayInput.value);
       checkChanged();
     };
     const handleBgUrlInput = () => {
@@ -1753,6 +1767,7 @@
       updateBackgroundPreview();
     };
     bgEnabledInput.addEventListener('change', updateBackgroundPreview);
+    bgfillwayInput.addEventListener('change', updateBackgroundPreview);
     if (bgUrlInput) bgUrlInput.addEventListener('input', handleBgUrlInput);
     bgOpacityInput.addEventListener('input', updateBackgroundPreview);
     if (bgFilePickBtn && bgFileInput) {
