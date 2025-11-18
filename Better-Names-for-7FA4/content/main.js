@@ -2784,6 +2784,118 @@ td.bn-plan-quick-skip-target .bn-plan-quick-skip-wrap {
   }
 })();
 
+/* === BN PATCH: contest page download buttons === */
+(function () {
+  const enabled = GM_getValue('enableContestDownloadButtons', false);
+  const pathMatch = location.pathname.match(/^\/contest\/(\d+)(?:\/?(?:[?#].*)?)?$/);
+  if (!enabled || !pathMatch) return;
+
+  const contestId = pathMatch[1];
+  const STATUS_SELECTOR = 'body > div:nth-child(2) > div > div.padding > div:nth-child(5)';
+  const TABLE_CONTAINER_SELECTOR = 'body > div:nth-child(2) > div > div.padding > div.ui.grid > div:nth-child(2)';
+  const ENDED_TEXT = '已经结束';
+
+  const isContestEnded = () => {
+    const statusEl = document.querySelector(STATUS_SELECTOR);
+    const statusText = statusEl ? (statusEl.textContent || '').replace(/\s+/g, '') : '';
+    if (statusText.includes(ENDED_TEXT)) return true;
+    // Fallback: scan lightweight nodes for the phrase in case structure differs
+    return Array.from(document.querySelectorAll('div, span, p'))
+      .some(el => (el.textContent || '').includes(ENDED_TEXT));
+  };
+
+  const tryInject = () => {
+    if (!isContestEnded()) return false;
+    const container = document.querySelector(TABLE_CONTAINER_SELECTOR);
+    if (!container) return;
+    const table = container.querySelector('table');
+    if (!table || table.dataset.bnContestDownloadInjected === '1') return false;
+    table.dataset.bnContestDownloadInjected = '1';
+    const tbody = table.tBodies && table.tBodies[0];
+    if (!tbody) return false;
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    if (!rows.length) return false;
+
+    const downloadUrls = [];
+
+    rows.forEach(row => {
+      const link = row.querySelector('a[href*="/problem/"]');
+      const href = link && link.getAttribute ? link.getAttribute('href') : '';
+      const match = href ? href.match(/\/contest\/(\d+)\/problem\/(\d+)/) : null;
+      const pid = match ? match[2] : null;
+      const cidForRow = match && match[1] ? match[1] : contestId;
+      const downloadUrl = pid ? `/contest/${cidForRow}/${pid}/download/additional_file` : '';
+
+      const cell = document.createElement('td');
+      cell.className = 'right aligned';
+      cell.style.textAlign = 'right';
+      cell.style.whiteSpace = 'nowrap';
+      cell.style.width = '1%';
+      if (downloadUrl) {
+        downloadUrls.push(downloadUrl);
+        const btn = document.createElement('a');
+        btn.className = 'ui primary mini button';
+        btn.href = downloadUrl;
+        btn.target = '_blank';
+        btn.textContent = '下载文件';
+        cell.appendChild(btn);
+      }
+      row.appendChild(cell);
+    });
+
+    const headRow = table.tHead && table.tHead.rows && table.tHead.rows[0];
+      if (headRow) {
+      const th = document.createElement('th');
+      th.className = 'right aligned';
+      th.style.textAlign = 'right';
+      th.style.width = '1%';
+      if (downloadUrls.length) {
+        const btnAll = document.createElement('button');
+        btnAll.type = 'button';
+        btnAll.className = 'ui mini button';
+        btnAll.textContent = '下载全部';
+        btnAll.addEventListener('click', () => {
+          downloadUrls.forEach((url, index) => {
+            setTimeout(() => {
+              const anchor = document.createElement('a');
+              anchor.href = url;
+              anchor.target = '_blank';
+              anchor.rel = 'noreferrer noopener';
+              anchor.style.display = 'none';
+              document.body.appendChild(anchor);
+              anchor.click();
+              requestAnimationFrame(() => anchor.remove());
+            }, index * 120);
+          });
+        });
+        th.appendChild(btnAll);
+      }
+      headRow.appendChild(th);
+    }
+    return true;
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      const injected = tryInject();
+      if (injected) return;
+      const observer = new MutationObserver(() => {
+        if (tryInject()) observer.disconnect();
+      });
+      observer.observe(document.documentElement || document.body, { childList: true, subtree: true });
+      setTimeout(() => observer.disconnect(), 10000);
+    }, { once: true });
+  } else {
+    const injected = tryInject();
+    if (injected) return;
+    const observer = new MutationObserver(() => {
+      if (tryInject()) observer.disconnect();
+    });
+    observer.observe(document.documentElement || document.body, { childList: true, subtree: true });
+    setTimeout(() => observer.disconnect(), 10000);
+  }
+})();
+
 /* === BN PATCH 2: user menu pure fade-in (no size change) + shadow fade === */
 (function () {
   const css = `
@@ -2822,4 +2934,3 @@ td.bn-plan-quick-skip-target .bn-plan-quick-skip-wrap {
   if (typeof GM_addStyle === 'function') GM_addStyle(css);
   else { const s = document.createElement('style'); s.textContent = css; document.head.appendChild(s); }
 })();
-

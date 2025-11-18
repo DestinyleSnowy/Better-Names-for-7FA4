@@ -895,9 +895,9 @@
   gap: 8px;
   padding: 6px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 193, 7, 0.5);
-  background: rgba(255, 213, 79, 0.25);
-  color: #8a6d3b;
+  border: 1px solid rgba(255, 77, 79, 0.6);
+  background: rgba(255, 77, 79, 0.2);
+  color: #a8071a;
   font-size: 12px;
   line-height: 1.4;
 }
@@ -910,8 +910,8 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #f39c12;
-  box-shadow: 0 0 6px rgba(243, 156, 18, 0.8);
+  background: #ff4d4f;
+  box-shadow: 0 0 6px rgba(255, 77, 79, 0.8);
 }
 
 .bn-update-copy {

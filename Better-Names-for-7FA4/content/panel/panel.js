@@ -37,6 +37,7 @@
   const enableCopy = GM_getValue('enableCopy', true);
   const enableDescCopy = GM_getValue('enableDescCopy', false);
   const hideOrig = GM_getValue('hideOrig', true);
+  const enableContestDownloadButtons = GM_getValue('enableContestDownloadButtons', false);
   const showUserNickname = GM_getValue('showUserNickname', false);
   const enableMenu = GM_getValue('enableUserMenu', true);
   const enablePlanAdder = GM_getValue('enablePlanAdder', true);
@@ -50,6 +51,7 @@
   const REMOTE_VERSION_URLS = [REMOTE_VERSION_URL, REMOTE_VERSION_FALLBACK_URL];
   const REMOTE_VERSION_PATTERN = /^\d+\.\d+\.\d+(?:\.\d+)?$/;
   const UPDATE_PAGE_URL = 'http://jx.7fa4.cn:9080/yx/better-names-for-7fa4';
+  const UPDATE_MANUAL_SYNC_MESSAGE = '登录 Gitlab 同步最新版本';
   const manifestVersion = normalizeVersionString(readManifestVersion());
   const isSupportedHostname = (host) => {
     if (typeof host !== 'string' || !host) return false;
@@ -838,6 +840,7 @@
   const chkCp = document.getElementById('bn-enable-copy');
   const chkDescCp = document.getElementById('bn-enable-desc-copy');
   const chkHo = document.getElementById('bn-hide-orig');
+  const chkContestDownload = document.getElementById('bn-enable-contest-download');
   const chkShowNickname = document.getElementById('bn-show-user-nickname');
 
   const chkMenu = document.getElementById('bn-enable-user-menu');
@@ -871,6 +874,7 @@
   chkCp.checked = enableCopy;
   chkDescCp.checked = enableDescCopy;
   chkHo.checked = hideOrig;
+  chkContestDownload.checked = enableContestDownloadButtons;
   chkShowNickname.checked = showUserNickname;
   chkMenu.checked = enableMenu;
   chkPlan.checked = enablePlanAdder;
@@ -947,6 +951,7 @@
     enableCopy,
     enableDescCopy,
     hideOrig,
+    enableContestDownloadButtons,
     showUserNickname,
     enableMenu,
     enablePlanAdder,
@@ -1456,6 +1461,7 @@
       (document.getElementById('bn-enable-copy').checked !== originalConfig.enableCopy) ||
       (document.getElementById('bn-enable-desc-copy').checked !== originalConfig.enableDescCopy) ||
       (document.getElementById('bn-hide-orig').checked !== originalConfig.hideOrig) ||
+      (document.getElementById('bn-enable-contest-download').checked !== originalConfig.enableContestDownloadButtons) ||
       (document.getElementById('bn-show-user-nickname').checked !== originalConfig.showUserNickname) ||
       (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) ||
       (document.getElementById('bn-enable-plan').checked !== originalConfig.enablePlanAdder) ||
@@ -1538,6 +1544,7 @@
   chkCp.onchange = () => { checkChanged(); };
   chkDescCp.onchange = checkChanged;
   chkHo.onchange = checkChanged;
+  chkContestDownload.onchange = checkChanged;
   chkShowNickname.onchange = checkChanged;
   chkMenu.onchange = checkChanged;
   chkVj.onchange = checkChanged;
@@ -1594,6 +1601,7 @@
     GM_setValue('enableCopy', chkCp.checked);
     GM_setValue('enableDescCopy', chkDescCp.checked);
     GM_setValue('hideOrig', chkHo.checked);
+    GM_setValue('enableContestDownloadButtons', chkContestDownload.checked);
     GM_setValue('showUserNickname', chkShowNickname.checked);
     GM_setValue('hideDoneSkip', chkHideDoneSkip.checked);
     GM_setValue('enableQuickSkip', chkQuickSkip.checked);
@@ -1686,6 +1694,7 @@
     chkCp.checked = originalConfig.enableCopy;
     chkDescCp.checked = originalConfig.enableDescCopy;
     chkHo.checked = originalConfig.hideOrig;
+    chkContestDownload.checked = originalConfig.enableContestDownloadButtons;
     chkShowNickname.checked = originalConfig.showUserNickname;
     chkMenu.checked = originalConfig.enableMenu;
     chkVj.checked = originalConfig.enableVjLink;
@@ -3113,18 +3122,29 @@
       }
     } catch (e) { }
   }
-  async function checkForPanelUpdates(noticeEl, remoteVersionEl) {
+    async function checkForPanelUpdates(noticeEl, remoteVersionEl) {
+    const showManualSyncNotice = () => {
+      if (!noticeEl) return;
+      const copyEl = noticeEl.querySelector('.bn-update-copy');
+      if (copyEl) copyEl.textContent = UPDATE_MANUAL_SYNC_MESSAGE;
+      noticeEl.classList.add('bn-visible');
+      noticeEl.removeAttribute('hidden');
+    };
     try {
       const remoteVersion = await fetchRemotePanelVersion();
-      if (!remoteVersion || remoteVersion === manifestVersion) return;
+      if (!remoteVersion) {
+        showManualSyncNotice();
+        return;
+      }
+      if (remoteVersion === manifestVersion) return;
       if (remoteVersionEl) remoteVersionEl.textContent = remoteVersion;
       noticeEl.classList.add('bn-visible');
       noticeEl.removeAttribute('hidden');
     } catch (error) {
-      console.warn('[BN] 检测更新失败', error);
+      console.warn('[BN] Failed to check panel updates', error);
+      showManualSyncNotice();
     }
-  }
-  async function fetchRemotePanelVersion() {
+  }async function fetchRemotePanelVersion() {
     let lastError = null;
     for (const baseUrl of REMOTE_VERSION_URLS) {
       if (!baseUrl) continue;
