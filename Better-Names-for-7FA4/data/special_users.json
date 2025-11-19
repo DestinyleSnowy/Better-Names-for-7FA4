@@ -1,25 +1,7 @@
 {
   "users": {},
   "tags": {
-    "definitions": {
-      "1": {
-        "id": "1",
-        "name": "波形",
-        "color": "gold"
-      },
-      "616": {
-        "id": "616",
-        "name": "雨小鱼",
-        "color": "blue"
-      }
-    },
-    "assignments": {
-      "994": [
-        "1"
-      ],
-      "811": [
-        "616"
-      ]
-    }
+    "definitions": {},
+    "assignments": {}
   }
 }
