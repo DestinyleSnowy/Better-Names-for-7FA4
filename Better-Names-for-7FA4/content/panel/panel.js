@@ -38,6 +38,7 @@
   const enableDescCopy = GM_getValue('enableDescCopy', false);
   const hideOrig = GM_getValue('hideOrig', true);
   const enableContestDownloadButtons = GM_getValue('enableContestDownloadButtons', false);
+  const enableContestReviewButtons = GM_getValue('enableContestReviewButtons', false);
   const showUserNickname = GM_getValue('showUserNickname', false);
   const enableMenu = GM_getValue('enableUserMenu', true);
   const enablePlanAdder = GM_getValue('enablePlanAdder', true);
@@ -841,6 +842,7 @@
   const chkDescCp = document.getElementById('bn-enable-desc-copy');
   const chkHo = document.getElementById('bn-hide-orig');
   const chkContestDownload = document.getElementById('bn-enable-contest-download');
+  const chkContestReview = document.getElementById('bn-enable-contest-review');
   const chkShowNickname = document.getElementById('bn-show-user-nickname');
 
   const chkMenu = document.getElementById('bn-enable-user-menu');
@@ -875,6 +877,7 @@
   chkDescCp.checked = enableDescCopy;
   chkHo.checked = hideOrig;
   chkContestDownload.checked = enableContestDownloadButtons;
+  chkContestReview.checked = enableContestReviewButtons;
   chkShowNickname.checked = showUserNickname;
   chkMenu.checked = enableMenu;
   chkPlan.checked = enablePlanAdder;
@@ -952,6 +955,7 @@
     enableDescCopy,
     hideOrig,
     enableContestDownloadButtons,
+    enableContestReviewButtons,
     showUserNickname,
     enableMenu,
     enablePlanAdder,
@@ -1462,6 +1466,7 @@
       (document.getElementById('bn-enable-desc-copy').checked !== originalConfig.enableDescCopy) ||
       (document.getElementById('bn-hide-orig').checked !== originalConfig.hideOrig) ||
       (document.getElementById('bn-enable-contest-download').checked !== originalConfig.enableContestDownloadButtons) ||
+      (document.getElementById('bn-enable-contest-review').checked !== originalConfig.enableContestReviewButtons) ||
       (document.getElementById('bn-show-user-nickname').checked !== originalConfig.showUserNickname) ||
       (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) ||
       (document.getElementById('bn-enable-plan').checked !== originalConfig.enablePlanAdder) ||
@@ -1545,6 +1550,7 @@
   chkDescCp.onchange = checkChanged;
   chkHo.onchange = checkChanged;
   chkContestDownload.onchange = checkChanged;
+  chkContestReview.onchange = checkChanged;
   chkShowNickname.onchange = checkChanged;
   chkMenu.onchange = checkChanged;
   chkVj.onchange = checkChanged;
@@ -1602,6 +1608,7 @@
     GM_setValue('enableDescCopy', chkDescCp.checked);
     GM_setValue('hideOrig', chkHo.checked);
     GM_setValue('enableContestDownloadButtons', chkContestDownload.checked);
+    GM_setValue('enableContestReviewButtons', chkContestReview.checked);
     GM_setValue('showUserNickname', chkShowNickname.checked);
     GM_setValue('hideDoneSkip', chkHideDoneSkip.checked);
     GM_setValue('enableQuickSkip', chkQuickSkip.checked);
@@ -1695,6 +1702,7 @@
     chkDescCp.checked = originalConfig.enableDescCopy;
     chkHo.checked = originalConfig.hideOrig;
     chkContestDownload.checked = originalConfig.enableContestDownloadButtons;
+    chkContestReview.checked = originalConfig.enableContestReviewButtons;
     chkShowNickname.checked = originalConfig.showUserNickname;
     chkMenu.checked = originalConfig.enableMenu;
     chkVj.checked = originalConfig.enableVjLink;

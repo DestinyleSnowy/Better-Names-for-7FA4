@@ -2784,33 +2784,35 @@ td.bn-plan-quick-skip-target .bn-plan-quick-skip-wrap {
   }
 })();
 
-/* === BN PATCH: contest page download buttons === */
+/* === BN PATCH: contest page download & review buttons === */
 (function () {
-  const enabled = GM_getValue('enableContestDownloadButtons', false);
+  const downloadEnabled = GM_getValue('enableContestDownloadButtons', false);
+  const reviewEnabled = GM_getValue('enableContestReviewButtons', false);
   const pathMatch = location.pathname.match(/^\/contest\/(\d+)(?:\/?(?:[?#].*)?)?$/);
-  if (!enabled || !pathMatch) return;
+  if ((!downloadEnabled && !reviewEnabled) || !pathMatch) return;
 
   const contestId = pathMatch[1];
   const STATUS_SELECTOR = 'body > div:nth-child(2) > div > div.padding > div:nth-child(5)';
   const TABLE_CONTAINER_SELECTOR = 'body > div:nth-child(2) > div > div.padding > div.ui.grid > div:nth-child(2)';
+  const BUTTON_COLUMN_SELECTOR = 'body > div:nth-child(2) > div > div.padding > div.ui.grid > div:nth-child(1)';
+  const TAG_LINK_SELECTOR = `${BUTTON_COLUMN_SELECTOR} > div > div:nth-child(1) > a.ui.small.red.button`;
   const ENDED_TEXT = '已经结束';
 
   const isContestEnded = () => {
     const statusEl = document.querySelector(STATUS_SELECTOR);
     const statusText = statusEl ? (statusEl.textContent || '').replace(/\s+/g, '') : '';
     if (statusText.includes(ENDED_TEXT)) return true;
-    // Fallback: scan lightweight nodes for the phrase in case structure differs
     return Array.from(document.querySelectorAll('div, span, p'))
       .some(el => (el.textContent || '').includes(ENDED_TEXT));
   };
 
-  const tryInject = () => {
-    if (!isContestEnded()) return false;
+  const ensureDownloadButtons = () => {
     const container = document.querySelector(TABLE_CONTAINER_SELECTOR);
-    if (!container) return;
+    if (!container) return false;
     const table = container.querySelector('table');
-    if (!table || table.dataset.bnContestDownloadInjected === '1') return false;
-    table.dataset.bnContestDownloadInjected = '1';
+    if (!table) return false;
+    if (table.dataset.bnContestDownloadInjected === '1') return true;
+
     const tbody = table.tBodies && table.tBodies[0];
     if (!tbody) return false;
     const rows = Array.from(tbody.querySelectorAll('tr'));
@@ -2844,7 +2846,7 @@ td.bn-plan-quick-skip-target .bn-plan-quick-skip-wrap {
     });
 
     const headRow = table.tHead && table.tHead.rows && table.tHead.rows[0];
-      if (headRow) {
+    if (headRow) {
       const th = document.createElement('th');
       th.className = 'right aligned';
       th.style.textAlign = 'right';
@@ -2872,27 +2874,89 @@ td.bn-plan-quick-skip-target .bn-plan-quick-skip-wrap {
       }
       headRow.appendChild(th);
     }
+
+    table.dataset.bnContestDownloadInjected = '1';
     return true;
   };
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      const injected = tryInject();
-      if (injected) return;
-      const observer = new MutationObserver(() => {
-        if (tryInject()) observer.disconnect();
-      });
-      observer.observe(document.documentElement || document.body, { childList: true, subtree: true });
-      setTimeout(() => observer.disconnect(), 10000);
-    }, { once: true });
-  } else {
-    const injected = tryInject();
-    if (injected) return;
+  const resolveReviewButtonGroup = () => {
+    const column = document.querySelector(BUTTON_COLUMN_SELECTOR);
+    if (!column) return null;
+    const groups = Array.from(column.querySelectorAll('.ui.buttons'));
+    return groups.find(group => !group.classList.contains('right')) || null;
+  };
+
+  const resolveTagId = () => {
+    const link = document.querySelector(TAG_LINK_SELECTOR) || document.querySelector('a.ui.small.red.button[href*="/problems/tag/"][href*="/renew"]');
+    const href = link && link.getAttribute ? link.getAttribute('href') : '';
+    const match = href && href.match(/tag\/(\d+)/);
+    return match ? match[1] : null;
+  };
+
+  const resolveUserId = () => {
+    if (typeof window.getCurrentUserId === 'function') {
+      const uid = window.getCurrentUserId();
+      if (Number.isFinite(uid)) return uid;
+    }
+    const link = document.querySelector('#user-dropdown a[href^="/user/"]');
+    const href = link && link.getAttribute ? link.getAttribute('href') : '';
+    const match = href && href.match(/\/user\/(\d+)/);
+    return match ? Number(match[1]) : null;
+  };
+
+  const ensureReviewButtons = () => {
+    const buttonGroup = resolveReviewButtonGroup();
+    if (!buttonGroup) return false;
+    if (buttonGroup.dataset.bnContestReviewInjected === '1') return true;
+
+    const tagId = resolveTagId();
+    const uid = resolveUserId();
+    if (!tagId || !uid) return false;
+
+    const writeBtn = document.createElement('a');
+    writeBtn.className = 'ui small teal button bn-contest-review-write';
+    writeBtn.href = `/review/user_tag/edit?user_id=${uid}&tag_id=${tagId}`;
+    writeBtn.textContent = '写复盘表';
+
+    const viewBtn = document.createElement('a');
+    viewBtn.className = 'ui small violet button bn-contest-review-view';
+    viewBtn.href = `/review/user_tags/html?tag_id=${tagId}`;
+    viewBtn.textContent = '查看复盘表';
+
+    buttonGroup.appendChild(writeBtn);
+    buttonGroup.appendChild(viewBtn);
+    buttonGroup.dataset.bnContestReviewInjected = '1';
+    return true;
+  };
+
+  let downloadDone = !downloadEnabled;
+  let reviewDone = !reviewEnabled;
+
+  const tryInject = () => {
+    if (!isContestEnded()) return;
+    if (!downloadDone && downloadEnabled && ensureDownloadButtons()) downloadDone = true;
+    if (!reviewDone && reviewEnabled && ensureReviewButtons()) reviewDone = true;
+  };
+
+  const ensureAllInjected = () => {
+    tryInject();
+    return downloadDone && reviewDone;
+  };
+
+  const startObserver = () => {
+    if (ensureAllInjected()) return;
+    if (typeof MutationObserver !== 'function') return;
     const observer = new MutationObserver(() => {
-      if (tryInject()) observer.disconnect();
+      if (ensureAllInjected()) observer.disconnect();
     });
     observer.observe(document.documentElement || document.body, { childList: true, subtree: true });
     setTimeout(() => observer.disconnect(), 10000);
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startObserver, { once: true });
+  } else {
+    startObserver();
   }
 })();
 
