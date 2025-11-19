@@ -714,6 +714,8 @@
   const updateNoticeEl = document.getElementById('bn-update-notice');
   const updateVersionEl = document.getElementById('bn-update-version');
   const updateLinkEl = document.getElementById('bn-update-link');
+  const UPDATE_NOTICE_WARNING_CLASS = 'bn-state-warning';
+  const UPDATE_NOTICE_ERROR_CLASS = 'bn-state-error';
   if (!panel || !pinBtn || !trigger) {
     console.error('[BN] 面板初始化失败：缺少必要的 DOM 元素');
     container.remove();
@@ -3130,11 +3132,21 @@
       }
     } catch (e) { }
   }
-    async function checkForPanelUpdates(noticeEl, remoteVersionEl) {
+
+  function setUpdateNoticeState(noticeEl, state) {
+    if (!noticeEl) return;
+    noticeEl.classList.remove(UPDATE_NOTICE_WARNING_CLASS, UPDATE_NOTICE_ERROR_CLASS);
+    if (!state) return;
+    const nextClass = state === 'error' ? UPDATE_NOTICE_ERROR_CLASS : UPDATE_NOTICE_WARNING_CLASS;
+    noticeEl.classList.add(nextClass);
+  }
+
+  async function checkForPanelUpdates(noticeEl, remoteVersionEl) {
     const showManualSyncNotice = () => {
       if (!noticeEl) return;
       const copyEl = noticeEl.querySelector('.bn-update-copy');
       if (copyEl) copyEl.textContent = UPDATE_MANUAL_SYNC_MESSAGE;
+      setUpdateNoticeState(noticeEl, 'error');
       noticeEl.classList.add('bn-visible');
       noticeEl.removeAttribute('hidden');
     };
@@ -3146,13 +3158,16 @@
       }
       if (remoteVersion === manifestVersion) return;
       if (remoteVersionEl) remoteVersionEl.textContent = remoteVersion;
+      setUpdateNoticeState(noticeEl, 'warning');
       noticeEl.classList.add('bn-visible');
       noticeEl.removeAttribute('hidden');
     } catch (error) {
       console.warn('[BN] Failed to check panel updates', error);
       showManualSyncNotice();
     }
-  }async function fetchRemotePanelVersion() {
+  }
+
+  async function fetchRemotePanelVersion() {
     let lastError = null;
     for (const baseUrl of REMOTE_VERSION_URLS) {
       if (!baseUrl) continue;

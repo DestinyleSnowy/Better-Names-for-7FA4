@@ -895,23 +895,47 @@
   gap: 8px;
   padding: 6px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 77, 79, 0.6);
-  background: rgba(255, 77, 79, 0.2);
-  color: #a8071a;
+  border: 1px solid transparent;
+  background: rgba(15, 23, 42, 0.04);
+  color: #374151;
   font-size: 12px;
   line-height: 1.4;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
 .bn-update-notice.bn-visible {
   display: flex;
 }
 
+.bn-update-notice.bn-state-warning {
+  background: #fef3c7;
+  border-color: #fbbf24;
+  color: #92400e;
+}
+
+.bn-update-notice.bn-state-error {
+  background: #fee2e2;
+  border-color: #f87171;
+  color: #991b1b;
+}
+
 .bn-update-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #ff4d4f;
-  box-shadow: 0 0 6px rgba(255, 77, 79, 0.8);
+  background: currentColor;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.2);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.bn-update-notice.bn-state-warning .bn-update-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.65);
+}
+
+.bn-update-notice.bn-state-error .bn-update-dot {
+  background: #ef4444;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.65);
 }
 
 .bn-update-copy {
