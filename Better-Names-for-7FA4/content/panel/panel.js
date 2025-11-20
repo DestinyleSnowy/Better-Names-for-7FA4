@@ -710,6 +710,12 @@
   const hiToiletInput = document.getElementById('bn-bt-enabled');
   const hiToiletIntervalInput = document.getElementById('bn-bt-interval');
   const hiToiletIntervalValue = document.getElementById('bn-bt-interval-value');
+  function getHiToiletEnabledState() {
+    if (hiToiletInput) return hiToiletInput.checked;
+    const fallback = document.getElementById('bn-bt-enabled');
+    if (fallback) return fallback.checked;
+    return originalConfig.btEnabled;
+  }
   const versionTextEl = document.getElementById('bn-version-text');
   const updateNoticeEl = document.getElementById('bn-update-notice');
   const updateVersionEl = document.getElementById('bn-update-version');
@@ -1457,6 +1463,7 @@
     }
     const submitterSelect = document.getElementById('bn-submitter-select');
     const submitterInitialized = submitterSelect?.dataset?.bnInitialized === '1';
+    const currentBtEnabled = getHiToiletEnabledState();
 
     const changed =
       (document.getElementById('bn-enable-title-truncate').checked !== originalConfig.titleTruncate) ||
@@ -1485,7 +1492,7 @@
       (currentBgEnabled !== originalConfig.bgEnabled) ||
       bgSourceChanged ||(currentBgfillway != originalConfig.bgfillway)||
       (currentBgOpacity !== originalConfig.bgOpacity) ||
-      (document.getElementById('bn-bt-enabled').checked !== originalConfig.btEnabled) ||
+      (currentBtEnabled !== originalConfig.btEnabled) ||
       (submitterInitialized && submitterSelect.value !== originalConfig.selectedSubmitter) ||
       (hiToiletIntervalInput && clampHiToiletInterval(hiToiletIntervalInput.value) !== originalConfig.btInterval) ||
       (getSelectedThemeMode() !== originalConfig.themeMode) ||
@@ -1644,7 +1651,7 @@
     const rawBgUrl = bgUrlInput ? bgUrlInput.value.trim() : '';
     const bgOpacityRaw = bgOpacityInput ? bgOpacityInput.value : normalizedBgOpacity;
     const bgOpacity = String(clampOpacity(bgOpacityRaw));
-    const btEnabled = hiToiletInput ? hiToiletInput.checked : !!(document.getElementById('bn-bt-enabled')?.checked);
+    const btEnabled = getHiToiletEnabledState();
     const btInterval = hiToiletIntervalInput ? clampHiToiletInterval(hiToiletIntervalInput.value) : originalConfig.btInterval;
     let bgImageSourceType = (currentBgSourceType === 'local' && currentBgImageData) ? 'local' : 'remote';
     let bgImageUrlToSave = rawBgUrl;
