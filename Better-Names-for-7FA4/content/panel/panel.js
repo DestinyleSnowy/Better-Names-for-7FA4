@@ -9,41 +9,113 @@
     "repeat",
     "center no-repeat",
   ];
-  const btEnabled = GM_getValue('bt_enabled', false);
   const DEFAULT_BT_INTERVAL = 2000;
   const HI_TOILET_INTERVAL_MIN = 10;
   const HI_TOILET_INTERVAL_MAX = 2000;
-  const storedBtInterval = clampHiToiletInterval(GM_getValue('bt_interval', DEFAULT_BT_INTERVAL));
-  const storedBgEnabled = GM_getValue('bg_enabled', false);
-  const storedBgfillway = GM_getValue('bg_fillway', 2);
-  console.log(storedBgfillway);
-  const storedBgImageUrl = GM_getValue('bg_imageUrl', '');
-  const storedBgImageData = GM_getValue('bg_imageData', '');
-  const storedBgImageDataName = GM_getValue('bg_imageDataName', '');
-  const storedBgSourceTypeRaw = GM_getValue('bg_imageSourceType', '');
-  const storedBgOpacity = GM_getValue('bg_opacity', '0.1');
   const DEFAULT_THEME_MODE = 'light';
-  const storedThemeModeRaw = GM_getValue('panelThemeMode', DEFAULT_THEME_MODE);
   const DEFAULT_THEME_COLOR = '#007bff';
-  const storedThemeColorRaw = GM_getValue('themeColor', DEFAULT_THEME_COLOR);
   const DEFAULT_MAX_UNITS = 10;
-  const storedTitleUnits = GM_getValue('maxTitleUnits', DEFAULT_MAX_UNITS);
-  const storedUserUnits = GM_getValue('maxUserUnits', DEFAULT_MAX_UNITS);
+  const WIDTH_MODE_KEY = 'truncate.widthMode';
+  const CORNER_KEY = 'bn.corner';
+  const CONFIG_DEFAULTS = Object.freeze({
+    bt_enabled: false,
+    bt_interval: DEFAULT_BT_INTERVAL,
+    bg_enabled: false,
+    bg_fillway: 2,
+    bg_imageUrl: '',
+    bg_imageData: '',
+    bg_imageDataName: '',
+    bg_imageSourceType: '',
+    bg_opacity: '0.1',
+    panelThemeMode: DEFAULT_THEME_MODE,
+    themeColor: DEFAULT_THEME_COLOR,
+    maxTitleUnits: DEFAULT_MAX_UNITS,
+    maxUserUnits: DEFAULT_MAX_UNITS,
+    hideAvatar: true,
+    enableCopy: true,
+    enableDescCopy: false,
+    hideOrig: true,
+    enableContestDownloadButtons: false,
+    enableContestReviewButtons: false,
+    showUserNickname: false,
+    enableUserMenu: true,
+    enablePlanAdder: true,
+    enableGuard: false,
+    enableAutoRenew: false,
+    selectedSubmitter: 'none',
+    'rankingFilter.enabled': false,
+    'rankingFilter.columnSwitch.enabled': true,
+    'rankingMerge.enabled': true,
+    enableVjLink: true,
+    hideDoneSkip: false,
+    enableQuickSkip: undefined,
+    'quickSkip.migrated.v1': false,
+    enableTitleOptimization: true,
+    debug: false,
+    [WIDTH_MODE_KEY]: 'visual',
+    panelPinned: false,
+    [CORNER_KEY]: 'br',
+    useCustomColors: false,
+    userPalette: {},
+  });
+
+  const readConfigValue = (key) => {
+    const hasDefault = Object.prototype.hasOwnProperty.call(CONFIG_DEFAULTS, key);
+    const fallback = hasDefault ? CONFIG_DEFAULTS[key] : undefined;
+    try {
+      return GM_getValue(key, fallback);
+    } catch (_) {
+      return fallback;
+    }
+  };
+
+  const DEBUG = !!readConfigValue('debug');
+  const debugLog = (...args) => {
+    if (!DEBUG) return;
+    try { console.log('[BN][debug]', ...args); } catch (_) { /* ignore */ }
+  };
+
+  function safeGetJSON(key, fallback) {
+    try {
+      const v = readConfigValue(key);
+      if (v == null) return fallback;
+      if (typeof v === 'string') return JSON.parse(v);
+      if (typeof v === 'object') return v;
+      return fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  const storedBtInterval = clampHiToiletInterval(readConfigValue('bt_interval'));
+  const btEnabled = !!readConfigValue('bt_enabled');
+  const storedBgEnabled = readConfigValue('bg_enabled');
+  const storedBgfillway = readConfigValue('bg_fillway');
+  debugLog('Background fill mode loaded', storedBgfillway);
+  const storedBgImageUrl = readConfigValue('bg_imageUrl');
+  const storedBgImageData = readConfigValue('bg_imageData');
+  const storedBgImageDataName = readConfigValue('bg_imageDataName');
+  const storedBgSourceTypeRaw = readConfigValue('bg_imageSourceType');
+  const storedBgOpacity = readConfigValue('bg_opacity');
+  const storedThemeModeRaw = readConfigValue('panelThemeMode');
+  const storedThemeColorRaw = readConfigValue('themeColor');
+  const storedTitleUnits = readConfigValue('maxTitleUnits');
+  const storedUserUnits = readConfigValue('maxUserUnits');
   const maxTitleUnits = (storedTitleUnits === 'none') ? Infinity : parseInt(storedTitleUnits, 10);
   const maxUserUnits = (storedUserUnits === 'none') ? Infinity : parseInt(storedUserUnits, 10);
-  let hideAvatar = GM_getValue('hideAvatar', true);
+  let hideAvatar = readConfigValue('hideAvatar');
   const AVATAR_BLOCK_HOST = 'gravatar.loli.net';
   const AVATAR_PLACEHOLDER_SRC = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
-  const enableCopy = GM_getValue('enableCopy', true);
-  const enableDescCopy = GM_getValue('enableDescCopy', false);
-  const hideOrig = GM_getValue('hideOrig', true);
-  const enableContestDownloadButtons = GM_getValue('enableContestDownloadButtons', false);
-  const enableContestReviewButtons = GM_getValue('enableContestReviewButtons', false);
-  const showUserNickname = GM_getValue('showUserNickname', false);
-  const enableMenu = GM_getValue('enableUserMenu', true);
-  const enablePlanAdder = GM_getValue('enablePlanAdder', true);
-  const enableGuard = GM_getValue('enableGuard', false);
-  const enableAutoRenew = GM_getValue('enableAutoRenew', false);
+  const enableCopy = readConfigValue('enableCopy');
+  const enableDescCopy = readConfigValue('enableDescCopy');
+  const hideOrig = readConfigValue('hideOrig');
+  const enableContestDownloadButtons = readConfigValue('enableContestDownloadButtons');
+  const enableContestReviewButtons = readConfigValue('enableContestReviewButtons');
+  const showUserNickname = readConfigValue('showUserNickname');
+  const enableMenu = readConfigValue('enableUserMenu');
+  const enablePlanAdder = readConfigValue('enablePlanAdder');
+  const enableGuard = readConfigValue('enableGuard');
+  const enableAutoRenew = readConfigValue('enableAutoRenew');
   const SUBMITTERS_CONFIG_URL = 'submitter/submitters.json';
   const SUPPORTED_PORTS = new Set(['', '8888', '5283']);
   const SUPPORTED_HOSTS = new Set(['7fa4.cn', '10.210.57.10', '211.137.101.118']);
@@ -59,21 +131,21 @@
     if (SUPPORTED_HOSTS.has(host)) return true;
     return host.endsWith('.7fa4.cn');
   };
-  const storedSelectedSubmitter = GM_getValue('selectedSubmitter', 'none');
-  const enableRankingFilterSetting = GM_getValue('rankingFilter.enabled', false);
-  const enableColumnSwitchSetting = GM_getValue('rankingFilter.columnSwitch.enabled', true) !== false;
-  const enableMergeAssistantSetting = GM_getValue('rankingMerge.enabled', true) !== false;
-  const enableVjLink = GM_getValue('enableVjLink', true);
-  const hideDoneSkip = GM_getValue('hideDoneSkip', false);
+  const storedSelectedSubmitter = readConfigValue('selectedSubmitter');
+  const enableRankingFilterSetting = readConfigValue('rankingFilter.enabled');
+  const enableColumnSwitchSetting = readConfigValue('rankingFilter.columnSwitch.enabled') !== false;
+  const enableMergeAssistantSetting = readConfigValue('rankingMerge.enabled') !== false;
+  const enableVjLink = readConfigValue('enableVjLink');
+  const hideDoneSkip = readConfigValue('hideDoneSkip');
   let rawQuickSkip;
   let quickSkipMigrated = false;
   try {
-    rawQuickSkip = GM_getValue('enableQuickSkip');
+    rawQuickSkip = readConfigValue('enableQuickSkip');
   } catch (err) {
     rawQuickSkip = undefined;
   }
   try {
-    quickSkipMigrated = !!GM_getValue('quickSkip.migrated.v1', false);
+    quickSkipMigrated = !!readConfigValue('quickSkip.migrated.v1');
   } catch (err) {
     quickSkipMigrated = false;
   }
@@ -102,9 +174,73 @@
     } catch (_) { /* ignore */ }
   }
   if (enableQuickSkip === undefined) enableQuickSkip = true;
-  const enableTitleOptimization = GM_getValue('enableTitleOptimization', true);
-  const WIDTH_MODE_KEY = 'truncate.widthMode';
-  const widthMode = GM_getValue(WIDTH_MODE_KEY, 'visual');
+  const enableTitleOptimization = readConfigValue('enableTitleOptimization');
+  const widthMode = readConfigValue(WIDTH_MODE_KEY);
+  // Centralized configuration groups for easier export/reset flows.
+  const backgroundConfig = {
+    enabled: storedBgEnabled,
+    fillway: storedBgfillway,
+    imageUrl: storedBgImageUrl,
+    imageData: storedBgImageData,
+    imageDataName: storedBgImageDataName,
+    sourceType: storedBgSourceTypeRaw,
+    opacity: storedBgOpacity,
+  };
+  const themeConfig = { mode: storedThemeModeRaw, color: storedThemeColorRaw };
+  const truncationConfig = {
+    rawTitleUnits: storedTitleUnits,
+    rawUserUnits: storedUserUnits,
+    maxTitleUnits,
+    maxUserUnits,
+    widthMode,
+  };
+  const hiToiletConfig = { enabled: btEnabled, interval: storedBtInterval };
+  const featureFlags = {
+    hideAvatar,
+    enableCopy,
+    enableDescCopy,
+    hideOrig,
+    enableContestDownloadButtons,
+    enableContestReviewButtons,
+    showUserNickname,
+    enableMenu,
+    enablePlanAdder,
+    enableGuard,
+    enableAutoRenew,
+    enableVjLink,
+    hideDoneSkip,
+    enableQuickSkip,
+    enableTitleOptimization,
+  };
+  const rankingConfig = {
+    enableRankingFilterSetting,
+    enableColumnSwitchSetting,
+    enableMergeAssistantSetting,
+  };
+  const submitterConfig = { selected: storedSelectedSubmitter };
+  const quickSkipState = { raw: rawQuickSkip, migrated: quickSkipMigrated, enabled: enableQuickSkip };
+  const layoutConfig = {
+    pinned: !!readConfigValue('panelPinned'),
+    corner: readConfigValue(CORNER_KEY),
+  };
+  const paletteConfig = {
+    storedPalette: safeGetJSON('userPalette', CONFIG_DEFAULTS.userPalette),
+    useCustomColors: readConfigValue('useCustomColors'),
+  };
+  const configCenter = {
+    defaults: CONFIG_DEFAULTS,
+    background: backgroundConfig,
+    theme: themeConfig,
+    truncation: truncationConfig,
+    hiToilet: hiToiletConfig,
+    featureFlags,
+    ranking: rankingConfig,
+    submitters: submitterConfig,
+    quickSkip: quickSkipState,
+    layout: layoutConfig,
+    palette: paletteConfig,
+    debug: DEBUG,
+  };
   const BN_TABLE_ROWS_SELECTOR = 'table.ui.very.basic.center.aligned.table tbody tr';
   const MAX_LOCAL_BG_SIZE = 2 * 1024 * 1024;
 
@@ -443,8 +579,8 @@
   const normalizedBgData = typeof storedBgImageData === 'string' ? storedBgImageData.trim() : '';
   const normalizedBgfillway = storedBgfillway;
   const normalizedBgUrl = typeof storedBgImageUrl === 'string' ? storedBgImageUrl.trim() : '';
-  console.log(normalizedBgUrl);
-  console.log(normalizedBgfillway);
+  debugLog('Background remote url normalized:', normalizedBgUrl);
+  debugLog('Background fillway normalized:', normalizedBgfillway);
   const normalizedBgSourceType = (() => {
     if (storedBgSourceTypeRaw === 'local' && normalizedBgData) return 'local';
     if (storedBgSourceTypeRaw === 'remote') return 'remote';
@@ -609,22 +745,14 @@
   }
 
   const COLOR_KEYS = ['x4', 'x5', 'x6', 'c1', 'c2', 'c3', 'g1', 'g2', 'g3', 'd1', 'd2', 'd3', 'd4', 'by', 'jl', 'uk'];
-  const COLOR_LABELS = { x4: '小2022级', x5: '小2021级', x6: '小2020级', c1: '初2025级', c2: '初2024级', c3: '初2023级', g1: '高2025级', g2: '高2024级', g3: '高2023级', d1: '大2025级', d2: '大2024级', d3: '大2023级', d4: '大2022级', by: '毕业', jl: '教练', uk: '其他' };
-  const GRADE_LABELS = { x4: '小2022级', x5: '小2021级', x6: '小2020级', c1: '初2025级', c2: '初2024级', c3: '初2023级', g1: '高2025级', g2: '高2024级', g3: '高2023级', d1: '大2025级', d2: '大2024级', d3: '大2023级', d4: '大2022级', by: '毕业', jl: '教练', uk: '其他' };
+  const LEVEL_LABELS = { x4: '小2022级', x5: '小2021级', x6: '小2020级', c1: '初2025级', c2: '初2024级', c3: '初2023级', g1: '高2025级', g2: '高2024级', g3: '高2023级', d1: '大2025级', d2: '大2024级', d3: '大2023级', d4: '大2022级', by: '毕业', jl: '教练', uk: '其他' };
+  const COLOR_LABELS = LEVEL_LABELS;
+  const GRADE_LABELS = LEVEL_LABELS;
 
-  function safeGetJSON(key, fallback) {
-    try {
-      const v = GM_getValue(key, null);
-      if (v == null) return fallback;
-      if (typeof v === 'string') return JSON.parse(v);
-      if (typeof v === 'object') return v;
-      return fallback;
-    } catch { return fallback; }
-  }
   const themeColor = normalizeHexColor(storedThemeColorRaw, DEFAULT_THEME_COLOR);
   const themeMode = normalizeThemeMode(storedThemeModeRaw);
-  const storedPalette = safeGetJSON('userPalette', {});
-  const useCustomColors = GM_getValue('useCustomColors', false);
+  const storedPalette = configCenter.palette.storedPalette;
+  const useCustomColors = configCenter.palette.useCustomColors;
 
   const palettes = {
     light: { x4: '#5a5a5a', x5: '#92800b', x6: '#b2ad2a', c1: '#ff0000', c2: '#ff6629', c3: '#ffbb00', g1: '#ca00ca', g2: '#62ca00', g3: '#13c2c2', d1: '#9900ff', d2: '#000cff', d3: '#597ef7', d4: '#186334', by: '#8c8c8c', jl: '#ff85c0', uk: '#5e6e5e' }
@@ -739,8 +867,7 @@
   }
   syncThemeModeUI(currentThemeMode);
   applyThemeMode(currentThemeMode);
-  let pinned = !!GM_getValue('panelPinned', false);
-  const CORNER_KEY = 'bn.corner';
+  let pinned = !!configCenter.layout.pinned;
   const SNAP_MARGIN = 20;
   const DRAG_THRESHOLD = 6;
   let isDragging = false;
@@ -830,12 +957,12 @@
         container.style.top = 'auto';
         break;
     }
-    try {
+  try {
       GM_setValue(CORNER_KEY, pos);
     } catch (_) {}
   }
 
-  const initialCorner = GM_getValue(CORNER_KEY, 'br');
+  const initialCorner = configCenter.layout.corner;
   applyCorner(initialCorner);
   updateContainerState();
 
@@ -1668,7 +1795,7 @@
     
     GM_setValue('bg_enabled', bgEnabled);
     GM_setValue('bg_fillway', bgfillway);
-    console.log(bgfillway);
+    debugLog('Saved bg fillway', bgfillway);
     GM_setValue('bg_imageSourceType', bgImageSourceType);
     GM_setValue('bg_imageUrl', bgImageUrlToSave);
     GM_setValue('bg_imageData', bgImageDataToSave);
@@ -1779,7 +1906,7 @@
     const updateBackgroundPreview = () => {
       bgOpacityValueSpan.textContent = formatOpacityText(bgOpacityInput.value);
       applyBackgroundOverlay(bgEnabledInput.checked, bgfillwayInput.value,getEffectiveBackgroundUrl(), bgOpacityInput.value);
-      console.log(bgfillwayInput.value);
+      debugLog('Preview bg fillway change', bgfillwayInput.value);
       checkChanged();
     };
     const handleBgUrlInput = () => {
@@ -1929,7 +2056,7 @@
         }
       }
       if (!data || data.success === false) {
-        if (data && data.err) console.log('[BN] HiToilet:', data.err);
+        if (data && data.err) debugLog('[BN] HiToilet:', data.err);
       } else {
         if (typeof window.upd === 'function') {
           try { window.upd(); } catch (err) { console.warn('[BN] HiToilet: upd() failed', err); }
@@ -2041,11 +2168,11 @@
       if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function') {
         try {
           const url = chrome.runtime.getURL('submitter/submitters.json');
-          console.log('Loading submitters config from:', url);
+          debugLog('Loading submitters config from:', url);
           const response = await fetch(url, { cache: 'no-store' });
           if (response && response.ok) {
             const config = await response.json();
-            console.log('Successfully loaded submitters config');
+            debugLog('Successfully loaded submitters config');
             return config;
           }
         } catch (err) {
@@ -2057,7 +2184,7 @@
         const response = await fetch('/submitter/submitters.json', { cache: 'no-store' });
         if (response && response.ok) {
           const config = await response.json();
-          console.log('Successfully loaded submitters config from relative path');
+          debugLog('Successfully loaded submitters config from relative path');
           return config;
         }
       } catch (err) {
