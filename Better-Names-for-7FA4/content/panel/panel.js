@@ -2756,6 +2756,10 @@
   function processUserLink(a) {
     if (!a || !a.matches(USER_LINK_SELECTOR)) return;
 
+    const rawHref = a.getAttribute('href') || '';
+    // Skip review actions; they are not user-name labels.
+    if (/\/review\/user_tag/i.test(rawHref)) return;
+
     if (
       a.matches('#user-dropdown > a') ||
       a.matches('#user-dropdown > div > a:nth-child(1)') ||
@@ -2763,7 +2767,7 @@
       a.matches('#form > div > div:nth-child(13) > a')
     ) return;
 
-    const uid = resolveUidFromHref(a.getAttribute('href') || '', a);
+    const uid = resolveUidFromHref(rawHref, a);
     if (!uid) return;
     if (!markOnce(a, 'UserDone')) return;
     const info = users[uid];
