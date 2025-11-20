@@ -14,6 +14,7 @@
   const HI_TOILET_INTERVAL_MAX = 2000;
   const DEFAULT_THEME_MODE = 'light';
   const DEFAULT_THEME_COLOR = '#007bff';
+  const DEFAULT_SUBMITTER_ID = 'origin';
   const DEFAULT_MAX_UNITS = 10;
   const WIDTH_MODE_KEY = 'truncate.widthMode';
   const CORNER_KEY = 'bn.corner';
@@ -44,7 +45,7 @@
     enableTemplateBulkAdd: false,
     enableGuard: false,
     enableAutoRenew: false,
-    selectedSubmitter: 'none',
+    selectedSubmitter: DEFAULT_SUBMITTER_ID,
     'rankingFilter.enabled': false,
     'rankingFilter.columnSwitch.enabled': true,
     'rankingMerge.enabled': true,
@@ -2103,8 +2104,22 @@
       option.dataset.popup = submitter.popup || '';
       select.appendChild(option);
     });
-    select.value = storedSelectedSubmitter;
-    updateSubmitterDescription(select.value);
+    const availableIds = new Set(config.submitters.map(submitter => submitter.id));
+    const defaultSubmitterId = config.default || DEFAULT_SUBMITTER_ID;
+    let initialSelection = storedSelectedSubmitter;
+    if (!initialSelection) {
+      initialSelection = defaultSubmitterId;
+    }
+    if (initialSelection !== 'none' && !availableIds.has(initialSelection)) {
+      initialSelection = availableIds.has(defaultSubmitterId)
+        ? defaultSubmitterId
+        : (config.submitters[0]?.id || 'none');
+    }
+    select.value = initialSelection;
+    updateSubmitterDescription(initialSelection);
+    if (initialSelection !== storedSelectedSubmitter) {
+      try { GM_setValue('selectedSubmitter', initialSelection); } catch (_) { /* ignore */ }
+    }
     select.dataset.bnInitialized = '1';
     checkChanged();
 
