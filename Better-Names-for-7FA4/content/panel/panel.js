@@ -27,6 +27,7 @@
     bg_imageDataName: '',
     bg_imageSourceType: '',
     bg_opacity: '0.1',
+    bg_blur: 0,
     panelThemeMode: DEFAULT_THEME_MODE,
     themeColor: DEFAULT_THEME_COLOR,
     maxTitleUnits: DEFAULT_MAX_UNITS,
@@ -74,6 +75,40 @@
     if (!DEBUG) return;
     try { console.log('[BN][debug]', ...args); } catch (_) { /* ignore */ }
   };
+  const resolveRuntimeUrl = (path) => {
+    try {
+      if (typeof browser !== 'undefined' && browser.runtime && typeof browser.runtime.getURL === 'function') {
+        return browser.runtime.getURL(path);
+      }
+    } catch (_) { /* ignore */ }
+    try {
+      if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function') {
+        return chrome.runtime.getURL(path);
+      }
+    } catch (_) { /* ignore */ }
+    return path;
+  };
+
+  let ensureAvatarBlockerInstalled = () => false;
+  let runAvatarSanitizer = () => {};
+  const avatarModuleCandidates = [resolveRuntimeUrl('content/panel/avatar-blocker.js'), './avatar-blocker.js'];
+  for (const candidate of avatarModuleCandidates) {
+    try {
+      const avatarModule = await import(candidate);
+      if (avatarModule && typeof avatarModule.createAvatarBlocker === 'function') {
+        const blocker = avatarModule.createAvatarBlocker({
+          isBlockingEnabled: () => !!hideAvatar,
+          placeholderSrc: AVATAR_PLACEHOLDER_SRC,
+          debugLog,
+        });
+        ensureAvatarBlockerInstalled = blocker.ensureAvatarBlockerInstalled;
+        runAvatarSanitizer = blocker.runAvatarSanitizer;
+        break;
+      }
+    } catch (error) {
+      debugLog('Avatar blocker module load failed', candidate, error);
+    }
+  }
 
   function safeGetJSON(key, fallback) {
     try {
@@ -97,6 +132,7 @@
   const storedBgImageDataName = readConfigValue('bg_imageDataName');
   const storedBgSourceTypeRaw = readConfigValue('bg_imageSourceType');
   const storedBgOpacity = readConfigValue('bg_opacity');
+  const storedBgBlur = readConfigValue('bg_blur');
   const storedThemeModeRaw = readConfigValue('panelThemeMode');
   const storedThemeColorRaw = readConfigValue('themeColor');
   const storedTitleUnits = readConfigValue('maxTitleUnits');
@@ -104,7 +140,6 @@
   const maxTitleUnits = (storedTitleUnits === 'none') ? Infinity : parseInt(storedTitleUnits, 10);
   const maxUserUnits = (storedUserUnits === 'none') ? Infinity : parseInt(storedUserUnits, 10);
   let hideAvatar = readConfigValue('hideAvatar');
-  const AVATAR_BLOCK_HOST = 'gravatar.loli.net';
   const AVATAR_PLACEHOLDER_SRC = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
   const enableCopy = readConfigValue('enableCopy');
   const enableDescCopy = readConfigValue('enableDescCopy');
@@ -185,6 +220,7 @@
     imageDataName: storedBgImageDataName,
     sourceType: storedBgSourceTypeRaw,
     opacity: storedBgOpacity,
+    blur: storedBgBlur,
   };
   const themeConfig = { mode: storedThemeModeRaw, color: storedThemeColorRaw };
   const truncationConfig = {
@@ -260,6 +296,17 @@
     const num = clampOpacity(value);
     return num.toFixed(2).replace(/\.?0+$/, '');
   }
+  function clampBlur(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return 0;
+    if (num < 0) return 0;
+    if (num > 50) return 50;
+    return Number(num.toFixed(2));
+  }
+  function formatBlurText(value) {
+    const num = clampBlur(value);
+    return num.toFixed(1).replace(/\.0+$/, '');
+  }
   function clampHiToiletInterval(value) {
     const num = Number(value);
     if (!Number.isFinite(num)) return DEFAULT_BT_INTERVAL;
@@ -267,233 +314,6 @@
     if (rounded < HI_TOILET_INTERVAL_MIN) return HI_TOILET_INTERVAL_MIN;
     if (rounded > HI_TOILET_INTERVAL_MAX) return HI_TOILET_INTERVAL_MAX;
     return rounded;
-  }
-  const isAvatarBlockingEnabled = () => !!hideAvatar;
-  function runAvatarSanitizer() {
-    if (typeof window.__BN_FORCE_AVATAR_SANITIZE__ !== 'function') return;
-    try {
-      window.__BN_FORCE_AVATAR_SANITIZE__();
-    } catch (error) {
-      console.warn('[BN] Avatar sanitizer failed', error);
-    }
-  }
-  function ensureAvatarBlockerInstalled(forceRetry = false) {
-    if (window.__BN_AVATAR_BLOCKER_INSTALLED__) return true;
-    if (forceRetry) delete window.__BN_AVATAR_BLOCKER_FAILED__;
-    if (window.__BN_AVATAR_BLOCKER_FAILED__) return false;
-    try {
-      const ok = installAvatarBlocker();
-      if (!ok) {
-        window.__BN_AVATAR_BLOCKER_FAILED__ = true;
-        console.warn('[BN] Avatar blocker prerequisites unavailable; will retry later');
-        return false;
-      }
-      return true;
-    } catch (error) {
-      window.__BN_AVATAR_BLOCKER_FAILED__ = true;
-      console.warn('[BN] Failed to install avatar blocker', error);
-      return false;
-    }
-  }
-  // Prevent loading third-party avatar hosts whenever avatars are hidden.
-  function shouldBlockAvatarUrl(url) {
-    if (url === undefined || url === null) return false;
-    try {
-      const parsed = new URL(String(url), window.location.href);
-      return parsed.hostname && parsed.hostname.toLowerCase() === AVATAR_BLOCK_HOST;
-    } catch (_) {
-      return false;
-    }
-  }
-  function installAvatarBlocker() {
-    if (window.__BN_AVATAR_BLOCKER_INSTALLED__ || window.__BN_AVATAR_BLOCKER_INSTALLING__) return true;
-    if (!document || typeof document.querySelectorAll !== 'function') return false;
-    const imgCtor = (typeof HTMLImageElement === 'undefined') ? null : HTMLImageElement;
-    if (!imgCtor || !imgCtor.prototype) return false;
-    window.__BN_AVATAR_BLOCKER_INSTALLING__ = true;
-    try {
-      const nativeSrcDescriptor = Object.getOwnPropertyDescriptor(imgCtor.prototype, 'src');
-      const elementProto = (typeof Element !== 'undefined' && Element.prototype) ? Element.prototype : null;
-      const nativeSetAttribute = (imgCtor.prototype.setAttribute || (elementProto && elementProto.setAttribute));
-      if (!nativeSetAttribute) return false;
-      const nativeFetch = typeof window.fetch === 'function' ? window.fetch : null;
-      const nativeXhrOpen = (typeof XMLHttpRequest !== 'undefined' && XMLHttpRequest.prototype.open) ? XMLHttpRequest.prototype.open : null;
-      const nativeXhrSend = (typeof XMLHttpRequest !== 'undefined' && XMLHttpRequest.prototype.send) ? XMLHttpRequest.prototype.send : null;
-      const shouldBlockLoad = (value) => isAvatarBlockingEnabled() && shouldBlockAvatarUrl(value);
-
-      const assignSrc = (img, value) => {
-        if (!img) return;
-        if (nativeSrcDescriptor && typeof nativeSrcDescriptor.set === 'function') {
-          try {
-            nativeSrcDescriptor.set.call(img, value);
-            return;
-          } catch (_) { /* ignore */ }
-        }
-        try {
-          nativeSetAttribute.call(img, 'src', value);
-        } catch (error) {
-          console.warn('[BN] Failed to assign placeholder avatar', error);
-        }
-      };
-      const applyPlaceholder = (img) => {
-        if (!img) return;
-        assignSrc(img, AVATAR_PLACEHOLDER_SRC);
-        try {
-          img.dataset.bnAvatarBlocked = 'true';
-        } catch (_) { /* ignore */ }
-      };
-
-      if (nativeSrcDescriptor && nativeSrcDescriptor.configurable !== false) {
-        try {
-          Object.defineProperty(imgCtor.prototype, 'src', {
-            configurable: true,
-            enumerable: nativeSrcDescriptor ? nativeSrcDescriptor.enumerable : false,
-            get() {
-              if (nativeSrcDescriptor && typeof nativeSrcDescriptor.get === 'function') {
-                try {
-                  return nativeSrcDescriptor.get.call(this);
-                } catch (_) { /* ignore */ }
-              }
-              return this.getAttribute('src') || '';
-            },
-            set(value) {
-              if (shouldBlockLoad(value)) {
-                if (isAvatarBlockingEnabled()) applyPlaceholder(this);
-                return;
-              }
-              assignSrc(this, value);
-            },
-          });
-        } catch (error) {
-          console.warn('[BN] Failed to patch HTMLImageElement.src', error);
-        }
-      }
-
-      try {
-        imgCtor.prototype.setAttribute = function (name, value) {
-          if (
-            typeof name === 'string' &&
-            name.toLowerCase() === 'src' &&
-            shouldBlockLoad(String(value || ''))
-          ) {
-            if (isAvatarBlockingEnabled()) applyPlaceholder(this);
-            return;
-          }
-          return nativeSetAttribute.call(this, name, value);
-        };
-      } catch (error) {
-        console.warn('[BN] Failed to patch image setAttribute', error);
-      }
-
-      const sanitizeExistingImages = () => {
-        if (!isAvatarBlockingEnabled()) return;
-        try {
-          document.querySelectorAll('img').forEach(img => {
-            const current = img.getAttribute('src') || img.currentSrc || img.src || '';
-            if (shouldBlockAvatarUrl(current)) applyPlaceholder(img);
-          });
-        } catch (error) {
-          console.warn('[BN] Avatar sanitize iteration failed', error);
-        }
-      };
-      window.__BN_FORCE_AVATAR_SANITIZE__ = sanitizeExistingImages;
-
-      const extractUrlFromFetchArgs = (input, init) => {
-        if (typeof input === 'string') return input;
-        if (input && typeof input === 'object') {
-          if (typeof input.url === 'string') return input.url;
-          if (typeof input.href === 'string') return input.href;
-        }
-        if (init && typeof init.url === 'string') return init.url;
-        return '';
-      };
-      const createBlockedFetchResponse = () => {
-        if (typeof Response === 'function') {
-          try {
-            return new Response('', { status: 204, statusText: 'BN Avatar blocked' });
-          } catch (_) { /* ignore */ }
-        }
-        return {
-          ok: true,
-          status: 204,
-          statusText: 'BN Avatar blocked',
-          text: () => Promise.resolve(''),
-          json: () => Promise.resolve(null),
-          blob: () => Promise.resolve((typeof Blob === 'function') ? new Blob() : ''),
-          arrayBuffer: () => Promise.resolve((typeof ArrayBuffer === 'function') ? new ArrayBuffer(0) : null),
-          clone() { return this; },
-        };
-      };
-
-      if (nativeFetch) {
-        try {
-          window.fetch = function patchedFetch(input, init) {
-            try {
-              if (shouldBlockLoad(extractUrlFromFetchArgs(input, init))) {
-                return Promise.resolve(createBlockedFetchResponse());
-              }
-            } catch (_) { /* ignore */ }
-            return nativeFetch.call(this, input, init);
-          };
-        } catch (error) {
-          console.warn('[BN] Failed to patch window.fetch', error);
-        }
-      }
-
-      if (nativeXhrOpen && nativeXhrSend) {
-        try {
-          XMLHttpRequest.prototype.open = function patchedOpen(method, url, async, user, password) {
-            this.__bnAvatarBlocked__ = shouldBlockLoad(url);
-            return nativeXhrOpen.call(this, method, url, async, user, password);
-          };
-          XMLHttpRequest.prototype.send = function patchedSend(body) {
-            if (this.__bnAvatarBlocked__) {
-              const errorEvent = (typeof ProgressEvent === 'function') ? new ProgressEvent('error') : new Event('error');
-              try { if (typeof this.onerror === 'function') this.onerror(errorEvent); } catch (_) { /* ignore */ }
-              try { this.dispatchEvent(errorEvent); } catch (_) { /* ignore */ }
-              const loadEndEvent = (typeof ProgressEvent === 'function') ? new ProgressEvent('loadend') : new Event('loadend');
-              try { if (typeof this.onloadend === 'function') this.onloadend(loadEndEvent); } catch (_) { /* ignore */ }
-              try { this.dispatchEvent(loadEndEvent); } catch (_) { /* ignore */ }
-              return;
-            }
-            return nativeXhrSend.call(this, body);
-          };
-        } catch (error) {
-          console.warn('[BN] Failed to patch XMLHttpRequest', error);
-        }
-      }
-
-      if (typeof document.addEventListener === 'function') {
-        try {
-          document.addEventListener('beforeload', (event) => {
-            if (!isAvatarBlockingEnabled()) return;
-            const target = event.target;
-            const url = (target && (target.currentSrc || target.src || target.href)) || event.url;
-            if (!shouldBlockAvatarUrl(url)) return;
-            try { event.preventDefault(); } catch (_) { /* ignore */ }
-            if (target && target.tagName === 'IMG') applyPlaceholder(target);
-          }, true);
-        } catch (error) {
-          console.warn('[BN] Failed to attach beforeload listener', error);
-        }
-      }
-
-      sanitizeExistingImages();
-      if (typeof MutationObserver === 'function') {
-        try {
-          const mo = new MutationObserver(() => sanitizeExistingImages());
-          mo.observe(document, { childList: true, subtree: true });
-          window.__BN_AVATAR_BLOCKER_MO__ = mo;
-        } catch (error) {
-          console.warn('[BN] Avatar blocker MutationObserver failed', error);
-        }
-      }
-
-      window.__BN_AVATAR_BLOCKER_INSTALLED__ = true;
-      return true;
-    } finally {
-      delete window.__BN_AVATAR_BLOCKER_INSTALLING__;
-    }
   }
   function readManifestVersion() {
     try {
@@ -550,7 +370,7 @@
     requestAnimationFrame(callback);
   }
 
-  function applyBackgroundOverlay(enabled,fillway,url, opacity) {
+  function applyBackgroundOverlay(enabled,fillway,url, opacity, blurPx) {
     ensureBody(() => {
       let layer = document.getElementById('bn-background-image');
       const trimmedUrl = typeof url === 'string' ? url.trim() : '';
@@ -573,6 +393,8 @@
         document.body.insertAdjacentElement('afterbegin', layer);
       }
       layer.style.opacity = String(clampOpacity(opacity));
+      const blurValue = clampBlur(blurPx);
+      layer.style.filter = blurValue > 0 ? `blur(${blurValue}px)` : 'none';
       layer.style.background = `url("${trimmedUrl}") ${backgroundStyles[fillway]}`;
     });
   }
@@ -588,10 +410,11 @@
   })();
   const normalizedBgFileName = typeof storedBgImageDataName === 'string' ? storedBgImageDataName : '';
   const normalizedBgOpacity = String(clampOpacity(storedBgOpacity));
+  const normalizedBgBlur = clampBlur(storedBgBlur);
   const initialBackgroundSource = (normalizedBgSourceType === 'local' && normalizedBgData)
     ? normalizedBgData
     : normalizedBgUrl;
-  applyBackgroundOverlay(storedBgEnabled,storedBgfillway, initialBackgroundSource, normalizedBgOpacity);
+  applyBackgroundOverlay(storedBgEnabled,storedBgfillway, initialBackgroundSource, normalizedBgOpacity, normalizedBgBlur);
 
   function readAutoRenewMemory() {
     try {
@@ -830,6 +653,8 @@
   const bgUrlInput = document.getElementById('bn-bg-image-url');
   const bgOpacityInput = document.getElementById('bn-bg-opacity');
   const bgOpacityValueSpan = document.getElementById('bn-bg-opacity-value');
+  const bgBlurInput = document.getElementById('bn-bg-blur');
+  const bgBlurValueSpan = document.getElementById('bn-bg-blur-value');
   const bgFileInput = document.getElementById('bn-bg-image-file');
   const bgFilePickBtn = document.getElementById('bn-bg-image-file-btn');
   const bgFileNameSpan = document.getElementById('bn-bg-image-file-name');
@@ -1027,6 +852,11 @@
   chkHideDoneSkip.checked = hideDoneSkip;
   chkQuickSkip.checked = enableQuickSkip;
   chkTitleOpt.checked = enableTitleOptimization;
+  if (bgOpacityValueSpan) bgOpacityValueSpan.textContent = formatOpacityText(normalizedBgOpacity);
+  if (bgBlurInput && bgBlurValueSpan) {
+    bgBlurInput.value = normalizedBgBlur;
+    bgBlurValueSpan.textContent = formatBlurText(normalizedBgBlur);
+  }
 
   const disableNeedWarn = () => {
     if (typeof window.needWarn === 'function' && !window.__bnGuardOriginalNeedWarn) {
@@ -1115,6 +945,7 @@
     bgImageDataName: normalizedBgFileName,
     bgSourceType: normalizedBgSourceType,
     bgOpacity: normalizedBgOpacity,
+    bgBlur: normalizedBgBlur,
     btEnabled: btEnabled,
     btInterval: storedBtInterval
   };
@@ -1577,6 +1408,7 @@
     const currentBgEnabled = bgEnabledInput ? bgEnabledInput.checked : originalConfig.bgEnabled;
     const currentBgfillway = bgfillwayInput ? bgfillwayInput.value : originalConfig.bgfillway;
     const currentBgOpacity = bgOpacityInput ? bgOpacityInput.value : originalConfig.bgOpacity;
+    const currentBgBlur = bgBlurInput ? bgBlurInput.value : originalConfig.bgBlur;
     const currentBgUrl = bgUrlInput ? bgUrlInput.value.trim() : '';
     let bgSourceChanged = false;
     if (currentBgSourceType === 'local') {
@@ -1619,6 +1451,7 @@
       (currentBgEnabled !== originalConfig.bgEnabled) ||
       bgSourceChanged ||(currentBgfillway != originalConfig.bgfillway)||
       (currentBgOpacity !== originalConfig.bgOpacity) ||
+      (clampBlur(currentBgBlur) !== clampBlur(originalConfig.bgBlur)) ||
       (currentBtEnabled !== originalConfig.btEnabled) ||
       (submitterInitialized && submitterSelect.value !== originalConfig.selectedSubmitter) ||
       (hiToiletIntervalInput && clampHiToiletInterval(hiToiletIntervalInput.value) !== originalConfig.btInterval) ||
@@ -1777,7 +1610,9 @@
     const bgfillway = bgfillwayInput.value ;
     const rawBgUrl = bgUrlInput ? bgUrlInput.value.trim() : '';
     const bgOpacityRaw = bgOpacityInput ? bgOpacityInput.value : normalizedBgOpacity;
+    const bgBlurRaw = bgBlurInput ? bgBlurInput.value : normalizedBgBlur;
     const bgOpacity = String(clampOpacity(bgOpacityRaw));
+    const bgBlur = clampBlur(bgBlurRaw);
     const btEnabled = getHiToiletEnabledState();
     const btInterval = hiToiletIntervalInput ? clampHiToiletInterval(hiToiletIntervalInput.value) : originalConfig.btInterval;
     let bgImageSourceType = (currentBgSourceType === 'local' && currentBgImageData) ? 'local' : 'remote';
@@ -1801,6 +1636,7 @@
     GM_setValue('bg_imageData', bgImageDataToSave);
     GM_setValue('bg_imageDataName', bgImageDataNameToSave);
     GM_setValue('bg_opacity', bgOpacity);
+    GM_setValue('bg_blur', bgBlur);
     GM_setValue('bt_enabled', btEnabled);
     GM_setValue('bt_interval', btInterval);
     originalConfig.btInterval = btInterval;
@@ -1811,14 +1647,17 @@
     originalConfig.bgImageDataName = bgImageDataNameToSave;
     originalConfig.bgSourceType = bgImageSourceType;
     originalConfig.bgOpacity = bgOpacity;
+    originalConfig.bgBlur = bgBlur;
     currentBgSourceType = bgImageSourceType;
     currentBgImageData = bgImageDataToSave;
     currentBgImageDataName = bgImageDataNameToSave;
 
     updateBgSourceUI();
-    applyBackgroundOverlay(bgEnabled,bgfillway, overlaySource, bgOpacity);
+    applyBackgroundOverlay(bgEnabled,bgfillway, overlaySource, bgOpacity, bgBlur);
     if (bgOpacityInput) bgOpacityInput.value = bgOpacity;
     if (bgOpacityValueSpan) bgOpacityValueSpan.textContent = formatOpacityText(bgOpacity);
+    if (bgBlurInput) bgBlurInput.value = bgBlur;
+    if (bgBlurValueSpan) bgBlurValueSpan.textContent = formatBlurText(bgBlur);
 
     const selectedSubmitter = submitterSelect.value;
     GM_setValue('selectedSubmitter', selectedSubmitter);
@@ -1890,11 +1729,13 @@
     if (bgFileInput) bgFileInput.value = '';
     if (bgOpacityInput) bgOpacityInput.value = originalConfig.bgOpacity;
     if (bgOpacityValueSpan) bgOpacityValueSpan.textContent = formatOpacityText(originalConfig.bgOpacity);
+    if (bgBlurInput) bgBlurInput.value = originalConfig.bgBlur;
+    if (bgBlurValueSpan) bgBlurValueSpan.textContent = formatBlurText(originalConfig.bgBlur);
     updateBgSourceUI();
     const restoreSource = (originalConfig.bgSourceType === 'local' && originalConfig.bgImageData)
       ? originalConfig.bgImageData
       : originalConfig.bgImageUrl;
-    applyBackgroundOverlay(originalConfig.bgEnabled,originalConfig.bgfillway, restoreSource, originalConfig.bgOpacity);
+    applyBackgroundOverlay(originalConfig.bgEnabled,originalConfig.bgfillway, restoreSource, originalConfig.bgOpacity, originalConfig.bgBlur);
     checkChanged();
   }
   restoreOriginalConfig();
@@ -1905,7 +1746,9 @@
   if (bgEnabledInput && bgOpacityInput && bgOpacityValueSpan) {
     const updateBackgroundPreview = () => {
       bgOpacityValueSpan.textContent = formatOpacityText(bgOpacityInput.value);
-      applyBackgroundOverlay(bgEnabledInput.checked, bgfillwayInput.value,getEffectiveBackgroundUrl(), bgOpacityInput.value);
+      const blurValue = bgBlurInput ? bgBlurInput.value : normalizedBgBlur;
+      if (bgBlurValueSpan) bgBlurValueSpan.textContent = formatBlurText(blurValue);
+      applyBackgroundOverlay(bgEnabledInput.checked, bgfillwayInput.value,getEffectiveBackgroundUrl(), bgOpacityInput.value, blurValue);
       debugLog('Preview bg fillway change', bgfillwayInput.value);
       checkChanged();
     };
@@ -1923,6 +1766,7 @@
     bgfillwayInput.addEventListener('change', updateBackgroundPreview);
     if (bgUrlInput) bgUrlInput.addEventListener('input', handleBgUrlInput);
     bgOpacityInput.addEventListener('input', updateBackgroundPreview);
+    if (bgBlurInput) bgBlurInput.addEventListener('input', updateBackgroundPreview);
     if (bgFilePickBtn && bgFileInput) {
       bgFilePickBtn.addEventListener('click', () => bgFileInput.click());
     }
