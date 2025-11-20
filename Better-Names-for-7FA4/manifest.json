@@ -69,6 +69,7 @@
         "data/users.json",
         "data/special_users.json",
         "content/panel/panel.html",
+        "content/panel/avatar-blocker.js",
         "submitter/submitters.json"
       ],
       "matches": [

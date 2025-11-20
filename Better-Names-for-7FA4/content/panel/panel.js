@@ -139,6 +139,7 @@
   const storedThemeColorRaw = readConfigValue('themeColor');
   const storedTitleUnits = readConfigValue('maxTitleUnits');
   const storedUserUnits = readConfigValue('maxUserUnits');
+  let templateBulkRetryTimer = null;
   const maxTitleUnits = (storedTitleUnits === 'none') ? Infinity : parseInt(storedTitleUnits, 10);
   const maxUserUnits = (storedUserUnits === 'none') ? Infinity : parseInt(storedUserUnits, 10);
   let hideAvatar = readConfigValue('hideAvatar');
@@ -2711,9 +2712,49 @@
     }
   }
 
+  const USER_LINK_SELECTOR = 'a[href*="/user/"], a[href*="user_id="], a[href*="uid="]';
+  const USER_ID_KEYS = ['user_id', 'userId', 'userID', 'uid', 'id'];
+
+  function resolveUidFromHref(href, el) {
+    const pickDataset = (element) => {
+      if (!element || !element.dataset) return null;
+      for (const key of USER_ID_KEYS) {
+        const k = key.replace(/[-_]/g, '');
+        const value = element.dataset[k] || element.dataset[key];
+        if (value && /^\d+$/.test(value)) return value;
+      }
+      return null;
+    };
+    const ds = pickDataset(el);
+    if (ds) return ds;
+
+    if (typeof href !== 'string') return null;
+    const direct = href.trim();
+
+    const directMatch = direct.match(/\/user\/(\d+)(?:[/?#].*)?$/);
+    if (directMatch) return directMatch[1];
+
+    const queryMatch = direct.match(/[?&#](?:user_id|userId|uid)=([0-9]+)/);
+    if (queryMatch) return queryMatch[1];
+
+    try {
+      const url = new URL(direct, location.href);
+      for (const key of USER_ID_KEYS) {
+        const v = url.searchParams.get(key);
+        if (v && /^\d+$/.test(v)) return v;
+      }
+      const pathMatch = url.pathname.match(/\/user\/(\d+)(?:\/.*)?$/);
+      if (pathMatch) return pathMatch[1];
+    } catch (_) {
+      // ignore URL parse errors
+    }
+
+    const looseMatch = direct.match(/\/user\/(\d+)(?:[/?#]|$)/);
+    return looseMatch ? looseMatch[1] : null;
+  }
+
   function processUserLink(a) {
-    if (!a || !a.matches('a[href^="/user/"]')) return;
-    if (!markOnce(a, 'UserDone')) return;
+    if (!a || !a.matches(USER_LINK_SELECTOR)) return;
 
     if (
       a.matches('#user-dropdown > a') ||
@@ -2722,10 +2763,9 @@
       a.matches('#form > div > div:nth-child(13) > a')
     ) return;
 
-    const m = (a.getAttribute('href') || '').match(/^\/user\/(\d+)\/?$/);
-    if (!m) return;
-
-    const uid = m[1];
+    const uid = resolveUidFromHref(a.getAttribute('href') || '', a);
+    if (!uid) return;
+    if (!markOnce(a, 'UserDone')) return;
     const info = users[uid];
     if (info && GRADE_LABELS[info.colorKey]) a.setAttribute('title', GRADE_LABELS[info.colorKey]);
 
@@ -3160,7 +3200,6 @@
     } catch (e) { }
   }
 
-  let templateBulkRetryTimer = null;
   function scheduleTemplateBulkButton(enabled) {
     if (templateBulkRetryTimer) {
       clearTimeout(templateBulkRetryTimer);
@@ -3336,7 +3375,7 @@
     });
   }
   // 初次遍历
-  document.querySelectorAll('a[href^="/user/"]').forEach(processUserLink);
+  document.querySelectorAll(USER_LINK_SELECTOR).forEach(processUserLink);
   document.querySelectorAll('#vueAppFuckSafari > tbody > tr > td:nth-child(2) > a > span').forEach(processProblemTitle)
   applyQuickSkip(enableQuickSkip);
   applyHideDoneSkip(hideDoneSkip);
@@ -3364,9 +3403,9 @@
     } catch (e) { }
     for (const node of nodes) {
       if (node.nodeType !== 1) continue;
-      if (node.matches?.('a[href^="/user/"]')) processUserLink(node);
+      if (node.matches?.(USER_LINK_SELECTOR)) processUserLink(node);
       if (node.matches?.('#vueAppFuckSafari > tbody > tr > td:nth-child(2) > a > span')) processProblemTitle(node);
-      node.querySelectorAll?.('a[href^="/user/"]').forEach(processUserLink);
+      node.querySelectorAll?.(USER_LINK_SELECTOR).forEach(processUserLink);
       node.querySelectorAll?.('#vueAppFuckSafari > tbody > tr > td:nth-child(2) > a > span').forEach(processProblemTitle);
       try { applyQuickSkip(quickSkipSetting, node); } catch (e) { }
     }

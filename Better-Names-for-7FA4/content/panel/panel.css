@@ -177,6 +177,13 @@
   fill: currentColor;
 }
 .bn-panel-subtitle { font-size: 12px; color: var(--bn-text-muted); margin: 4px 0 0 0; }
+.bn-ai-models {
+  text-decoration: underline;
+  text-decoration-style: solid;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  cursor: help;
+}
 
 .bn-panel-content {
   display: flex; transition: all .4s cubic-bezier(.4,0,.2,1);
