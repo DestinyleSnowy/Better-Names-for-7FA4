@@ -41,6 +41,7 @@
     showUserNickname: false,
     enableUserMenu: true,
     enablePlanAdder: true,
+    enableTemplateBulkAdd: false,
     enableGuard: false,
     enableAutoRenew: false,
     selectedSubmitter: 'none',
@@ -149,6 +150,7 @@
   const showUserNickname = readConfigValue('showUserNickname');
   const enableMenu = readConfigValue('enableUserMenu');
   const enablePlanAdder = readConfigValue('enablePlanAdder');
+  const enableTemplateBulkAdd = readConfigValue('enableTemplateBulkAdd');
   const enableGuard = readConfigValue('enableGuard');
   const enableAutoRenew = readConfigValue('enableAutoRenew');
   const SUBMITTERS_CONFIG_URL = 'submitter/submitters.json';
@@ -241,6 +243,7 @@
     showUserNickname,
     enableMenu,
     enablePlanAdder,
+    enableTemplateBulkAdd,
     enableGuard,
     enableAutoRenew,
     enableVjLink,
@@ -807,6 +810,7 @@
 
   const chkMenu = document.getElementById('bn-enable-user-menu');
   const chkPlan = document.getElementById('bn-enable-plan');
+  let chkTemplateBulkAdd = document.getElementById('bn-enable-template-bulk-add');
   const chkAutoRenew = document.getElementById('bn-enable-renew');
   const chkRankingFilter = document.getElementById('bn-enable-ranking-filter');
   const chkColumnSwitch = document.getElementById('bn-enable-column-switch');
@@ -821,6 +825,20 @@
   const chkHideDoneSkip = document.getElementById('bn-hide-done-skip');
   const chkQuickSkip = document.getElementById('bn-enable-quick-skip');
   const chkTitleOpt = document.getElementById('bn-enable-title-optimization');
+
+  if (!chkTemplateBulkAdd) {
+    const displaySection = chkTitleOpt?.closest('.bn-section');
+    const anchorLabel = chkTitleOpt?.closest('label');
+    const label = document.createElement('label');
+    label.innerHTML = '<input type="checkbox" id="bn-enable-template-bulk-add" /> 启用一键添加所有模板按钮';
+    if (anchorLabel && anchorLabel.parentElement) {
+      anchorLabel.parentElement.insertBefore(label, anchorLabel.nextSibling);
+      chkTemplateBulkAdd = label.querySelector('input');
+    } else if (displaySection) {
+      displaySection.appendChild(label);
+      chkTemplateBulkAdd = label.querySelector('input');
+    }
+  }
 
   chkTitleTr.checked = isFinite(maxTitleUnits);
   titleInp.value = isFinite(maxTitleUnits) ? maxTitleUnits : '';
@@ -841,6 +859,7 @@
   chkShowNickname.checked = showUserNickname;
   chkMenu.checked = enableMenu;
   chkPlan.checked = enablePlanAdder;
+  if (chkTemplateBulkAdd) chkTemplateBulkAdd.checked = enableTemplateBulkAdd;
   chkAutoRenew.checked = enableAutoRenew;
   chkRankingFilter.checked = enableRankingFilterSetting;
   if (chkColumnSwitch) chkColumnSwitch.checked = enableColumnSwitchSetting;
@@ -924,6 +943,7 @@
     showUserNickname,
     enableMenu,
     enablePlanAdder,
+    enableTemplateBulkAdd,
     enableAutoRenew,
     enableRankingFilter: enableRankingFilterSetting,
     columnSwitchEnabled: enableColumnSwitchSetting,
@@ -1423,6 +1443,7 @@
     const submitterSelect = document.getElementById('bn-submitter-select');
     const submitterInitialized = submitterSelect?.dataset?.bnInitialized === '1';
     const currentBtEnabled = getHiToiletEnabledState();
+    const templateBulkAddChk = document.getElementById('bn-enable-template-bulk-add');
 
     const changed =
       (document.getElementById('bn-enable-title-truncate').checked !== originalConfig.titleTruncate) ||
@@ -1438,6 +1459,7 @@
       (document.getElementById('bn-show-user-nickname').checked !== originalConfig.showUserNickname) ||
       (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) ||
       (document.getElementById('bn-enable-plan').checked !== originalConfig.enablePlanAdder) ||
+      ((templateBulkAddChk ? templateBulkAddChk.checked : originalConfig.enableTemplateBulkAdd) !== originalConfig.enableTemplateBulkAdd) ||
       (document.getElementById('bn-enable-renew').checked !== originalConfig.enableAutoRenew) ||
       (document.getElementById('bn-enable-ranking-filter').checked !== originalConfig.enableRankingFilter) ||
       (document.getElementById('bn-enable-column-switch').checked !== originalConfig.columnSwitchEnabled) ||
@@ -1527,6 +1549,13 @@
   chkQuickSkip.onchange = () => { applyQuickSkip(chkQuickSkip.checked); checkChanged(); };
   chkTitleOpt.onchange = checkChanged;
   chkPlan.onchange = checkChanged;
+  if (chkTemplateBulkAdd) {
+    chkTemplateBulkAdd.onchange = () => {
+      applyTemplateBulkAddButton(chkTemplateBulkAdd.checked);
+      scheduleTemplateBulkButton(chkTemplateBulkAdd.checked);
+      checkChanged();
+    };
+  }
   chkAutoRenew.onchange = checkChanged;
   chkRankingFilter.onchange = checkChanged;
   if (chkColumnSwitch) chkColumnSwitch.onchange = checkChanged;
@@ -1585,6 +1614,7 @@
     GM_setValue('enableUserMenu', chkMenu.checked);
     GM_setValue('enableVjLink', chkVj.checked);
     GM_setValue('enablePlanAdder', chkPlan.checked);
+    GM_setValue('enableTemplateBulkAdd', chkTemplateBulkAdd ? chkTemplateBulkAdd.checked : enableTemplateBulkAdd);
     GM_setValue('enableAutoRenew', chkAutoRenew.checked);
     GM_setValue('rankingFilter.enabled', chkRankingFilter.checked);
     if (chkColumnSwitch) GM_setValue('rankingFilter.columnSwitch.enabled', chkColumnSwitch.checked);
@@ -1687,6 +1717,10 @@
     applyQuickSkip(originalConfig.enableQuickSkip);
     chkTitleOpt.checked = originalConfig.enableTitleOptimization;
     chkPlan.checked = originalConfig.enablePlanAdder;
+    if (chkTemplateBulkAdd) chkTemplateBulkAdd.checked = originalConfig.enableTemplateBulkAdd;
+    const bulkEnabled = chkTemplateBulkAdd ? chkTemplateBulkAdd.checked : originalConfig.enableTemplateBulkAdd;
+    applyTemplateBulkAddButton(bulkEnabled);
+    scheduleTemplateBulkButton(bulkEnabled);
     chkAutoRenew.checked = originalConfig.enableAutoRenew;
     chkRankingFilter.checked = originalConfig.enableRankingFilter;
     if (chkColumnSwitch) chkColumnSwitch.checked = originalConfig.columnSwitchEnabled;
@@ -3111,6 +3145,97 @@
     } catch (e) { }
   }
 
+  let templateBulkRetryTimer = null;
+  function scheduleTemplateBulkButton(enabled) {
+    if (templateBulkRetryTimer) {
+      clearTimeout(templateBulkRetryTimer);
+      templateBulkRetryTimer = null;
+    }
+    if (!enabled) return;
+    let attempts = 0;
+    const tick = () => {
+      attempts += 1;
+      const ok = applyTemplateBulkAddButton(true);
+      if (ok || attempts >= 10) {
+        templateBulkRetryTimer = null;
+        return;
+      }
+      templateBulkRetryTimer = setTimeout(tick, 800);
+    };
+    tick();
+  }
+
+  function triggerAddAllTemplates() {
+    try {
+      if (typeof window.$ === 'function') {
+        window.$('.plus.icon').click();
+        return true;
+      }
+      const icons = document.querySelectorAll('.plus.icon');
+      icons.forEach((icon) => {
+        const evt = new MouseEvent('click', { bubbles: true, cancelable: true });
+        icon.dispatchEvent(evt);
+      });
+      return icons.length > 0;
+    } catch (error) {
+      console.warn('[BN] Failed to trigger bulk template add', error);
+      return false;
+    }
+  }
+
+  function findTemplateAnchor(scopeRoot) {
+    const preciseSelector = 'body > div.pusher > div > div > div.padding > div.ui.grid > div > div.eight.wide.column > a.ui.mini.yellow.button';
+    const candidates = [];
+    const roots = [];
+    if (scopeRoot) roots.push(scopeRoot);
+    roots.push(document);
+    for (const root of roots) {
+      if (!root) continue;
+      const precise = root.querySelector ? root.querySelector(preciseSelector) : null;
+      if (precise) candidates.push(precise);
+      if (root.matches && root.matches('a[href="/problems"].ui.mini.yellow.button')) candidates.push(root);
+      if (root.querySelectorAll) {
+        root.querySelectorAll('a[href="/problems"].ui.mini.yellow.button').forEach(a => candidates.push(a));
+      }
+    }
+    const textMatched = candidates.find(a => /模板题/.test((a.textContent || '').trim()));
+    return textMatched || candidates[0] || null;
+  }
+
+  function applyTemplateBulkAddButton(enabled, scopeRoot) {
+    let exists = false;
+    const existingBtn = document.getElementById('bn-add-all-templates');
+    if (!enabled) {
+      if (existingBtn) existingBtn.remove();
+      return exists;
+    }
+    const anchor = findTemplateAnchor(scopeRoot);
+    if (!anchor) {
+      if (existingBtn) existingBtn.remove();
+      return exists;
+    }
+    let btn = existingBtn;
+    if (!btn) {
+      btn = document.createElement('a');
+      btn.id = 'bn-add-all-templates';
+      btn.href = '#';
+      btn.className = 'ui mini teal button';
+      btn.style.marginLeft = '6px';
+      btn.textContent = '添加所有模板';
+      btn.addEventListener('click', (event) => {
+        event.preventDefault();
+        const ok = triggerAddAllTemplates();
+        if (!ok) debugLog('Bulk template add triggered but no .plus.icon found');
+      });
+    }
+    if (btn.parentElement !== anchor.parentElement || anchor.nextElementSibling !== btn) {
+      btn.remove();
+      anchor.insertAdjacentElement('afterend', btn);
+    }
+    exists = true;
+    return exists;
+  }
+
   function setUpdateNoticeState(noticeEl, state) {
     if (!noticeEl) return;
     noticeEl.classList.remove(UPDATE_NOTICE_WARNING_CLASS, UPDATE_NOTICE_ERROR_CLASS);
@@ -3200,6 +3325,8 @@
   document.querySelectorAll('#vueAppFuckSafari > tbody > tr > td:nth-child(2) > a > span').forEach(processProblemTitle)
   applyQuickSkip(enableQuickSkip);
   applyHideDoneSkip(hideDoneSkip);
+  applyTemplateBulkAddButton(enableTemplateBulkAdd);
+  scheduleTemplateBulkButton(enableTemplateBulkAdd);
   ;
 
   let submittersConfig = null;
@@ -3215,6 +3342,11 @@
       const quickChk = document.getElementById('bn-enable-quick-skip');
       if (quickChk) quickSkipSetting = quickChk.checked;
     } catch (e) { }
+    let bulkAddSetting = enableTemplateBulkAdd;
+    try {
+      const bulkChk = document.getElementById('bn-enable-template-bulk-add');
+      if (bulkChk) bulkAddSetting = bulkChk.checked;
+    } catch (e) { }
     for (const node of nodes) {
       if (node.nodeType !== 1) continue;
       if (node.matches?.('a[href^="/user/"]')) processUserLink(node);
@@ -3225,6 +3357,7 @@
     }
 
     try { const _c = document.getElementById('bn-hide-done-skip'); applyHideDoneSkip(_c ? _c.checked : hideDoneSkip); } catch (e) { }
+    try { const ok = applyTemplateBulkAddButton(bulkAddSetting); if (!ok) scheduleTemplateBulkButton(bulkAddSetting); } catch (e) { }
   }
   const observer = new MutationObserver(muts => {
     for (const mut of muts) mut.addedNodes.forEach(n => moQueue.add(n));
