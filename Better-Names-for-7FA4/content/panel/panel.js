@@ -2715,6 +2715,41 @@
   const USER_LINK_SELECTOR = 'a[href*="/user/"], a[href*="user_id="], a[href*="uid="]';
   const USER_ID_KEYS = ['user_id', 'userId', 'userID', 'uid', 'id'];
 
+  function isLikelyUrlLabel(text, rawHref) {
+    if (typeof text !== 'string') return false;
+    const t = text.trim();
+    if (!t) return false;
+    const raw = typeof rawHref === 'string' ? rawHref.trim() : '';
+    if (raw) {
+      let decoded = '';
+      try { decoded = decodeURIComponent(raw); } catch (_) { decoded = ''; }
+      if (t === raw || (decoded && t === decoded)) return true;
+    }
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(t)) return true;
+    if (t.startsWith('//')) return true;
+    if (/^www\./i.test(t)) return true;
+    if (/\/user\/\d+/i.test(t)) return true;
+    if (/[?&](?:user_id|userId|uid)=\d+/i.test(t)) return true;
+    return false;
+  }
+
+  function isBareUserProfileHref(rawHref, uid) {
+    if (!rawHref) return false;
+    let pathname = '';
+    try {
+      const url = new URL(rawHref, location.href);
+      pathname = url.pathname || '';
+    } catch (_) {
+      pathname = String(rawHref || '').split(/[?#]/)[0] || '';
+      if (!pathname.startsWith('/')) pathname = '/' + pathname;
+    }
+    const segments = pathname.split('/').filter(Boolean);
+    if (segments.length !== 2) return false;
+    if (segments[0] !== 'user') return false;
+    if (!/^\d+$/.test(segments[1])) return false;
+    return segments[1] === String(uid);
+  }
+
   function resolveUidFromHref(href, el) {
     const pickDataset = (element) => {
       if (!element || !element.dataset) return null;
@@ -2770,20 +2805,22 @@
     const uid = resolveUidFromHref(rawHref, a);
     if (!uid) return;
     if (!markOnce(a, 'UserDone')) return;
+    if (!isBareUserProfileHref(rawHref, uid)) return;
     const info = users[uid];
     if (info && GRADE_LABELS[info.colorKey]) a.setAttribute('title', GRADE_LABELS[info.colorKey]);
+
+    let baseText = '';
+    a.childNodes.forEach(n => { if (n.nodeType === Node.TEXT_NODE) baseText += n.textContent; });
+    baseText = baseText.trim();
+    const defaultSource = baseText || (a.textContent || '').trim();
+    if (isLikelyUrlLabel(defaultSource, rawHref)) return;
+    const originalNickname = (showUserNickname && info) ? extractOriginalNickname(baseText) : '';
 
     const img = a.querySelector('img');
     if (img && hideAvatar) img.remove();
 
     a.querySelectorAll('.bn-icon').forEach(el => el.remove());
     a.querySelectorAll('.bn-user-tags').forEach(el => el.remove());
-
-    let baseText = '';
-    a.childNodes.forEach(n => { if (n.nodeType === Node.TEXT_NODE) baseText += n.textContent; });
-    baseText = baseText.trim();
-    const defaultSource = baseText || (a.textContent || '').trim();
-    const originalNickname = (showUserNickname && info) ? extractOriginalNickname(baseText) : '';
 
     let combinedName = defaultSource;
     if (info) {
