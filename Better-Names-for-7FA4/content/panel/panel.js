@@ -2967,26 +2967,29 @@
 
     let computedIndex = null;
 
-    const anchorIndex = cells.findIndex(td => {
-      const anchor = td.querySelector('a[href^="/problem/"]');
-      if (!anchor || anchor.getAttribute('data-bn-quick-skip') === '1') return false;
-      const text = (anchor.textContent || '').trim();
+    // Prefer the problem code cell (usually wrapped in <b>) to anchor text to avoid
+    // placing the skip column after the title when titles start with Latin letters.
+    const codeCellIndex = cells.findIndex(td => {
+      const bold = td.querySelector('b');
+      if (!bold) return false;
+      const text = (bold.textContent || '').trim();
       if (!text) return false;
       if (/^L/i.test(text)) return false;
       return /^[A-Za-z]/.test(text);
     });
-    if (anchorIndex > -1) computedIndex = anchorIndex + 1;
+    if (codeCellIndex > -1) computedIndex = codeCellIndex;
 
     if (computedIndex === null) {
-      const codeCellIndex = cells.findIndex(td => {
-        const bold = td.querySelector('b');
-        if (!bold) return false;
-        const text = (bold.textContent || '').trim();
+      const anchorIndex = cells.findIndex(td => {
+        const anchor = td.querySelector('a[href^="/problem/"]');
+        if (!anchor || anchor.getAttribute('data-bn-quick-skip') === '1') return false;
+        const text = (anchor.textContent || '').trim();
         if (!text) return false;
         if (/^L/i.test(text)) return false;
+        if (!/[0-9]/.test(text)) return false; // titles with letters but no digits should not drive placement
         return /^[A-Za-z]/.test(text);
       });
-      if (codeCellIndex > -1) computedIndex = codeCellIndex;
+      if (anchorIndex > -1) computedIndex = anchorIndex + 1;
     }
 
     if (computedIndex === null) return { qualifies: false, insertIndex: null, questionIcon: true };
