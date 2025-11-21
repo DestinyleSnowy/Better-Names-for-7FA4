@@ -922,9 +922,52 @@ window.getCurrentUserId = getCurrentUserId;
     $('#pad-ok').onclick = submitPlan;
 
     count();
-    const pos = GM_getValue(KEY.barPos, null);
-    if (pos) { bar.style.left = pos.left; bar.style.top = pos.top; bar.style.right = 'auto'; bar.style.bottom = 'auto'; }
-    drag(bar, $('#pad-handle'));
+    // Keep the floating bar visible after window resize / page zoom by scaling saved coordinates
+    const coerceNumber = (v) => {
+      if (typeof v === 'number' && Number.isFinite(v)) return v;
+      const parsed = parseFloat(v);
+      return Number.isFinite(parsed) ? parsed : NaN;
+    };
+    const clampBarPosition = (left, top) => {
+      const rect = bar.getBoundingClientRect();
+      const w = rect.width || bar.offsetWidth || 0;
+      const h = rect.height || bar.offsetHeight || 0;
+      const margin = 8;
+      const maxLeft = Math.max(margin, window.innerWidth - w - margin);
+      const maxTop = Math.max(margin, window.innerHeight - h - margin);
+      return {
+        left: Math.min(maxLeft, Math.max(margin, left)),
+        top: Math.min(maxTop, Math.max(margin, top))
+      };
+    };
+    let savedBarPos = GM_getValue(KEY.barPos, null);
+    const applyBarPosition = (pos = savedBarPos) => {
+      const rawLeft = coerceNumber(pos?.left);
+      const rawTop = coerceNumber(pos?.top);
+      if (!Number.isFinite(rawLeft) || !Number.isFinite(rawTop)) return false;
+      const hasViewport = Number.isFinite(pos?.vw) && pos.vw > 0 && Number.isFinite(pos?.vh) && pos.vh > 0;
+      const ratioX = hasViewport ? Math.min(1, Math.max(0, rawLeft / pos.vw)) : null;
+      const ratioY = hasViewport ? Math.min(1, Math.max(0, rawTop / pos.vh)) : null;
+      const clamped = clampBarPosition(
+        hasViewport ? ratioX * window.innerWidth : rawLeft,
+        hasViewport ? ratioY * window.innerHeight : rawTop
+      );
+      bar.style.left = clamped.left + 'px';
+      bar.style.top = clamped.top + 'px';
+      bar.style.right = 'auto';
+      bar.style.bottom = 'auto';
+      savedBarPos = { ...clamped, vw: window.innerWidth, vh: window.innerHeight };
+      GM_setValue(KEY.barPos, savedBarPos);
+      return true;
+    };
+    const persistBarPosition = () => {
+      const rect = bar.getBoundingClientRect();
+      applyBarPosition({ left: rect.left, top: rect.top, vw: window.innerWidth, vh: window.innerHeight });
+    };
+
+    applyBarPosition(savedBarPos);
+    window.addEventListener('resize', () => { if (savedBarPos) applyBarPosition(savedBarPos); });
+    drag(bar, $('#pad-handle'), persistBarPosition);
   }
 
   function extractProblemMetaTitle(doc) {
@@ -1094,13 +1137,13 @@ window.getCurrentUserId = getCurrentUserId;
     if (el) el.textContent = selected.size;
     renderPlanPreview();
   }
-  function drag(el, handle) {
+  function drag(el, handle, onDone) {
     let sx, sy, sl, st, d = false;
     handle.onmousedown = e => {
       d = true; sx = e.clientX; sy = e.clientY; const r = el.getBoundingClientRect(); sl = r.left; st = r.top;
       el.style.right = 'auto'; el.style.bottom = 'auto';
       window.onmousemove = ev => { if (!d) return; const L = Math.max(0, Math.min(window.innerWidth - el.offsetWidth, sl + ev.clientX - sx)); const T = Math.max(0, Math.min(window.innerHeight - el.offsetHeight, st + ev.clientY - sy)); el.style.left = L + 'px'; el.style.top = T + 'px'; };
-      window.onmouseup = () => { d = false; window.onmousemove = null; window.onmouseup = null; GM_setValue(KEY.barPos, { left: el.style.left, top: el.style.top }); };
+      window.onmouseup = () => { d = false; window.onmousemove = null; window.onmouseup = null; if (typeof onDone === 'function') onDone(); };
       e.preventDefault();
     };
   }
