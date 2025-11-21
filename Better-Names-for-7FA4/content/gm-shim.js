@@ -36,18 +36,30 @@
     } catch (e) {}
   }
 
-  readFromChromeStorage(null, (all) => {
-    if (!all) return;
+  const gmReadyPromise = new Promise((resolve) => {
     try {
-      Object.keys(all).forEach(k => {
-        const lk = "__gm__" + k;
-        if (localStorage.getItem(lk) === null) {
-          const v = all[k];
-          localStorage.setItem(lk, (typeof v === 'string') ? v : JSON.stringify(v));
-        }
+      readFromChromeStorage(null, (all) => {
+        try {
+          if (all) {
+            Object.keys(all).forEach(k => {
+              const lk = "__gm__" + k;
+              const v = all[k];
+              if (v === undefined) {
+                localStorage.removeItem(lk);
+              } else {
+                localStorage.setItem(lk, (typeof v === 'string') ? v : JSON.stringify(v));
+              }
+            });
+          }
+        } catch (e) {}
+        resolve();
       });
-    } catch (e) {}
+    } catch (_) {
+      resolve();
+    }
   });
+
+  window.__GM_ready = function() { return gmReadyPromise; };
 
   function GM_addStyle(css) {
     try {
