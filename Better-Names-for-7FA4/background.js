@@ -1021,6 +1021,8 @@ function patchJQueryGet(options) {
         let replayLastGet = null;
         let statsRefs = null;
         let lastStats = { pages: 0, users: 0, elapsedMs: 0 };
+        const MERGE_REQUEST_TIMEOUT_MS = 2600;
+        let pendingMergeKick = null;
 
         const CONTROL_ID = 'bn-merge-container';
         const BUTTON_ID = 'bn-merge-button';
@@ -1471,6 +1473,12 @@ function patchJQueryGet(options) {
         const controls = ensureControls();
         const mergeButton = controls && controls.button;
         const statusEl = controls && controls.status;
+        const clearPendingMergeKick = () => {
+          if(pendingMergeKick){
+            clearTimeout(pendingMergeKick);
+            pendingMergeKick = null;
+          }
+        };
 
         const setStatus = (text, tone = 'info') => {
           if(statusEl){
@@ -1510,7 +1518,25 @@ function patchJQueryGet(options) {
               return;
             }
             if(typeof replayLastGet !== 'function'){
-              setStatus('暂未检测到榜单请求，请刷新后重试', 'warning');
+              gatherRequested = true;
+              gatherInProgress = true;
+              resetStatsDisplay();
+              setButtonBusy('刷新中...');
+              setStatus('正在刷新榜单并捕获请求...', 'info');
+              clearPendingMergeKick();
+              pendingMergeKick = setTimeout(() => {
+                if(gatherInProgress){
+                  gatherRequested = false;
+                  gatherInProgress = false;
+                  setButtonIdle(ERROR_RETRY_TEXT);
+                  setStatus('未捕获到榜单请求，请刷新后重试', 'warning');
+                }
+              }, MERGE_REQUEST_TIMEOUT_MS);
+              try {
+                triggerFilterReload();
+              } catch(err){
+                console.warn('show-all: failed to trigger filter reload for merge', err);
+              }
               return;
             }
             gatherRequested = true;
@@ -1518,6 +1544,7 @@ function patchJQueryGet(options) {
             resetStatsDisplay();
             setButtonBusy('合并中...');
             setStatus('准备抓取所有页面...', 'info');
+            clearPendingMergeKick();
             try {
               replayLastGet();
             } catch(err){
@@ -1540,6 +1567,7 @@ function patchJQueryGet(options) {
 
             const argsCopy = args.slice();
             replayLastGet = () => patchedGet.apply($, argsCopy);
+            clearPendingMergeKick();
 
             if(!gatherRequested){
               if(!gatherInProgress) setStatus('检测到榜单数据，可点击「合并榜单」', 'info');
