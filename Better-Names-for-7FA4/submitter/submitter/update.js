@@ -70,6 +70,9 @@ function makeNotice(remoteVer, localVer, remoteBase) {
   // container.appendChild(info);
   document.getElementById('verLocal').innerText = localVer;
   document.getElementById('verRemote').innerText = remoteVer;
+  if(localVer != remoteVer) {
+    document.getElementById('versionLocal').style = "color: red;";
+  }
 
   // return container;
 }

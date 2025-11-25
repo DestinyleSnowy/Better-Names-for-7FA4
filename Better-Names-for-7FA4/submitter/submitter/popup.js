@@ -156,20 +156,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 		'7fa4': /http:\/\/(?:jx)|(?:in)\.7fa4\.cn:8888\/submission\/(\d+)/,
 	}
 	let oj_host = {
-		luogu: 'https://www.luogu.com.cn',
-		uoj: 'https://uoj.ac',
-		qoj: 'https://qoj.ac',
-		cf: 'https://codeforces.com',
-		cfgym: 'https://codeforces.com',
-		atc: 'https://atcoder.jp',
-		vj: 'https://vjudge.net',
-		cc: 'https://www.codechef.com',
-		csa: 'https://csacademy.com',
-		zr: 'http://www.zhengruioi.com',
-		xyd: 'https://www.xinyoudui.com',
-		oifha: 'https://oifha.com',
-		mx: 'https://mna.wang',
-		'7fa4': '7fa4.cn:8888',
+		luogu: /https:\/\/(?:www\.)?luogu\.com\.cn/,
+		uoj: /https:\/\/(?:www\.)?uoj\.ac/,
+		qoj: /https:\/\/(?:www\.)?qoj\.ac/,
+		cf: /https:\/\/(?:www\.)?codeforces\.com/,
+		cfgym: /https:\/\/(?:www\.)?codeforces\.com/,
+		atc: /https:\/\/(?:www\.)?atcoder\.jp/,
+		vj: /https:\/\/(?:www\.)?vjudge\.net/,
+		cc: /https:\/\/(?:www\.)?codechef\.com/,
+		csa: /https:\/\/(?:www\.)?csacademy\.com/,
+		zr: /http:\/\/(?:www\.)?zhengruioi\.com/,
+		xyd: /https:\/\/(?:www\.)?xinyoudui\.com/,
+		oifha: /https:\/\/(?:www\.)?oifha\.com/,
+		mx: /https:\/\/(?:www\.)?mna\.wang/,
+		'7fa4': /http:\/\/(?:jx)|(?:in)\.7fa4\.cn:8888/,
 	}
 	let deal_uoj = (oj) => (rid) => {
 		let q = $(html);
@@ -629,7 +629,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 	}
 	let state = null, is_oj = false;
 	for(let name in oj_urls){
-		if(!sender.origin.endsWith(oj_host[name]))
+		if(!oj_host[name].exec(sender.origin))
 			continue;
 		is_oj = true;
 		let m = oj_urls[name].exec(sender.url);
