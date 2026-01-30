@@ -1,5 +1,10 @@
 ﻿## CHANGELOG
 
+### 2026.01
+> 版本代号：后会无期
+- 更新 submitter。
+- 关闭 GitHub 数据库自动更新的工作流（原因：cookie 没了）。
+
 ### 6.1.6.12
 > 版本代号：NOIP rp++
 - 更新 submitter。

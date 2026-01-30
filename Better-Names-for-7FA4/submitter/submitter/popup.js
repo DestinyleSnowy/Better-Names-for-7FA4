@@ -17,10 +17,8 @@ function freshLoginStatus() {
 		if(!cookies || !cookies.login || !cookies['connect.sid']) {
 			a.innerHTML = '未登录';
 		} else {
-			a.innerHTML = '已登录';
-
 			let headers = new Headers({
-				"Set-Cookie": `login=${cookies.login}; connect.sid=${cookies['connect.sid']}`,
+				"Cookie": `login=${cookies.login}; connect.sid=${cookies['connect.sid']}`,
 				"Content-Type": "application/json"
 			});
 			let current_host = cookies.chost;
@@ -37,10 +35,13 @@ function freshLoginStatus() {
 				json => {
 					console.log(json)
 					if(json.success) 
-						a.innerHTML += '  ' + json.user.nickname;
+						a.innerHTML = '已登录  ' + json.user.nickname;
+					else 
+						a.innerHTML = '未登录';	
 				}
 			).catch(
 				error => {
+					a.innerHTML = '未登录';
 					console.log(error);
 				}
 			)
@@ -468,6 +469,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 			let q = $(html);
 			let td = q.find('tbody').find('td');
 			let st = $(td[0]).text();
+			if(st == 'Happy New Year!') 
+				st = 'Accepted';
 			if(st != 'Accepted')
 				st = 'Wrong Answer';
 
@@ -655,7 +658,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 			return;
 		}
 		let headers = new Headers({
-			"Set-Cookie": `login=${cookies.login}; connect.sid=${cookies['connect.sid']}`,
+			"Cookie": `login=${cookies.login}; connect.sid=${cookies['connect.sid']}`,
 			"Content-Type": "application/json"
 		});
 		let current_host = cookies.chost;
