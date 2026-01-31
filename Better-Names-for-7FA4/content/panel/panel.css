@@ -1080,3 +1080,19 @@ a[data-bn-quick-skip="1"] i.icon,
   background: transparent !important;
   color: var(--bn-text-sub) !important;
 }
+/* 确保 KaTeX 的字体优先级最高 */
+.katex {
+    font-family: KaTeX_Main, 'Times New Roman', serif !important;
+    text-indent: 0 !important; /* 防止某些网页的段落缩进破坏公式 */
+}
+
+.katex-display {
+    margin: 1em 0 !important;
+}
+
+/* 如果 Markdown 渲染出来的标题太大或太丑，也可以顺便修一下 */
+.rendered-by-me h1, .rendered-by-me h2 {
+    border-bottom: 1px solid #eee;
+    margin-top: 10px;
+    font-family: sans-serif;
+}
