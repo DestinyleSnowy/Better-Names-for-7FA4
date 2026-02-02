@@ -12293,7 +12293,7 @@
   },
   "3074": {
     "name": "全柏锋",
-    "colorKey": "by"
+    "colorKey": "g2"
   },
   "3075": {
     "name": "孙美怡",
@@ -12661,6 +12661,238 @@
   },
   "3166": {
     "name": "李思汗",
+    "colorKey": "by"
+  },
+  "3167": {
+    "name": "吴希珏",
+    "colorKey": "g2"
+  },
+  "3168": {
+    "name": "潘洛诚",
+    "colorKey": "c2"
+  },
+  "3169": {
+    "name": "乔子迅",
+    "colorKey": "g2"
+  },
+  "3170": {
+    "name": "张旭坤",
+    "colorKey": "by"
+  },
+  "3171": {
+    "name": "宋若初",
+    "colorKey": "c1"
+  },
+  "3172": {
+    "name": "李承泽",
+    "colorKey": "c2"
+  },
+  "3173": {
+    "name": "王羿洋",
+    "colorKey": "c2"
+  },
+  "3174": {
+    "name": "陈昱翰",
+    "colorKey": "c2"
+  },
+  "3175": {
+    "name": "李京徽",
+    "colorKey": "c3"
+  },
+  "3176": {
+    "name": "贾宸浩",
+    "colorKey": "c3"
+  },
+  "3177": {
+    "name": "陈熠芾",
+    "colorKey": "c3"
+  },
+  "3178": {
+    "name": "康珈晨",
+    "colorKey": "c3"
+  },
+  "3179": {
+    "name": "郭庭瑞",
+    "colorKey": "c3"
+  },
+  "3180": {
+    "name": "殷思远",
+    "colorKey": "c3"
+  },
+  "3181": {
+    "name": "榜B",
+    "colorKey": "by"
+  },
+  "3182": {
+    "name": "榜C",
+    "colorKey": "by"
+  },
+  "3183": {
+    "name": "榜D",
+    "colorKey": "by"
+  },
+  "3184": {
+    "name": "",
+    "colorKey": "by"
+  },
+  "3185": {
+    "name": "孙家瑞",
+    "colorKey": "c2"
+  },
+  "3186": {
+    "name": "刘熹恩",
+    "colorKey": "c1"
+  },
+  "3187": {
+    "name": "宋韦颐",
+    "colorKey": "x6"
+  },
+  "3188": {
+    "name": "文思翰",
+    "colorKey": "x5"
+  },
+  "3189": {
+    "name": "伍思宥",
+    "colorKey": "x6"
+  },
+  "3190": {
+    "name": "赵亮",
+    "colorKey": "x5"
+  },
+  "3191": {
+    "name": "赵翰霖",
+    "colorKey": "x5"
+  },
+  "3192": {
+    "name": "杨丰瑞",
+    "colorKey": "x5"
+  },
+  "3193": {
+    "name": "钟鸿蔚",
+    "colorKey": "x6"
+  },
+  "3194": {
+    "name": "刘成鹏",
+    "colorKey": "x5"
+  },
+  "3195": {
+    "name": "赵旭航",
+    "colorKey": "by"
+  },
+  "3196": {
+    "name": "侯舒桓",
+    "colorKey": "by"
+  },
+  "3197": {
+    "name": "王铭朗",
+    "colorKey": "c1"
+  },
+  "3198": {
+    "name": "杨浩基",
+    "colorKey": "g1"
+  },
+  "3199": {
+    "name": "杨仪",
+    "colorKey": "by"
+  },
+  "3200": {
+    "name": "徐锦轩",
+    "colorKey": "c1"
+  },
+  "3201": {
+    "name": "张家宁",
+    "colorKey": "by"
+  },
+  "3202": {
+    "name": "邓少杰",
+    "colorKey": "c1"
+  },
+  "3203": {
+    "name": "谢涵瑞",
+    "colorKey": "by"
+  },
+  "3204": {
+    "name": "胡源浩",
+    "colorKey": "by"
+  },
+  "3205": {
+    "name": "李俊",
+    "colorKey": "by"
+  },
+  "3206": {
+    "name": "张金浩",
+    "colorKey": "by"
+  },
+  "3207": {
+    "name": "王思涵",
+    "colorKey": "by"
+  },
+  "3208": {
+    "name": "仇奕皓",
+    "colorKey": "c1"
+  },
+  "3209": {
+    "name": "杨皓循",
+    "colorKey": "by"
+  },
+  "3210": {
+    "name": "李城淏",
+    "colorKey": "by"
+  },
+  "3211": {
+    "name": "鲁泊成",
+    "colorKey": "by"
+  },
+  "3212": {
+    "name": "张浩然",
+    "colorKey": "by"
+  },
+  "3213": {
+    "name": "赵旭航",
+    "colorKey": "by"
+  },
+  "3214": {
+    "name": "雷康宁",
+    "colorKey": "c3"
+  },
+  "3215": {
+    "name": "傅天宇",
+    "colorKey": "c3"
+  },
+  "3216": {
+    "name": "王浩宇",
+    "colorKey": "g3"
+  },
+  "3217": {
+    "name": "侯舒桓",
+    "colorKey": "by"
+  },
+  "3218": {
+    "name": "马栾和",
+    "colorKey": "g1"
+  },
+  "3219": {
+    "name": "方铨铎",
+    "colorKey": "g1"
+  },
+  "3220": {
+    "name": "谢雨衡",
+    "colorKey": "g1"
+  },
+  "3221": {
+    "name": "华铭伟",
+    "colorKey": "g1"
+  },
+  "3222": {
+    "name": "谢进",
+    "colorKey": "x6"
+  },
+  "3223": {
+    "name": "刘天琦",
+    "colorKey": "c3"
+  },
+  "3224": {
+    "name": "颜佳",
     "colorKey": "by"
   }
 }
