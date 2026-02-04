@@ -70,7 +70,15 @@
         "http://10.210.57.10:8888/user_plans/*",
         "http://10.210.57.10:5283/user_plans/*",
         "http://211.137.101.118:8888/user_plans/*",
-        "http://211.137.101.118:5283/user_plans/*"
+        "http://211.137.101.118:5283/user_plans/*",
+        "http://in.7fa4.cn:8888/review/user_tags/html?tag_id=*",
+        "http://in.7fa4.cn:5283/review/user_tags/html?tag_id=*",
+        "http://jx.7fa4.cn:8888/review/user_tags/html?tag_id=*",
+        "http://jx.7fa4.cn:5283/review/user_tags/html?tag_id=*",
+        "http://10.210.57.10:8888/review/user_tags/html?tag_id=*",
+        "http://10.210.57.10:5283/review/user_tags/html?tag_id=*",
+        "http://211.137.101.118:8888/review/user_tags/html?tag_id=*",
+        "http://211.137.101.118:5283/review/user_tags/html?tag_id=*"
       ],
       "exclude_matches": [
         "http://in.7fa4.cn:9080/*",
