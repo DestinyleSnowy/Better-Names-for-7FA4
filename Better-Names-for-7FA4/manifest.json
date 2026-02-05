@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Better Names for 7FA4",
-  "version": "2026.02",
+  "version": "2026.03",
   "description": "强大的 7FA4 用户名与颜色映射插件",
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"

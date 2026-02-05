@@ -151,7 +151,8 @@
   const enableContestReviewButtons = readConfigValue('enableContestReviewButtons');
   const showUserNickname = readConfigValue('showUserNickname');
   const enableMenu = readConfigValue('enableUserMenu');
-  const enablePlanAdder = readConfigValue('enablePlanAdder');
+  const enablePlanAdder = true;
+  try { GM_setValue('enablePlanAdder', true); } catch (_) { /* ignore */ }
   const enableTemplateBulkAdd = readConfigValue('enableTemplateBulkAdd');
   const enableGuard = readConfigValue('enableGuard');
   const enableAutoRenew = readConfigValue('enableAutoRenew');
@@ -811,7 +812,6 @@
   const chkShowNickname = document.getElementById('bn-show-user-nickname');
 
   const chkMenu = document.getElementById('bn-enable-user-menu');
-  const chkPlan = document.getElementById('bn-enable-plan');
   let chkTemplateBulkAdd = document.getElementById('bn-enable-template-bulk-add');
   const chkAutoRenew = document.getElementById('bn-enable-renew');
   const chkRankingFilter = document.getElementById('bn-enable-ranking-filter');
@@ -860,7 +860,6 @@
   chkContestReview.checked = enableContestReviewButtons;
   chkShowNickname.checked = showUserNickname;
   chkMenu.checked = enableMenu;
-  chkPlan.checked = enablePlanAdder;
   if (chkTemplateBulkAdd) chkTemplateBulkAdd.checked = enableTemplateBulkAdd;
   chkAutoRenew.checked = enableAutoRenew;
   chkRankingFilter.checked = enableRankingFilterSetting;
@@ -1460,7 +1459,6 @@
       (document.getElementById('bn-enable-contest-review').checked !== originalConfig.enableContestReviewButtons) ||
       (document.getElementById('bn-show-user-nickname').checked !== originalConfig.showUserNickname) ||
       (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) ||
-      (document.getElementById('bn-enable-plan').checked !== originalConfig.enablePlanAdder) ||
       ((templateBulkAddChk ? templateBulkAddChk.checked : originalConfig.enableTemplateBulkAdd) !== originalConfig.enableTemplateBulkAdd) ||
       (document.getElementById('bn-enable-renew').checked !== originalConfig.enableAutoRenew) ||
       (document.getElementById('bn-enable-ranking-filter').checked !== originalConfig.enableRankingFilter) ||
@@ -1550,7 +1548,6 @@
   chkHideDoneSkip.onchange = () => { applyHideDoneSkip(chkHideDoneSkip.checked); checkChanged(); };
   chkQuickSkip.onchange = () => { applyQuickSkip(chkQuickSkip.checked); checkChanged(); };
   chkTitleOpt.onchange = checkChanged;
-  chkPlan.onchange = checkChanged;
   if (chkTemplateBulkAdd) {
     chkTemplateBulkAdd.onchange = () => {
       applyTemplateBulkAddButton(chkTemplateBulkAdd.checked);
@@ -1615,7 +1612,7 @@
     GM_setValue('enableTitleOptimization', chkTitleOpt.checked);
     GM_setValue('enableUserMenu', chkMenu.checked);
     GM_setValue('enableVjLink', chkVj.checked);
-    GM_setValue('enablePlanAdder', chkPlan.checked);
+    GM_setValue('enablePlanAdder', true);
     GM_setValue('enableTemplateBulkAdd', chkTemplateBulkAdd ? chkTemplateBulkAdd.checked : enableTemplateBulkAdd);
     GM_setValue('enableAutoRenew', chkAutoRenew.checked);
     GM_setValue('rankingFilter.enabled', chkRankingFilter.checked);
@@ -1718,7 +1715,6 @@
     chkQuickSkip.checked = originalConfig.enableQuickSkip;
     applyQuickSkip(originalConfig.enableQuickSkip);
     chkTitleOpt.checked = originalConfig.enableTitleOptimization;
-    chkPlan.checked = originalConfig.enablePlanAdder;
     if (chkTemplateBulkAdd) chkTemplateBulkAdd.checked = originalConfig.enableTemplateBulkAdd;
     const bulkEnabled = chkTemplateBulkAdd ? chkTemplateBulkAdd.checked : originalConfig.enableTemplateBulkAdd;
     applyTemplateBulkAddButton(bulkEnabled);

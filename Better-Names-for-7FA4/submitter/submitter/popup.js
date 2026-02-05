@@ -617,9 +617,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 				return false;
 			}
 			let td = $(q.find('tbody tr td'));
+			let pid = $(td[1]).find('a').attr('href').split('/');
 			return {
 				code: $(code).text(),
-				pid: $(td[1]).find('a').attr('href').split('/')[1],
+				pid: pid[pid.length-1],
 				rid: rid,
 				oj: '7fa4',
 				language: 'cpp17',

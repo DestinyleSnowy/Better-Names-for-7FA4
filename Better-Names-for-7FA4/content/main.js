@@ -54,7 +54,8 @@ window.getCurrentUserId = getCurrentUserId;
   const CODE_COL_KEYWORDS = ['编号', '题号', '外站题号'];
   const FOREIGN_TITLE_KEYWORDS = ['标题', '题目', '题名'];
 
-  const enablePlanAdder = GM_getValue('enablePlanAdder', true);
+  const enablePlanAdder = true;
+  try { GM_setValue('enablePlanAdder', true); } catch (_) { /* ignore */ }
   let modeOn = !!GM_getValue(KEY.mode, false);
   const PADDER_HANDLED_FLAG = '__bnPlanHandled';
 
