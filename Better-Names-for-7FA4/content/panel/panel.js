@@ -706,10 +706,17 @@
   let dragStartX = 0;
   let dragStartY = 0;
   let gearW = 48, gearH = 48;
-  let __bn_trail = [];
-  let __bn_raf = null;
   let __bn_dragX = 0, __bn_dragY = 0;
+  let __bn_dragOffsetX = 24, __bn_dragOffsetY = 24;
   let __bn_pointerId = null;
+  let __bn_pointerMode = null;
+  let __bn_dragRafId = null;
+  let __bn_snapRafId = null;
+  let __bn_settleTimer = null;
+  let __bn_dragPendingX = 0;
+  let __bn_dragPendingY = 0;
+  let __bn_suppressTriggerClickUntil = 0;
+  const __bn_nowMs = () => (window.performance && performance.now) ? performance.now() : Date.now();
   let currentBgSourceType = normalizedBgSourceType;
   let currentBgImageData = normalizedBgData;
   let currentBgImageDataName = normalizedBgFileName;
@@ -978,133 +985,195 @@
     disableNeedWarn();
   }
 
-  const WAKE_REASON_PIN = 'pin';
-  const WAKE_REASON_TRIGGER = 'hover:trigger';
-  const WAKE_REASON_PANEL = 'hover:panel';
-  const WAKE_REASON_FOCUS = 'focus';
-  const PANEL_HIDE_DELAY = 300;
-  const HOVER_SUPPRESS_MS = 600;
-  const wakeReasons = new Set();
-  let pointerMovedSinceLoad = false;
-  const hoverSuppressUntil = (() => {
-    if (typeof performance !== 'undefined' && performance.now) return performance.now() + HOVER_SUPPRESS_MS;
-    return Date.now() + HOVER_SUPPRESS_MS;
-  })();
-  const nowTs = () => {
-    if (typeof performance !== 'undefined' && performance.now) return performance.now();
-    return Date.now();
-  };
+  function createPanelWakeController() {
+    const reasons = Object.freeze({
+      PIN: 'pin',
+      TRIGGER: 'hover:trigger',
+      PANEL: 'hover:panel',
+      FOCUS: 'focus',
+    });
+    const PANEL_HIDE_DELAY = 300;
+    const HOVER_SUPPRESS_MS = 600;
+    const DRAG_HOVER_SUPPRESS_MS = 260;
+    const wakeReasons = new Set();
 
-  window.addEventListener('pointermove', () => { pointerMovedSinceLoad = true; }, { once: true, passive: true });
-  const canHonorHoverWake = () => pointerMovedSinceLoad && nowTs() >= hoverSuppressUntil;
+    let pointerMovedSinceLoad = false;
+    const nowTs = () => {
+      if (typeof performance !== 'undefined' && performance.now) return performance.now();
+      return Date.now();
+    };
+    const hoverSuppressUntil = nowTs() + HOVER_SUPPRESS_MS;
+    window.addEventListener('pointermove', () => { pointerMovedSinceLoad = true; }, { once: true, passive: true });
 
-  let hideTimer = null;
-  let initialRevealPending = true;
-  let initialRevealFrame = null;
+    let hideTimer = null;
+    let initialRevealPending = true;
+    let initialRevealFrame = null;
+    let hoverWakeBlockedUntil = 0;
 
-  const cancelPendingReveal = () => {
-    if (initialRevealFrame != null) {
-      cancelAnimationFrame(initialRevealFrame);
-      initialRevealFrame = null;
-    }
-  };
-  const shouldRevealPanel = () => pinned || wakeReasons.size > 0;
+    const isHoverWakeBlocked = () => nowTs() < hoverWakeBlockedUntil;
+    const canHonorHoverWake = () => pointerMovedSinceLoad && nowTs() >= hoverSuppressUntil && !isHoverWakeBlocked();
+    const shouldRevealPanel = () => pinned || wakeReasons.size > 0;
+    const cancelPendingReveal = () => {
+      if (initialRevealFrame != null) {
+        cancelAnimationFrame(initialRevealFrame);
+        initialRevealFrame = null;
+      }
+    };
+    const cancelHide = () => {
+      if (hideTimer != null) {
+        clearTimeout(hideTimer);
+        hideTimer = null;
+      }
+    };
 
-  const cancelHide = () => {
-    if (hideTimer != null) {
-      clearTimeout(hideTimer);
-      hideTimer = null;
-    }
-  };
+    const showPanel = () => {
+      if (isDragging || container.classList.contains('bn-dragging')) return;
+      bringContainerToFront();
+      if (panel.classList.contains('bn-show')) {
+        cancelPendingReveal();
+        panel.classList.add('bn-show');
+        updateContainerState();
+        return;
+      }
+      const commitReveal = () => {
+        initialRevealFrame = null;
+        if (!shouldRevealPanel()) return;
+        panel.classList.add('bn-show');
+        updateContainerState();
+      };
+      if (initialRevealPending) {
+        initialRevealPending = false;
+        initialRevealFrame = requestAnimationFrame(() => {
+          initialRevealFrame = requestAnimationFrame(commitReveal);
+        });
+      } else {
+        commitReveal();
+      }
+    };
 
-  const showPanel = () => {
-    if (isDragging || container.classList.contains('bn-dragging')) return;
-    bringContainerToFront();
-    if (panel.classList.contains('bn-show')) {
+    const hidePanel = () => {
+      if (pinned) return;
       cancelPendingReveal();
-      panel.classList.add('bn-show');
-      updateContainerState();
-      return;
-    }
-    const commitReveal = () => {
-      initialRevealFrame = null;
-      if (!shouldRevealPanel()) return;
-      panel.classList.add('bn-show');
+      panel.classList.remove('bn-show');
+      if (panel.contains(document.activeElement)) document.activeElement.blur();
       updateContainerState();
     };
-    if (initialRevealPending) {
-      initialRevealPending = false;
-      initialRevealFrame = requestAnimationFrame(() => {
-        initialRevealFrame = requestAnimationFrame(commitReveal);
+
+    const detectHoverReason = () => {
+      if (isDragging || container.classList.contains('bn-dragging') || isHoverWakeBlocked()) return null;
+      try {
+        if (panel.matches(':hover')) return reasons.PANEL;
+        if (trigger.matches(':hover')) return reasons.TRIGGER;
+      } catch (_) { /* ignore */ }
+      return null;
+    };
+
+    const requestWake = (reason) => {
+      if ((isDragging || container.classList.contains('bn-dragging')) && reason !== reasons.PIN) return;
+      if (reason) wakeReasons.add(reason);
+      cancelHide();
+      showPanel();
+    };
+
+    const scheduleHide = () => {
+      cancelHide();
+      if (wakeReasons.size || pinned) return;
+      hideTimer = setTimeout(() => {
+        if (pinned || wakeReasons.size) return;
+        const hoverReason = detectHoverReason();
+        if (hoverReason) {
+          if (canHonorHoverWake()) requestWake(hoverReason);
+          return;
+        }
+        const activeElement = document.activeElement;
+        if (activeElement && container.contains(activeElement)) {
+          if (panel.classList.contains('bn-show') || canHonorHoverWake()) {
+            requestWake(reasons.FOCUS);
+          }
+          return;
+        }
+        hidePanel();
+      }, PANEL_HIDE_DELAY);
+    };
+
+    const releaseWake = (reason) => {
+      if (!reason) return;
+      if (!wakeReasons.delete(reason)) return;
+      if (!wakeReasons.size && !pinned) scheduleHide();
+    };
+
+    const attachHoverWake = (element, reason) => {
+      if (!element) return;
+      element.addEventListener('mouseenter', () => {
+        if (isDragging || container.classList.contains('bn-dragging')) return;
+        if (!canHonorHoverWake()) return;
+        requestWake(reason);
       });
-    } else {
-      commitReveal();
-    }
-  };
-  const hidePanel = () => {
-    if (pinned) return;
-    cancelPendingReveal();
-    panel.classList.remove('bn-show');
-    if (panel.contains(document.activeElement)) document.activeElement.blur();
-    updateContainerState();
-  };
-  const detectHoverReason = () => {
-    try {
-      if (panel.matches(':hover')) return WAKE_REASON_PANEL;
-      if (trigger.matches(':hover')) return WAKE_REASON_TRIGGER;
-    } catch (_) { /* ignore */ }
-    return null;
-  };
+      element.addEventListener('mouseleave', () => releaseWake(reason));
+    };
 
-  const requestWake = (reason) => {
-    if (reason) wakeReasons.add(reason);
-    cancelHide();
-    showPanel();
-  };
-  const scheduleHide = () => {
-    cancelHide();
-    if (wakeReasons.size || pinned) return;
-    hideTimer = setTimeout(() => {
-      if (pinned || wakeReasons.size) return;
-      const hoverReason = detectHoverReason();
-      if (hoverReason) {
-        if (canHonorHoverWake()) {
-          requestWake(hoverReason);
-        }
+    const syncPinnedState = () => {
+      pinBtn.classList.toggle('bn-pinned', pinned);
+      if (pinned) requestWake(reasons.PIN);
+      else releaseWake(reasons.PIN);
+    };
+
+    const toggleFromTrigger = () => {
+      if (panel.classList.contains('bn-show')) {
+        releaseWake(reasons.TRIGGER);
+        hidePanel();
         return;
       }
-      const activeElement = document.activeElement;
-      if (activeElement && container.contains(activeElement)) {
-        if (panel.classList.contains('bn-show') || canHonorHoverWake()) {
-          requestWake(WAKE_REASON_FOCUS);
-        }
-        return;
-      }
-      hidePanel();
-    }, PANEL_HIDE_DELAY);
-  };
-  const releaseWake = (reason) => {
-    if (!reason) return;
-    if (!wakeReasons.delete(reason)) return;
-    if (!wakeReasons.size && !pinned) scheduleHide();
-  };
+      requestWake(reasons.TRIGGER);
+      showPanel();
+    };
 
-  const attachHoverWake = (element, reason) => {
-    if (!element) return;
-    element.addEventListener('mouseenter', () => {
-      if (!canHonorHoverWake()) return;
-      requestWake(reason);
-    });
-    element.addEventListener('mouseleave', () => releaseWake(reason));
-  };
+    const onFocusIn = () => {
+      if (!panel.classList.contains('bn-show') && !canHonorHoverWake()) return;
+      requestWake(reasons.FOCUS);
+    };
 
-  const syncPinnedState = () => {
-    pinBtn.classList.toggle('bn-pinned', pinned);
-    if (pinned) requestWake(WAKE_REASON_PIN);
-    else releaseWake(WAKE_REASON_PIN);
-  };
+    const onFocusOut = (event) => {
+      const next = event.relatedTarget;
+      if (next && container.contains(next)) return;
+      releaseWake(reasons.FOCUS);
+    };
 
-  syncPinnedState();
+    const onDragStart = () => {
+      hoverWakeBlockedUntil = Number.POSITIVE_INFINITY;
+      wakeReasons.delete(reasons.TRIGGER);
+      wakeReasons.delete(reasons.PANEL);
+      wakeReasons.delete(reasons.FOCUS);
+      cancelPendingReveal();
+      cancelHide();
+      if (!pinned) panel.classList.remove('bn-show');
+      updateContainerState();
+    };
+
+    const onDragEnd = () => {
+      hoverWakeBlockedUntil = nowTs() + DRAG_HOVER_SUPPRESS_MS;
+      wakeReasons.delete(reasons.TRIGGER);
+      wakeReasons.delete(reasons.PANEL);
+      wakeReasons.delete(reasons.FOCUS);
+      if (pinned) requestWake(reasons.PIN);
+      else panel.classList.remove('bn-show');
+      updateContainerState();
+    };
+
+    return {
+      reasons,
+      attachHoverWake,
+      syncPinnedState,
+      toggleFromTrigger,
+      onFocusIn,
+      onFocusOut,
+      onDragStart,
+      onDragEnd,
+    };
+  }
+
+  const wakeController = createPanelWakeController();
+  wakeController.syncPinnedState();
   updateContainerState();
 
   titleInp.disabled = !originalConfig.titleTruncate;
@@ -1200,61 +1269,89 @@
     colorSidebar.classList.add('bn-show');
   }
 
-  attachHoverWake(trigger, WAKE_REASON_TRIGGER);
-  attachHoverWake(panel, WAKE_REASON_PANEL);
+  wakeController.attachHoverWake(trigger, wakeController.reasons.TRIGGER);
+  wakeController.attachHoverWake(panel, wakeController.reasons.PANEL);
   trigger.addEventListener('click', (event) => {
     if (isDragging || container.classList.contains('bn-dragging')) return;
-    event.preventDefault();
-    if (panel.classList.contains('bn-show')) {
-      releaseWake(WAKE_REASON_TRIGGER);
-      hidePanel();
-    } else {
-      requestWake(WAKE_REASON_TRIGGER);
-      showPanel();
+    if (__bn_nowMs() < __bn_suppressTriggerClickUntil) {
+      event.preventDefault();
+      return;
     }
+    event.preventDefault();
+    wakeController.toggleFromTrigger();
   });
-  container.addEventListener('focusin', () => {
-    if (!panel.classList.contains('bn-show') && !canHonorHoverWake()) return;
-    requestWake(WAKE_REASON_FOCUS);
-  });
-  container.addEventListener('focusout', (event) => {
-    const next = event.relatedTarget;
-    if (next && container.contains(next)) return;
-    releaseWake(WAKE_REASON_FOCUS);
-  });
+  container.addEventListener('focusin', wakeController.onFocusIn);
+  container.addEventListener('focusout', wakeController.onFocusOut);
 
-  const __bn_lagMs = 100;
-  const __bn_trailWindow = 400;
-  const __bn_now = () => (window.performance && performance.now) ? performance.now() : Date.now();
-
-  function __bn_pushTrail(e) {
-    const t = __bn_now();
-    __bn_trail.push({ t, x: e.clientX, y: e.clientY });
-    const cutoff = t - __bn_trailWindow;
-    while (__bn_trail.length && __bn_trail[0].t < cutoff) __bn_trail.shift();
-  }
-  function __bn_sampleAt(tgt) {
-    if (!__bn_trail.length) return null;
-    if (tgt <= __bn_trail[0].t) return __bn_trail[0];
-    const last = __bn_trail[__bn_trail.length - 1];
-    if (tgt >= last.t) return last;
-    let lo = 0, hi = __bn_trail.length - 1;
-    while (lo <= hi) { const mid = (lo + hi) >> 1; (__bn_trail[mid].t < tgt) ? (lo = mid + 1) : (hi = mid - 1); }
-    const a = __bn_trail[lo - 1], b = __bn_trail[lo];
-    const r = (tgt - a.t) / Math.max(1, b.t - a.t);
-    return { t: tgt, x: a.x + (b.x - a.x) * r, y: a.y + (b.y - a.y) * r };
-  }
   function __bn_applyTransform(x, y) {
     __bn_dragX = x; __bn_dragY = y;
     trigger.style.transform = `translate3d(${x}px, ${y}px, 0)`;
   }
-  function __bn_beginDrag(e) {
+  function __bn_dragLeft(clientX) {
+    return clientX - __bn_dragOffsetX;
+  }
+  function __bn_dragTop(clientY) {
+    return clientY - __bn_dragOffsetY;
+  }
+  function __bn_cancelDragRaf() {
+    if (__bn_dragRafId !== null) {
+      cancelAnimationFrame(__bn_dragRafId);
+      __bn_dragRafId = null;
+    }
+  }
+  function __bn_cancelSnapRaf() {
+    if (__bn_snapRafId !== null) {
+      cancelAnimationFrame(__bn_snapRafId);
+      __bn_snapRafId = null;
+    }
+  }
+  function __bn_clearSettleState() {
+    if (__bn_settleTimer !== null) {
+      clearTimeout(__bn_settleTimer);
+      __bn_settleTimer = null;
+    }
+    container.classList.remove('bn-drag-settling');
+  }
+  function __bn_scheduleDragApply(clientX, clientY) {
+    __bn_dragPendingX = clientX;
+    __bn_dragPendingY = clientY;
+    if (__bn_dragRafId !== null) return;
+    __bn_dragRafId = requestAnimationFrame(() => {
+      __bn_dragRafId = null;
+      if (!isDragging) return;
+      __bn_applyTransform(__bn_dragLeft(__bn_dragPendingX), __bn_dragTop(__bn_dragPendingY));
+    });
+  }
+  function __bn_detachDragListeners() {
+    document.removeEventListener('pointermove', __bn_onPointerMove);
+    document.removeEventListener('pointerup', __bn_onPointerUp);
+    document.removeEventListener('pointercancel', __bn_onPointerCancel);
+    document.removeEventListener('mousemove', __bn_onMouseMove);
+    document.removeEventListener('mouseup', __bn_onMouseUp);
+    trigger.removeEventListener('lostpointercapture', __bn_onLostPointerCapture);
+  }
+  function __bn_cleanupPointer() {
+    dragPending = false;
+    __bn_cancelDragRaf();
+    __bn_cancelSnapRaf();
+    __bn_detachDragListeners();
+    if (__bn_pointerMode === 'pointer' && __bn_pointerId !== null && trigger.releasePointerCapture) {
+      try { trigger.releasePointerCapture(__bn_pointerId); } catch (_) { }
+    }
+    __bn_pointerId = null;
+    __bn_pointerMode = null;
+  }
+  function __bn_beginDrag(clientX, clientY) {
     dragPending = false;
     isDragging = true;
+    __bn_clearSettleState();
+    wakeController.onDragStart();
     panel.classList.remove('bn-show');
 
     const rect = trigger.getBoundingClientRect();
     gearW = rect.width; gearH = rect.height;
+    __bn_dragOffsetX = Math.max(0, Math.min(gearW, __bn_dragOffsetX));
+    __bn_dragOffsetY = Math.max(0, Math.min(gearH, __bn_dragOffsetY));
     trigger.style.position = 'fixed';
     trigger.style.left = '0px'; trigger.style.top = '0px';
     trigger.style.bottom = 'auto'; trigger.style.right = 'auto';
@@ -1265,59 +1362,9 @@
     container.classList.add('bn-dragging');
     updateContainerState();
 
-    __bn_trail = [];
-    __bn_applyTransform(e.clientX - gearW / 2, e.clientY - gearH / 2);
-
-    if (!__bn_raf) __bn_raf = requestAnimationFrame(__bn_tick);
+    __bn_applyTransform(__bn_dragLeft(clientX), __bn_dragTop(clientY));
   }
-  function __bn_cleanupPointer() {
-    dragPending = false;
-    if (__bn_pointerId !== null && trigger.releasePointerCapture) {
-      try { trigger.releasePointerCapture(__bn_pointerId); } catch (_) { }
-    }
-    document.removeEventListener('pointermove', __bn_onMove);
-    document.removeEventListener('pointerup', __bn_onUp);
-    document.removeEventListener('mousemove', __bn_onMove);
-    document.removeEventListener('mouseup', __bn_onUp);
-    __bn_trail = [];
-    __bn_pointerId = null;
-  }
-  function __bn_tick() {
-    if (!isDragging) { __bn_raf = null; return; }
-    const s = __bn_sampleAt(__bn_now() - __bn_lagMs);
-    if (s) __bn_applyTransform(s.x - gearW / 2, s.y - gearH / 2);
-    __bn_raf = requestAnimationFrame(__bn_tick);
-  }
-  function __bn_onMove(e) {
-    if (dragPending) {
-      const dx = e.clientX - dragStartX;
-      const dy = e.clientY - dragStartY;
-      if ((dx * dx + dy * dy) >= DRAG_THRESHOLD * DRAG_THRESHOLD) {
-        __bn_beginDrag(e);
-      } else {
-        return;
-      }
-    }
-    if (!isDragging) return;
-    __bn_pushTrail(e);
-    if (!__bn_raf) __bn_raf = requestAnimationFrame(__bn_tick);
-  }
-  function __bn_onUp(e) {
-    if (dragPending) {
-      dragPending = false;
-      if (__bn_raf) cancelAnimationFrame(__bn_raf);
-      __bn_raf = null;
-      __bn_cleanupPointer();
-      return;
-    }
-    if (!isDragging) {
-      __bn_cleanupPointer();
-      return;
-    }
-    isDragging = false;
-    if (__bn_raf) cancelAnimationFrame(__bn_raf);
-    __bn_raf = null;
-
+  function __bn_findNearestCorner() {
     const cx = __bn_dragX + gearW / 2;
     const cy = __bn_dragY + gearH / 2;
     const W = window.innerWidth, H = window.innerHeight;
@@ -1329,69 +1376,212 @@
     };
     let best = 'br', bestDist = Infinity;
     for (const k in corners) {
-      const p = corners[k]; const dx = p.x - cx, dy = p.y - cy; const d2 = dx * dx + dy * dy;
-      if (d2 < bestDist) { bestDist = d2; best = k; }
+      const p = corners[k];
+      const dx = p.x - cx;
+      const dy = p.y - cy;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bestDist) {
+        bestDist = d2;
+        best = k;
+      }
     }
-    const fx = corners[best].x - gearW / 2;
-    const fy = corners[best].y - gearH / 2;
+    return { best, corners };
+  }
+  function __bn_finalizeDragCorner(best) {
+    // Prevent visual jump while switching from fixed drag state back to anchored layout.
+    trigger.style.transition = 'none';
+    applyCorner(best);
 
-    let finalized = false;
-    let fallbackTimer = null;
-    const finalize = () => {
-      if (finalized) return;
-      finalized = true;
-
-      trigger.style.transition = '';
-      trigger.style.position = '';
-      trigger.style.left = trigger.style.top = '';
-      trigger.style.bottom = trigger.style.right = '';
-      trigger.style.transform = '';
-      trigger.style.touchAction = '';
-      trigger.style.willChange = '';
-
-      applyCorner(best);
-      container.classList.remove('bn-dragging');
-      if (wakeReasons.size) showPanel();
-      updateContainerState();
+    trigger.style.position = '';
+    trigger.style.left = trigger.style.top = '';
+    trigger.style.bottom = trigger.style.right = '';
+    trigger.style.transform = '';
+    trigger.style.touchAction = '';
+    trigger.style.willChange = '';
+    container.classList.remove('bn-dragging');
+    container.classList.add('bn-drag-settling');
+    __bn_settleTimer = setTimeout(() => {
+      __bn_settleTimer = null;
+      if (!isDragging) trigger.style.transition = '';
+      container.classList.remove('bn-drag-settling');
+    }, 180);
+    wakeController.onDragEnd();
+    __bn_cleanupPointer();
+  }
+  function __bn_completeDrag() {
+    if (dragPending) {
       __bn_cleanupPointer();
+      return;
+    }
+    if (!isDragging) {
+      __bn_cleanupPointer();
+      return;
+    }
+    isDragging = false;
+    __bn_suppressTriggerClickUntil = __bn_nowMs() + 320;
+    const { best, corners } = __bn_findNearestCorner();
+    const fromX = __bn_dragX;
+    const fromY = __bn_dragY;
+    let toX = fromX;
+    let toY = fromY;
+    if (corners && corners[best]) {
+      toX = corners[best].x - gearW / 2;
+      toY = corners[best].y - gearH / 2;
+    }
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const dist = Math.hypot(dx, dy);
+
+    if (!Number.isFinite(dist) || dist < 2) {
+      __bn_applyTransform(toX, toY);
+      __bn_finalizeDragCorner(best);
+      return;
+    }
+
+    // Quadratic-bezier snap path so the trigger returns along a parabola instead of a straight line.
+    const side = (best === 'tl' || best === 'br') ? -1 : 1;
+    const perpX = -dy / dist;
+    const perpY = dx / dist;
+    const arc = Math.max(18, Math.min(72, dist * 0.2));
+    const ctrlX = (fromX + toX) * 0.5 + perpX * arc * side;
+    const ctrlY = (fromY + toY) * 0.5 + perpY * arc * side;
+    const bezierAt = (t) => {
+      const it = 1 - t;
+      return {
+        x: it * it * fromX + 2 * it * t * ctrlX + t * t * toX,
+        y: it * it * fromY + 2 * it * t * ctrlY + t * t * toY,
+      };
     };
+    const steps = Math.max(20, Math.min(72, Math.ceil(dist / 7)));
+    const points = [];
+    const lengths = [0];
+    let totalLen = 0;
+    for (let i = 0; i <= steps; i++) {
+      const p = bezierAt(i / steps);
+      points.push(p);
+      if (i > 0) {
+        const prev = points[i - 1];
+        totalLen += Math.hypot(p.x - prev.x, p.y - prev.y);
+        lengths.push(totalLen);
+      }
+    }
+    if (!Number.isFinite(totalLen) || totalLen < 1) {
+      __bn_applyTransform(toX, toY);
+      __bn_finalizeDragCorner(best);
+      return;
+    }
+    const speedPxPerMs = 1.9;
+    const duration = Math.max(150, Math.min(320, totalLen / speedPxPerMs));
+    const start = __bn_nowMs();
 
-    const onTransitionEnd = (event) => {
-      if (event.propertyName && event.propertyName !== 'transform') return;
-      trigger.removeEventListener('transitionend', onTransitionEnd);
-      if (fallbackTimer !== null) clearTimeout(fallbackTimer);
-      finalize();
+    __bn_cancelSnapRaf();
+    const tick = () => {
+      const elapsed = __bn_nowMs() - start;
+      const targetLen = Math.min(totalLen, (elapsed / duration) * totalLen);
+      if (targetLen >= totalLen) {
+        __bn_snapRafId = null;
+        __bn_applyTransform(toX, toY);
+        __bn_finalizeDragCorner(best);
+        return;
+      }
+      let hi = lengths.length - 1;
+      let lo = 0;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (lengths[mid] < targetLen) lo = mid + 1;
+        else hi = mid;
+      }
+      const idx = Math.max(1, lo);
+      const segStart = lengths[idx - 1];
+      const segEnd = lengths[idx];
+      const segSpan = Math.max(1e-6, segEnd - segStart);
+      const r = (targetLen - segStart) / segSpan;
+      const a = points[idx - 1];
+      const b = points[idx];
+      const x = a.x + (b.x - a.x) * r;
+      const y = a.y + (b.y - a.y) * r;
+      __bn_applyTransform(x, y);
+      __bn_snapRafId = requestAnimationFrame(tick);
     };
-
-    trigger.addEventListener('transitionend', onTransitionEnd);
-    fallbackTimer = setTimeout(() => {
-      trigger.removeEventListener('transitionend', onTransitionEnd);
-      finalize();
-    }, 320);
-
-    trigger.style.transition = 'transform 0.24s ease-out';
-    __bn_applyTransform(fx, fy);
+    __bn_snapRafId = requestAnimationFrame(tick);
+  }
+  function __bn_onMove(clientX, clientY) {
+    if (dragPending) {
+      const dx = clientX - dragStartX;
+      const dy = clientY - dragStartY;
+      if ((dx * dx + dy * dy) >= DRAG_THRESHOLD * DRAG_THRESHOLD) {
+        __bn_beginDrag(clientX, clientY);
+      } else {
+        return;
+      }
+    }
+    if (!isDragging) return;
+    __bn_scheduleDragApply(clientX, clientY);
+  }
+  function __bn_onPointerMove(e) {
+    if (__bn_pointerId !== null && e.pointerId !== __bn_pointerId) return;
+    __bn_onMove(e.clientX, e.clientY);
+  }
+  function __bn_onMouseMove(e) {
+    __bn_onMove(e.clientX, e.clientY);
+  }
+  function __bn_onPointerUp(e) {
+    if (__bn_pointerId !== null && e.pointerId !== __bn_pointerId) return;
+    if (isDragging) {
+      __bn_cancelDragRaf();
+      __bn_applyTransform(__bn_dragLeft(e.clientX), __bn_dragTop(e.clientY));
+    }
+    __bn_completeDrag();
+  }
+  function __bn_onMouseUp(e) {
+    if (isDragging) {
+      __bn_cancelDragRaf();
+      __bn_applyTransform(__bn_dragLeft(e.clientX), __bn_dragTop(e.clientY));
+    }
+    __bn_completeDrag();
+  }
+  function __bn_onPointerCancel(e) {
+    if (__bn_pointerId !== null && e.pointerId !== __bn_pointerId) return;
+    __bn_completeDrag();
+  }
+  function __bn_onLostPointerCapture(e) {
+    if (__bn_pointerId !== null && e.pointerId !== __bn_pointerId) return;
+    if (!dragPending && !isDragging) return;
+    __bn_completeDrag();
   }
   const __bn_onDown = (e) => {
+    if (container.classList.contains('bn-dragging')) return;
     if (e.type === 'mousedown' && window.PointerEvent) return;
     if ((e.type === 'mousedown' || e.type === 'pointerdown') && e.button !== 0) return;
+    if (e.type === 'pointerdown' && e.isPrimary === false) return;
     e.preventDefault();
 
     dragPending = true;
     isDragging = false;
     dragStartX = e.clientX;
     dragStartY = e.clientY;
-    __bn_trail = [];
+    const downRect = trigger.getBoundingClientRect();
+    __bn_dragOffsetX = e.clientX - downRect.left;
+    __bn_dragOffsetY = e.clientY - downRect.top;
+    __bn_dragOffsetX = Math.max(0, Math.min(downRect.width || gearW, __bn_dragOffsetX));
+    __bn_dragOffsetY = Math.max(0, Math.min(downRect.height || gearH, __bn_dragOffsetY));
 
-    if (e.pointerId != null && trigger.setPointerCapture) {
+    if (e.pointerId != null) {
+      __bn_pointerMode = 'pointer';
       __bn_pointerId = e.pointerId;
-      try { trigger.setPointerCapture(e.pointerId); } catch (_) { }
-      document.addEventListener('pointermove', __bn_onMove);
-      document.addEventListener('pointerup', __bn_onUp);
-    } else {
-      document.addEventListener('mousemove', __bn_onMove);
-      document.addEventListener('mouseup', __bn_onUp);
+      trigger.addEventListener('lostpointercapture', __bn_onLostPointerCapture);
+      if (trigger.setPointerCapture) {
+        try { trigger.setPointerCapture(e.pointerId); } catch (_) { }
+      }
+      document.addEventListener('pointermove', __bn_onPointerMove);
+      document.addEventListener('pointerup', __bn_onPointerUp);
+      document.addEventListener('pointercancel', __bn_onPointerCancel);
+      return;
     }
+    __bn_pointerMode = 'mouse';
+    __bn_pointerId = null;
+    document.addEventListener('mousemove', __bn_onMouseMove);
+    document.addEventListener('mouseup', __bn_onMouseUp);
   };
   if (window.PointerEvent) {
     trigger.addEventListener('pointerdown', __bn_onDown, { passive: false });
@@ -1402,7 +1592,7 @@
   pinBtn.addEventListener('click', () => {
     pinned = !pinned;
     GM_setValue('panelPinned', pinned);
-    syncPinnedState();
+    wakeController.syncPinnedState();
     updateContainerState();
   });
 

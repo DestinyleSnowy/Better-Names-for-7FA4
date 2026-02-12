@@ -967,6 +967,20 @@
   display: none !important;
 }
 
+#bn-container.bn-dragging {
+  transition: none !important;
+}
+
+#bn-container.bn-dragging #bn-trigger {
+  transition: none !important;
+}
+
+#bn-container.bn-drag-settling #bn-trigger,
+#bn-container.bn-drag-settling #bn-trigger:hover {
+  transition: none !important;
+  transform: none !important;
+}
+
 .bn-hide-done-skip {
   display: none !important;
 }
