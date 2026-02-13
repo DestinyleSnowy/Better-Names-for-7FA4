@@ -162,10 +162,13 @@
   const REMOTE_VERSION_URL = 'http://jx.7fa4.cn:9080/yx/better-names-for-7fa4/-/raw/main/version';
   const REMOTE_VERSION_FALLBACK_URL = 'http://in.7fa4.cn:9080/yx/better-names-for-7fa4/-/raw/main/version';
   const REMOTE_VERSION_URLS = [REMOTE_VERSION_URL, REMOTE_VERSION_FALLBACK_URL];
-  const REMOTE_VERSION_PATTERN = /^\d+\.\d+\.\d+(?:\.\d+)?$/;
+  const VERSION_LINE_PREFIX_RE = /^(?:version|ver)\s*[:=]\s*/i;
+  const VERSION_CANDIDATE_RE = /^v?\d+(?:\.\d+){1,3}(?:[-_][0-9A-Za-z.-]+)?$/;
+  const VERSION_CANDIDATE_IN_LINE_RE = /(v?\d+(?:\.\d+){1,3}(?:[-_][0-9A-Za-z.-]+)?)/i;
   const UPDATE_PAGE_URL = 'http://jx.7fa4.cn:9080/yx/better-names-for-7fa4';
   const UPDATE_MANUAL_SYNC_MESSAGE = '登录 Gitlab 同步最新版本';
   const manifestVersion = normalizeVersionString(readManifestVersion());
+  const manifestVersionInfo = parseComparableVersion(manifestVersion);
   const isSupportedHostname = (host) => {
     if (typeof host !== 'string' || !host) return false;
     if (SUPPORTED_HOSTS.has(host)) return true;
@@ -340,7 +343,55 @@
     if (!trimmed) return '';
     const newlineIndex = trimmed.indexOf('\n');
     const sliced = newlineIndex >= 0 ? trimmed.slice(0, newlineIndex) : trimmed;
-    return sliced.replace(/\r/g, '');
+    return sliced.replace(/^\uFEFF/, '').replace(/\r/g, '');
+  }
+  function extractVersionCandidate(value) {
+    const normalized = normalizeVersionString(value);
+    if (!normalized) return '';
+    if (/^\s*</.test(normalized)) return '';
+    const stripped = normalized.replace(VERSION_LINE_PREFIX_RE, '').trim();
+    if (!stripped) return '';
+    if (VERSION_CANDIDATE_RE.test(stripped)) return stripped;
+    const matched = stripped.match(VERSION_CANDIDATE_IN_LINE_RE);
+    return matched ? matched[1] : '';
+  }
+  function parseComparableVersion(value) {
+    const candidate = extractVersionCandidate(value);
+    if (!candidate) return null;
+    const normalized = candidate.toLowerCase().replace(/^v(?=\d)/, '');
+    const [coreRaw, suffixRaw = ''] = normalized.split(/[-_]/, 2);
+    if (!coreRaw) return null;
+    const coreParts = coreRaw
+      .split('.')
+      .map(part => part.trim())
+      .filter(Boolean)
+      .map(part => {
+        if (!/^\d+$/.test(part)) return NaN;
+        return Number(part);
+      });
+    if (!coreParts.length || coreParts.some(part => !Number.isFinite(part))) return null;
+    const safeSuffix = suffixRaw.replace(/[^0-9a-z.-]/g, '');
+    return {
+      display: candidate,
+      canonical: `${coreParts.join('.')}${safeSuffix ? `-${safeSuffix}` : ''}`,
+      coreParts,
+      suffix: safeSuffix,
+    };
+  }
+  function compareParsedVersions(left, right) {
+    if (!left || !right) return null;
+    const maxLen = Math.max(left.coreParts.length, right.coreParts.length);
+    for (let i = 0; i < maxLen; i += 1) {
+      const lv = left.coreParts[i] ?? 0;
+      const rv = right.coreParts[i] ?? 0;
+      if (lv > rv) return 1;
+      if (lv < rv) return -1;
+    }
+    const leftStable = !left.suffix;
+    const rightStable = !right.suffix;
+    if (leftStable !== rightStable) return leftStable ? 1 : -1;
+    if (left.suffix === right.suffix) return 0;
+    return left.suffix > right.suffix ? 1 : -1;
   }
   function normalizeHexColor(value, fallback = DEFAULT_THEME_COLOR) {
     const normalizedFallback = (() => {
@@ -3538,13 +3589,18 @@
       noticeEl.removeAttribute('hidden');
     };
     try {
-      const remoteVersion = await fetchRemotePanelVersion();
-      if (!remoteVersion) {
+      const remoteVersionInfo = await fetchRemotePanelVersion();
+      if (!remoteVersionInfo) {
         showManualSyncNotice();
         return;
       }
-      if (remoteVersion === manifestVersion) return;
-      if (remoteVersionEl) remoteVersionEl.textContent = remoteVersion;
+      if (manifestVersionInfo) {
+        const compareResult = compareParsedVersions(remoteVersionInfo, manifestVersionInfo);
+        if (compareResult !== null && compareResult <= 0) return;
+      } else if (remoteVersionInfo.display === manifestVersion) {
+        return;
+      }
+      if (remoteVersionEl) remoteVersionEl.textContent = remoteVersionInfo.display;
       setUpdateNoticeState(noticeEl, 'warning');
       noticeEl.classList.add('bn-visible');
       noticeEl.removeAttribute('hidden');
@@ -3560,10 +3616,8 @@
       if (!baseUrl) continue;
       try {
         const rawText = await fetchRemotePanelVersionText(baseUrl);
-        const normalized = normalizeVersionString(typeof rawText === 'string' ? rawText : '');
-        if (normalized && REMOTE_VERSION_PATTERN.test(normalized)) {
-          return normalized;
-        }
+        const parsed = parseComparableVersion(rawText);
+        if (parsed) return parsed;
       } catch (error) {
         lastError = error;
         continue;
