@@ -6,22 +6,40 @@
 const style = document.createElement('style');
 const cssPath = chrome.runtime.getURL('content/libs/katex/fonts/');
 
-// 覆盖 KaTeX 的字体声明，强制指向扩展内部的绝对路径
-style.textContent = `
+// 覆盖 KaTeX 的字体声明，强制指向扩展内部的绝对路径。
+// 需要包含 Size1~Size4，否则如 \binom 这类依赖可伸缩分隔符的公式可能退化成小括号。
+const katexFontFaces = [
+  ['KaTeX_AMS', 'KaTeX_AMS-Regular.woff2'],
+  ['KaTeX_Caligraphic', 'KaTeX_Caligraphic-Regular.woff2'],
+  ['KaTeX_Caligraphic', 'KaTeX_Caligraphic-Bold.woff2', 'bold'],
+  ['KaTeX_Fraktur', 'KaTeX_Fraktur-Regular.woff2'],
+  ['KaTeX_Fraktur', 'KaTeX_Fraktur-Bold.woff2', 'bold'],
+  ['KaTeX_Main', 'KaTeX_Main-Regular.woff2'],
+  ['KaTeX_Main', 'KaTeX_Main-Italic.woff2', 'normal', 'italic'],
+  ['KaTeX_Main', 'KaTeX_Main-Bold.woff2', 'bold'],
+  ['KaTeX_Main', 'KaTeX_Main-BoldItalic.woff2', 'bold', 'italic'],
+  ['KaTeX_Math', 'KaTeX_Math-Italic.woff2', 'normal', 'italic'],
+  ['KaTeX_Math', 'KaTeX_Math-BoldItalic.woff2', 'bold', 'italic'],
+  ['KaTeX_SansSerif', 'KaTeX_SansSerif-Regular.woff2'],
+  ['KaTeX_SansSerif', 'KaTeX_SansSerif-Italic.woff2', 'normal', 'italic'],
+  ['KaTeX_SansSerif', 'KaTeX_SansSerif-Bold.woff2', 'bold'],
+  ['KaTeX_Script', 'KaTeX_Script-Regular.woff2'],
+  ['KaTeX_Size1', 'KaTeX_Size1-Regular.woff2'],
+  ['KaTeX_Size2', 'KaTeX_Size2-Regular.woff2'],
+  ['KaTeX_Size3', 'KaTeX_Size3-Regular.woff2'],
+  ['KaTeX_Size4', 'KaTeX_Size4-Regular.woff2'],
+  ['KaTeX_Typewriter', 'KaTeX_Typewriter-Regular.woff2'],
+];
+
+style.textContent = katexFontFaces.map(([family, file, weight = 'normal', styleType = 'normal']) => `
   @font-face {
-    font-family: 'KaTeX_Main';
-    src: url('${cssPath}KaTeX_Main-Regular.woff2') format('woff2');
-    font-weight: normal;
-    font-style: normal;
+    font-family: '${family}';
+    src: url('${cssPath}${file}') format('woff2');
+    font-weight: ${weight};
+    font-style: ${styleType};
+    font-display: swap;
   }
-  @font-face {
-    font-family: 'KaTeX_Math';
-    src: url('${cssPath}KaTeX_Math-Italic.woff2') format('woff2');
-    font-weight: normal;
-    font-style: italic;
-  }
-  /* 根据需要可以继续添加其他字体文件... */
-`;
+`).join('\n');
 document.head.appendChild(style);
 
 // 同时确保加载原始 CSS
