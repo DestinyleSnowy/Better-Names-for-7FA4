@@ -29,44 +29,85 @@ const link = document.createElement('link');
 link.rel = 'stylesheet';
 link.href = chrome.runtime.getURL('content/libs/katex/katex.min.css');
 document.head.appendChild(link);
+
+const targetSelector = 'pre';
+
+const MATH_DELIMITERS = [
+  { left: '$$', right: '$$', display: true },
+  { left: '$', right: '$', display: false },
+  { left: '\\(', right: '\\)', display: false },
+  { left: '\\[', right: '\\]', display: true },
+  { left: '\\begin{equation}', right: '\\end{equation}', display: true },
+  { left: '\\begin{equation*}', right: '\\end{equation*}', display: true },
+  { left: '\\begin{align}', right: '\\end{align}', display: true },
+  { left: '\\begin{align*}', right: '\\end{align*}', display: true },
+  { left: '\\begin{alignat}', right: '\\end{alignat}', display: true },
+  { left: '\\begin{alignat*}', right: '\\end{alignat*}', display: true },
+  { left: '\\begin{gather}', right: '\\end{gather}', display: true },
+  { left: '\\begin{gather*}', right: '\\end{gather*}', display: true },
+  { left: '\\begin{multline}', right: '\\end{multline}', display: true },
+  { left: '\\begin{multline*}', right: '\\end{multline*}', display: true },
+];
+
+const MATH_HINT_RE = /(\$\$[\s\S]*\$\$)|(\$[^$\n]+\$)|(\\\([\s\S]*?\\\))|(\\\[[\s\S]*?\\\])|(\\begin\{[a-zA-Z*]+\})/m;
+const MARKDOWN_HINT_RE = /(^|\n)\s{0,3}(#{1,6}\s|>|[-*+]\s|\d+\.\s)|(\*\*)|(__)|(`{1,3})|(\[[^\]]+\]\([^)]+\))/m;
+const MATH_SEGMENT_RE = /(\$\$[\s\S]*?\$\$)|(\$[^$\n]+\$)|(\\\[[\s\S]*?\\\])|(\\\([\s\S]*?\\\))|(\\begin\{(?:equation\*?|align\*?|alignat\*?|gather\*?|multline\*?)\}[\s\S]*?\\end\{(?:equation\*?|align\*?|alignat\*?|gather\*?|multline\*?)\})/g;
+
+function protectMathSegments(text) {
+  const segments = [];
+  const placeholderText = text.replace(MATH_SEGMENT_RE, (match) => {
+    const token = `BN_MATH_PLACEHOLDER_${segments.length}_BN`;
+    segments.push({ token, match });
+    return token;
+  });
+  return { placeholderText, segments };
+}
+
+function restoreMathSegments(text, segments) {
+  let output = text;
+  segments.forEach(({ token, match }) => {
+    output = output.split(token).join(match);
+  });
+  return output;
+}
+
 // 1. 定义执行函数
 function doRender() {
-  // 【关键】你需要根据 7fa4.cn 的实际网页结构修改这个 CSS 选择器
-  // 比如内容是在 <div class="content"> 里，就写 '.content'
-  const targetSelector = 'pre'; // 暂定范围大一点，之后可以精确化
-
   const elements = document.querySelectorAll(targetSelector);
 
   elements.forEach(el => {
     // 防止重复渲染（通过添加一个自定义 class 标记）
     if (el.classList.contains('rendered-by-me')) return;
 
-    // 如果元素里包含 $ 或 Markdown 特征（如 #, **, [）
-    const text = el.innerText.trim();
-    if (text.includes('$') || text.includes('#') || text.includes('**')) {
-      
-      // --- 处理 Markdown ---
-      // 注意：marked.parse 比较重，如果只有 LaTeX 需求可以去掉这步
-      const htmlResult = marked.parse(text);
-      el.innerHTML = htmlResult;
+    const text = (el.textContent || '').trim();
+    if (!text) return;
 
-      // --- 处理 LaTeX ---
-      // 使用 KaTeX 的 auto-render 插件直接渲染整个元素
-      if (typeof renderMathInElement === 'function') {
-        renderMathInElement(el, {
-          delimiters: [
-            {left: '$$', right: '$$', display: true},
-            {left: '$', right: '$', display: false},
-            {left: '\\(', right: '\\)', display: false},
-            {left: '\\[', right: '\\]', display: true}
-          ],
-          throwOnError: false
-        });
-      }
+    const hasMath = MATH_HINT_RE.test(text);
+    const hasMarkdown = MARKDOWN_HINT_RE.test(text);
+    if (!hasMath && !hasMarkdown) return;
 
-      // 标记已处理
-      el.classList.add('rendered-by-me');
+    // --- 处理 Markdown ---
+    if (hasMarkdown && typeof marked !== 'undefined' && typeof marked.parse === 'function') {
+      const { placeholderText, segments } = hasMath
+        ? protectMathSegments(text)
+        : { placeholderText: text, segments: [] };
+      const htmlResult = marked.parse(placeholderText);
+      el.innerHTML = restoreMathSegments(htmlResult, segments);
     }
+
+    // --- 处理 LaTeX ---
+    // 注意：auto-render 默认会忽略 pre/code；这里移除 pre，保证题面里的公式可渲染。
+    if (hasMath && typeof renderMathInElement === 'function') {
+      renderMathInElement(el, {
+        delimiters: MATH_DELIMITERS,
+        ignoredTags: ['script', 'noscript', 'style', 'textarea', 'option', 'code'],
+        throwOnError: false,
+        strict: 'ignore'
+      });
+    }
+
+    // 标记已处理
+    el.classList.add('rendered-by-me');
   });
 }
 
