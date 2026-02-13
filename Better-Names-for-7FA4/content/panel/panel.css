@@ -162,14 +162,67 @@
     radial-gradient(circle at 12% 20%, rgba(56,141,227,0.25), transparent 46%),
     radial-gradient(circle at 88% 10%, rgba(255,144,64,0.16), transparent 40%);
 }
-#bn-pin {
-  position: absolute; top: 12px; right: 12px; width: 20px; height: 20px;
+#bn-pin,
+#bn-fireworks {
+  position: absolute; top: 12px; width: 20px; height: 20px;
   display: flex; align-items: center; justify-content: center; cursor: pointer;
   color: #8b96a5; transition: color .2s, transform .2s;
 }
+#bn-pin { right: 12px; }
+#bn-fireworks {
+  right: 40px;
+  top: 12px;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  touch-action: manipulation;
+  transition: none;
+}
+#bn-fireworks::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: -8px;
+  bottom: -18px;
+  left: -8px;
+  background: rgba(0, 0, 0, 0);
+}
 #bn-pin svg { width: 100%; height: 100%; fill: currentColor; }
+#bn-fireworks svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  transition: transform .18s ease;
+}
 #bn-pin:hover { color: var(--bn-text); transform: scale(1.2); }
+#bn-fireworks:hover {
+  transform: none;
+}
 #bn-pin.bn-pinned { color: #007bff; transform: rotate(45deg); }
+#bn-fireworks.bn-active {
+  transform: none;
+}
+#bn-fireworks:hover svg {
+  transform: scale(1.08);
+}
+#bn-fireworks.bn-active svg {
+  transform: scale(1.12);
+}
+#bn-fireworks:focus-visible {
+  outline: none;
+}
+
+#bn-fireworks-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 2147483647;
+}
 
 .bn-panel-title {
   font-size: 16px; font-weight: 600; color: var(--bn-text);

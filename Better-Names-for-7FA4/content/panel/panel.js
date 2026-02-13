@@ -701,6 +701,7 @@
 
   const panel = document.getElementById('bn-panel');
   const pinBtn = document.getElementById('bn-pin');
+  let fireworksBtn = document.getElementById('bn-fireworks');
   const trigger = document.getElementById('bn-trigger');
   const themeColorInput = document.getElementById('bn-theme-color');
   const themeColorHexInput = document.getElementById('bn-theme-color-hex');
@@ -737,6 +738,9 @@
     container.remove();
     return;
   }
+  if (!fireworksBtn) {
+    fireworksBtn = createFireworksButton(pinBtn);
+  }
   if (versionTextEl && manifestVersion) {
     const slogan = (versionTextEl.dataset && versionTextEl.dataset.slogan) ? String(versionTextEl.dataset.slogan).trim() : '';
     versionTextEl.textContent = slogan ? `${manifestVersion} · ${slogan}` : manifestVersion;
@@ -771,6 +775,364 @@
   let currentBgSourceType = normalizedBgSourceType;
   let currentBgImageData = normalizedBgData;
   let currentBgImageDataName = normalizedBgFileName;
+  let fireworksEngine = null;
+  let fireworksActiveTimer = null;
+  const FIREWORKS_ICON_SVG = `
+      <svg class="bn-icon bn-icon-fireworks" viewBox="0 0 1088 1024" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M528.991209 435.636191c-0.50423-4.117882-0.840384-7.563457-1.176537-11.345185s-0.50423-7.39538-0.672308-11.177108v-22.102101a379.853598 379.853598 0 0 1 4.117882-44.540355 279.763855 279.763855 0 0 1 10.504801-44.288241 249.341952 249.341952 0 0 1 77.987641-118.494153 285.730582 285.730582 0 0 1 85.130906-48.574199h0.672307a42.523434 42.523434 0 0 1 29.58152 79.752448 44.120163 44.120163 0 0 1-7.899611 2.184998 208.247171 208.247171 0 0 0-67.987071 22.774409 185.724878 185.724878 0 0 0-29.833634 20.673448A195.809487 195.809487 0 0 0 603.617314 287.224365a221.777355 221.777355 0 0 0-21.177678 32.18671 272.284437 272.284437 0 0 0-16.219413 36.304591A304.219032 304.219032 0 0 0 554.791 394.457372c-1.428653 6.723073-2.773267 13.278068-3.781728 20.169217-0.50423 3.445575-1.008461 6.723073-1.260576 10.168647s-0.672307 6.891149-0.840384 9.832494v0.50423a9.916532 9.916532 0 0 1-10.924993 9.328264 10.168647 10.168647 0 0 1-9.328263-8.824033z" fill="#FFC229"></path>
+        <path d="M584.624634 491.101539c2.437114-2.941344 4.706151-5.378458 7.059227-8.40384s4.706151-5.042304 7.227303-7.479419c4.874228-4.958266 10.00057-9.748455 15.210951-14.286529a313.29518 313.29518 0 0 1 33.615363-25.631714 270.687707 270.687707 0 0 1 78.57591-36.640745 238.753113 238.753113 0 0 1 44.792471-7.647495c3.781728-0.50423 7.731533 0 11.513261-0.50423h11.513262c3.949805 0 7.731533 0 11.681338 0.672307l11.597301 1.260576a262.031752 262.031752 0 0 1 88.324365 30.085749 42.439395 42.439395 0 1 1-40.758627 74.794182 33.615363 33.615363 0 0 1-6.134804-3.949805l-6.554996-5.294419a79.500333 79.500333 0 0 0-6.554995-5.042305 157.824127 157.824127 0 0 0-13.782299-9.244225 166.227968 166.227968 0 0 0-29.665558-14.286529l-7.89961-2.60519c-2.605191-0.840384-5.462496-1.512691-8.40384-2.10096l-4.285959-1.0925-4.117882-0.840384c-2.773267-0.50423-5.546535-1.176538-8.403841-1.428653a168.076813 168.076813 0 0 0-34.455746-1.176537 224.550622 224.550622 0 0 0-70.760339 16.807681 310.942104 310.942104 0 0 0-34.119593 16.807681c-5.630573 3.109421-11.009031 6.386919-16.303451 10.000571l-7.815571 5.462496a80.67687 80.67687 0 0 0-7.39538 5.546535h-0.504231a10.00057 10.00057 0 0 1-13.950375-1.59673 9.748455 9.748455 0 0 1 0.50423-12.353646z" fill="#FFE045"></path>
+        <path d="M580.002522 557.912072c3.613651 1.176538 6.554996 2.10096 9.832494 3.277498l9.49634 3.445575c6.30288 2.437114 12.521723 5.126343 18.572487 7.89961a335.565357 335.565357 0 0 1 35.968438 19.160757 290.184618 290.184618 0 0 1 64.625535 53.028234 230.013119 230.013119 0 0 1 26.472098 34.791901A225.895237 225.895237 0 0 1 764.887016 719.601967c0.672307 1.764807 1.512691 3.445575 2.100961 5.210381l1.848845 5.462496c1.176538 3.613651 2.437114 7.227303 3.445574 10.840955 1.764807 7.39538 3.949805 14.79076 5.126343 22.270177a287.999619 287.999619 0 0 1 4.20192 45.632855 42.523434 42.523434 0 1 1-84.962829 2.353075 57.230155 57.230155 0 0 1 0.588269-8.40384v-0.840384a181.43892 181.43892 0 0 0 3.949805-31.68248c0.50423-5.378458 0-10.672878 0-15.883258 0-2.605191-0.50423-5.29442-0.672307-8.403841v-3.949805c0-1.260576-0.50423-2.605191-0.672307-3.865767a159.672972 159.672972 0 0 0-8.403841-31.682479 176.480654 176.480654 0 0 0-14.454606-30.758057 246.064454 246.064454 0 0 0-44.624394-55.465348 349.011502 349.011502 0 0 0-28.236904-23.782869c-4.958266-3.613651-10.00057-7.39538-15.29499-10.672878-2.605191-1.680768-5.210381-3.445575-7.815572-4.958266s-5.462496-3.277498-7.89961-4.538074h-0.504231a10.084609 10.084609 0 0 1-3.949805-13.614222 9.076148 9.076148 0 0 1 11.345185-4.958266z m-116.729347-76.811103c-2.269037-2.437114-4.874228-5.210381-7.563456-7.731534s-5.378458-5.042304-8.403841-7.731533c-5.462496-5.042304-11.177108-9.832494-16.807681-14.370568A341.616123 341.616123 0 0 0 395.118028 425.63562 327.245555 327.245555 0 0 0 356.796514 404.878134a258.081946 258.081946 0 0 0-39.750166-14.118452 183.876034 183.876034 0 0 0-40.170358-6.554996 175.64027 175.64027 0 0 0-39.414013 1.428653 41.094781 41.094781 0 0 0-4.790189 0.672307l-4.706151 1.008461c-3.193459 0.672307-6.470957 1.092499-9.580378 1.932883a181.018728 181.018728 0 0 0-18.48845 5.79865 225.306968 225.306968 0 0 0-35.128054 16.219413l-1.00846 0.50423a42.523434 42.523434 0 1 1-40.422474-74.87822 52.608042 52.608042 0 0 1 6.723073-2.941344A330.270938 330.270938 0 0 1 181.660475 320.839728a256.485217 256.485217 0 0 1 26.38806-3.109422c4.454036 0 8.908071 0 13.278068-0.50423h13.362107a249.678106 249.678106 0 0 1 52.019773 7.39538 264.636942 264.636942 0 0 1 48.238046 16.807681A308.841144 308.841144 0 0 1 378.310346 366.388544 363.718223 363.718223 0 0 1 416.547821 396.474293a401.619545 401.619545 0 0 1 33.615363 34.28767c5.126343 6.134804 10.168647 12.185569 15.126913 18.404411 2.437114 3.109421 4.706151 6.386919 7.059226 9.49634l6.89115 10.084609a9.916532 9.916532 0 0 1-15.631144 12.101531z" fill="#FFC229"></path>
+        <path d="M444.280496 298.905703c-1.344615-4.958266-2.941344-10.336724-4.79019-15.547105s-3.613651-10.420762-5.714611-15.631143c-4.117882-10.336724-8.403841-20.337294-13.446145-30.169788a377.500522 377.500522 0 0 0-33.615363-55.38131c-6.386919-8.403841-13.109991-16.807681-20.169217-24.623253s-14.454606-15.210952-22.18614-22.102101a303.378648 303.378648 0 0 0-49.078429-36.304592 42.607472 42.607472 0 0 1 43.699971-73.197452 43.699971 43.699971 0 0 1 7.89961 6.050765l0.756346 0.840384a383.971479 383.971479 0 0 1 48.910353 58.826885c7.059226 10.504801 13.530183 21.177678 19.580948 32.018633s11.345185 22.018063 16.051336 33.615362A420.192033 420.192033 0 0 1 453.944912 225.708251c2.605191 11.681339 4.874228 23.278639 6.554996 35.128054 0.840384 5.882688 1.512691 11.849415 2.10096 17.732104s1.008461 11.681339 1.008461 18.236334A10.00057 10.00057 0 0 1 453.944912 306.97339a9.832494 9.832494 0 0 1-9.832493-7.395379zM291.246557 549.256116c-4.874228 0.756346-10.672878 1.764807-15.883259 2.941345s-10.672878 2.437114-16.051335 3.949805c-10.672878 2.941344-21.177678 6.386919-31.346326 10.168647a361.365148 361.365148 0 0 0-58.826884 27.900751C159.810489 599.595122 151.406649 605.561849 143.002808 611.612614s-16.807681 12.773838-24.455176 19.49691a310.942104 310.942104 0 0 0-41.346896 44.960548A42.691511 42.691511 0 1 1 8.541358 624.722606a43.111703 43.111703 0 0 1 6.891149-7.227303l0.840384-0.672308a376.5761 376.5761 0 0 1 63.533035-42.019203c11.177108-5.882688 22.438255-11.09307 33.615363-15.883259s23.110562-8.908071 34.7919-12.521722A411.788192 411.788192 0 0 1 219.729873 530.935744a337.246125 337.246125 0 0 1 35.632285-2.773268h17.90018c6.134804 0 11.765377 0 18.152296 0.924423a10.084609 10.084609 0 0 1 0.672307 19.917102h-0.840384z m514.315048 33.615363c6.218842 1.008461 11.765377 2.10096 17.564027 3.445575s11.261146 2.773267 16.807682 4.454035c11.261146 3.109421 22.270178 7.059226 33.615362 11.261147a373.802832 373.802832 0 0 1 63.869189 32.354786 366.155337 366.155337 0 0 1 57.734385 45.128625 373.634755 373.634755 0 0 1 48.658238 57.48227v0.840384a42.691511 42.691511 0 1 1-70.340146 48.406122 38.657667 38.657667 0 0 1-4.79019-9.244225 306.824222 306.824222 0 0 0-26.135944-52.776119 299.680958 299.680958 0 0 0-37.901321-48.322084 339.851316 339.851316 0 0 0-48.069969-41.178819c-8.403841-6.218842-17.732104-11.933454-27.228444-17.39595L815.31006 609.259539c-4.790189-2.437114-9.832494-4.706151-14.454606-6.554996h-0.672307a10.00057 10.00057 0 0 1-5.378458-13.109991 10.420762 10.420762 0 0 1 11.009031-6.050766z" fill="#CE111B"></path>
+        <path d="M522.688329 674.809496c2.941344 25.211522 6.134804 50.002852 8.908071 75.130335s5.042304 50.423044 6.723072 76.222835c3.445575 51.011313 4.454036 102.190702 4.874228 153.117977a42.523434 42.523434 0 1 1-84.962829 0.672307 45.548816 45.548816 0 0 1 0.924423-9.076148c10.252686-48.742276 19.917102-97.652628 27.144405-146.731058 3.613651-24.287099 6.891149-49.498621 9.664417-74.037836s4.958266-49.918813 7.227303-74.962259a10.00057 10.00057 0 0 1 11.009031-9.076147 9.832494 9.832494 0 0 1 8.40384 8.40384z m221.777355-356.658997c5.210381-3.781728 10.00057-6.723073 15.29499-9.916532s10.168647-6.050765 15.379028-8.403841c10.504801-5.714612 21.177678-10.840954 32.18671-15.631144a422.545108 422.545108 0 0 1 68.743416-22.774408c12.017492-2.773267 24.203061-5.126343 36.304592-6.723072s25.211522-2.773267 37.229014-3.277498a388.761669 388.761669 0 0 1 76.222835 4.70615h0.756345a42.691511 42.691511 0 0 1-13.614221 84.038407 37.565168 37.565168 0 0 1-9.664417-2.773267 299.260766 299.260766 0 0 0-89.416865-22.606332c-10.504801-1.008461-21.009602-1.680768-31.850556-1.680768a383.551287 383.551287 0 0 0-64.709573 5.378458 328.338054 328.338054 0 0 0-32.18671 7.059226l-15.883258 4.622113c-5.29442 1.680768-10.672878 3.613651-15.29499 5.462496h-0.504231a10.084609 10.084609 0 0 1-12.941914-5.630573 10.840954 10.840954 0 0 1 3.949805-11.849415z" fill="#FF2528"></path>
+        <path d="M477.055474 569.08918c-2.941344 0.840384-6.386919 1.932883-9.664417 3.109421s-6.554996 2.269037-9.832493 3.613652c-6.554996 2.437114-12.773838 5.210381-19.244795 8.403841a298.840574 298.840574 0 0 0-36.220554 19.49691 247.661184 247.661184 0 0 0-60.255537 51.515543 178.497575 178.497575 0 0 0-34.959977 65.045727 174.463732 174.463732 0 0 0-6.386919 35.464207 159.672972 159.672972 0 0 0-0.672307 18.068258 80.424755 80.424755 0 0 0 0 8.992109l0.840384 8.655956v1.680768a42.523434 42.523434 0 0 1-84.878791 4.790189 42.943626 42.943626 0 0 1 0-8.40384l1.59673-12.521723c0.672307-4.033844 1.008461-8.403841 2.016922-12.269607a245.560224 245.560224 0 0 1 6.218842-23.698831 240.097727 240.097727 0 0 1 79.920524-123.536457A290.268656 290.268656 0 0 1 386.714187 571.022064a343.128814 343.128814 0 0 1 43.195741-13.614222c7.227303-1.764807 14.622683-3.445575 22.018063-4.706151a234.752885 234.752885 0 0 1 22.606331-3.193459 10.084609 10.084609 0 0 1 10.840954 9.076148 9.832494 9.832494 0 0 1-7.227303 10.5048z" fill="#FFE045"></path>
+        <path d="M451.171645 31.243379a29.749596 29.749596 0 0 0 59.415153 0 29.749596 29.749596 0 1 0-59.415153 0z" fill="#FF2528"></path>
+        <path d="M1026.330499 610.099923a27.060367 27.060367 0 1 0 27.060367-27.060367 27.060367 27.060367 0 0 0-27.060367 27.060367z" fill="#FFC229"></path>
+        <path d="M342.173832 986.507946a21.849986 21.849986 0 1 0 21.849985-21.849986 21.765947 21.765947 0 0 0-21.849985 21.849986zM1041.03722 217.472487a21.849986 21.849986 0 0 0 43.699972 0 21.849986 21.849986 0 0 0-43.699972 0z" fill="#FF2528"></path>
+        <path d="M55.602865 783.975386a20.673448 20.673448 0 1 0 41.346896 0 20.673448 20.673448 0 1 0-41.346896 0z" fill="#FFC229"></path>
+      </svg>
+  `;
+
+  function createFireworksButton(pinElement) {
+    if (!pinElement || !pinElement.parentElement) return null;
+    const button = document.createElement('div');
+    button.id = 'bn-fireworks';
+    button.setAttribute('title', '放烟花');
+    button.setAttribute('role', 'button');
+    button.setAttribute('tabindex', '0');
+    button.setAttribute('aria-label', '放烟花');
+    button.innerHTML = FIREWORKS_ICON_SVG;
+    pinElement.insertAdjacentElement('beforebegin', button);
+    return button;
+  }
+
+  function createFireworksEngine() {
+    if (!document.body) return null;
+    const canvas = document.createElement('canvas');
+    canvas.id = 'bn-fireworks-canvas';
+    canvas.setAttribute('aria-hidden', 'true');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    document.body.appendChild(canvas);
+
+    let dpr = 1;
+    let width = 1;
+    let height = 1;
+    let rafId = null;
+    let lastTs = 0;
+    let activeUntil = 0;
+    const particles = [];
+    const pendingTimers = new Set();
+
+    const nowMs = () => (window.performance && typeof performance.now === 'function') ? performance.now() : Date.now();
+    const rand = (min, max) => min + Math.random() * (max - min);
+    const randInt = (min, max) => Math.floor(rand(min, max + 1));
+    const BURST_STYLES = Object.freeze(['sphere', 'ring', 'chrysanthemum', 'willow', 'strobe', 'double']);
+
+    const resize = () => {
+      width = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1);
+      height = Math.max(1, window.innerHeight || document.documentElement.clientHeight || 1);
+      dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+
+    const scheduleBurst = (delay, fn) => {
+      const timerId = window.setTimeout(() => {
+        pendingTimers.delete(timerId);
+        fn();
+      }, Math.max(0, delay));
+      pendingTimers.add(timerId);
+    };
+
+    const spawnParticle = (x, y, angle, speed, options = {}) => {
+      const ttl = options.ttl ?? rand(0.9, 1.9);
+      const life = options.life ?? ttl;
+      particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life,
+        ttl,
+        size: options.size ?? rand(1.2, 3.6),
+        drag: options.drag ?? rand(0.9, 0.965),
+        gravity: options.gravity ?? rand(90, 240),
+        alpha: options.alpha ?? rand(0.68, 1),
+        hue: options.hue ?? randInt(0, 359),
+        sat: options.sat ?? randInt(70, 100),
+        light: options.light ?? randInt(52, 72),
+        trail: options.trail ?? rand(0.7, 1.8),
+        twinkle: options.twinkle ?? rand(0.4, 1.2),
+      });
+    };
+
+    const spawnBurst = (x, y, options = {}) => {
+      const style = options.style || BURST_STYLES[randInt(0, BURST_STYLES.length - 1)];
+      const sizeScale = Math.max(0.55, Math.min(2.4, Number(options.sizeScale) || rand(0.68, 2.05)));
+      const baseHue = randInt(0, 359);
+      const baseCount = Math.max(20, Math.round(rand(42, 92) * sizeScale));
+      const basePower = rand(145, 325) * (0.72 + sizeScale * 0.42);
+      const baseGravity = rand(85, 220) * (0.8 + sizeScale * 0.2);
+      const addCore = options.addCore !== false;
+
+      if (addCore) {
+        spawnParticle(x, y, rand(0, Math.PI * 2), rand(20, 55), {
+          size: rand(2.4, 4.4) * Math.min(1.35, sizeScale),
+          ttl: rand(0.25, 0.45),
+          life: rand(0.25, 0.45),
+          drag: rand(0.84, 0.9),
+          gravity: rand(40, 90),
+          alpha: rand(0.85, 1),
+          hue: (baseHue + rand(-14, 14) + 360) % 360,
+          sat: randInt(75, 100),
+          light: randInt(68, 92),
+          trail: rand(0.22, 0.5),
+          twinkle: rand(0.9, 1.8),
+        });
+      }
+
+      const emit = (angle, speed, overrides = {}) => {
+        const hue = overrides.hue ?? (baseHue + rand(-68, 68) + 360) % 360;
+        spawnParticle(x, y, angle, speed, {
+          gravity: baseGravity,
+          hue,
+          ...overrides,
+        });
+      };
+
+      if (style === 'ring') {
+        const count = Math.max(18, Math.round(baseCount * 0.85));
+        for (let i = 0; i < count; i += 1) {
+          const angle = (Math.PI * 2 * i) / count + rand(-0.03, 0.03);
+          const speed = basePower * rand(0.9, 1.1);
+          emit(angle, speed, {
+            size: rand(1.2, 3.2) * Math.min(1.5, sizeScale),
+            ttl: rand(1.1, 2.1),
+            drag: rand(0.922, 0.97),
+            trail: rand(1.05, 2.1),
+            alpha: rand(0.72, 0.96),
+          });
+        }
+        return;
+      }
+
+      if (style === 'chrysanthemum') {
+        const spokes = randInt(9, 18);
+        const rings = randInt(2, 3);
+        for (let ring = 0; ring < rings; ring += 1) {
+          const speedFactor = 0.6 + ring * 0.22;
+          for (let i = 0; i < spokes; i += 1) {
+            const stem = (Math.PI * 2 * i) / spokes + rand(-0.05, 0.05);
+            for (let j = 0; j < randInt(2, 4); j += 1) {
+              const angle = stem + rand(-0.075, 0.075);
+              const speed = basePower * speedFactor * rand(0.78, 1.1);
+              emit(angle, speed, {
+                size: rand(1, 3) * Math.min(1.35, sizeScale),
+                ttl: rand(1.1, 2.1),
+                drag: rand(0.918, 0.968),
+                trail: rand(0.95, 1.9),
+              });
+            }
+          }
+        }
+        return;
+      }
+
+      if (style === 'willow') {
+        const count = Math.max(18, Math.round(baseCount * 0.72));
+        for (let i = 0; i < count; i += 1) {
+          const angle = rand(0, Math.PI * 2);
+          const speed = basePower * rand(0.3, 0.78);
+          emit(angle, speed, {
+            gravity: baseGravity * rand(1.15, 1.5),
+            size: rand(1.2, 3.1) * Math.min(1.55, sizeScale),
+            ttl: rand(1.5, 2.8),
+            drag: rand(0.938, 0.982),
+            trail: rand(1.6, 2.9),
+            alpha: rand(0.62, 0.9),
+            sat: randInt(62, 95),
+            light: randInt(50, 70),
+          });
+        }
+        return;
+      }
+
+      if (style === 'strobe') {
+        const count = Math.max(24, Math.round(baseCount * 1.25));
+        for (let i = 0; i < count; i += 1) {
+          const angle = rand(0, Math.PI * 2);
+          const speed = basePower * rand(0.36, 1.04);
+          emit(angle, speed, {
+            size: rand(0.9, 2.1) * Math.min(1.35, sizeScale),
+            ttl: rand(0.58, 1.08),
+            drag: rand(0.88, 0.93),
+            trail: rand(0.45, 1.1),
+            twinkle: rand(1.4, 3.3),
+            alpha: rand(0.72, 1),
+          });
+        }
+        return;
+      }
+
+      if (style === 'double') {
+        spawnBurst(x, y, { style: 'ring', sizeScale, addCore });
+        scheduleBurst(randInt(80, 170), () => {
+          spawnBurst(x + rand(-14, 14), y + rand(-12, 12), {
+            style: BURST_STYLES[randInt(0, BURST_STYLES.length - 2)],
+            sizeScale: Math.max(0.55, sizeScale * rand(0.52, 0.78)),
+            addCore: true,
+          });
+        });
+        return;
+      }
+
+      for (let i = 0; i < baseCount; i += 1) {
+        const angle = rand(0, Math.PI * 2);
+        const distanceScale = Math.pow(Math.random(), 0.42);
+        const speed = basePower * (0.42 + distanceScale);
+        emit(angle, speed, {
+          size: rand(1.15, 3.45) * Math.min(1.45, sizeScale),
+          ttl: rand(0.95, 1.95),
+          drag: rand(0.9, 0.965),
+          trail: rand(0.75, 1.85),
+        });
+      }
+    };
+
+    const stop = () => {
+      if (rafId != null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      ctx.clearRect(0, 0, width, height);
+      ctx.globalCompositeOperation = 'source-over';
+    };
+
+    const frame = (ts) => {
+      if (!lastTs) lastTs = ts;
+      const dt = Math.min((ts - lastTs) / 1000, 0.05);
+      lastTs = ts;
+
+      ctx.clearRect(0, 0, width, height);
+      ctx.globalCompositeOperation = 'lighter';
+
+      for (let i = particles.length - 1; i >= 0; i -= 1) {
+        const p = particles[i];
+        p.life -= dt;
+        if (p.life <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+        const lifeRatio = Math.max(0, p.life / p.ttl);
+        const prevX = p.x;
+        const prevY = p.y;
+        p.vx *= p.drag;
+        p.vy = p.vy * p.drag + p.gravity * dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+
+        const alpha = Math.max(0, lifeRatio * p.alpha * (0.7 + Math.sin(ts * 0.015 * p.twinkle) * 0.3));
+        if (alpha <= 0) continue;
+
+        ctx.strokeStyle = `hsla(${p.hue}, ${p.sat}%, ${p.light}%, ${alpha * 0.55})`;
+        ctx.lineWidth = Math.max(0.6, p.size * p.trail * lifeRatio);
+        ctx.beginPath();
+        ctx.moveTo(prevX, prevY);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+
+        ctx.fillStyle = `hsla(${p.hue}, ${p.sat}%, ${Math.min(92, p.light + 14)}%, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, Math.max(0.5, p.size * lifeRatio), 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      if (!particles.length && ts > activeUntil) {
+        stop();
+        return;
+      }
+      rafId = requestAnimationFrame(frame);
+    };
+
+    const start = () => {
+      if (rafId != null) return;
+      lastTs = 0;
+      rafId = requestAnimationFrame(frame);
+    };
+
+    const launch = () => {
+      resize();
+      if (canvas.parentElement && canvas.parentElement.lastElementChild !== canvas) {
+        canvas.parentElement.appendChild(canvas);
+      }
+      const waveCount = randInt(2, 6);
+      const now = nowMs();
+      activeUntil = Math.max(activeUntil, now + 2700);
+
+      for (let i = 0; i < waveCount; i += 1) {
+        const delay = i * randInt(90, 240) + randInt(0, 180);
+        const burstStyle = BURST_STYLES[randInt(0, BURST_STYLES.length - 1)];
+        const burstScale = rand(0.62, 2.18);
+        scheduleBurst(delay, () => {
+          const x = rand(width * 0.12, width * 0.88);
+          const y = rand(height * 0.08, height * (0.54 - Math.min(0.18, burstScale * 0.06)));
+          spawnBurst(x, y, { style: burstStyle, sizeScale: burstScale, addCore: true });
+          activeUntil = Math.max(activeUntil, nowMs() + 2050 + burstScale * 320);
+          start();
+        });
+      }
+
+      if (Math.random() < 0.35) {
+        scheduleBurst(randInt(420, 760), () => {
+          const centerX = rand(width * 0.3, width * 0.7);
+          const centerY = rand(height * 0.12, height * 0.3);
+          spawnBurst(centerX, centerY, { style: 'double', sizeScale: rand(1.45, 2.3), addCore: true });
+          activeUntil = Math.max(activeUntil, nowMs() + 2500);
+          start();
+        });
+      }
+
+      start();
+    };
+
+    const destroy = () => {
+      stop();
+      pendingTimers.forEach(timerId => clearTimeout(timerId));
+      pendingTimers.clear();
+      window.removeEventListener('resize', resize);
+      canvas.remove();
+    };
+
+    window.addEventListener('resize', resize);
+    resize();
+
+    return {
+      launch,
+      destroy,
+    };
+  }
+
+  function ensureFireworksEngine() {
+    if (!fireworksEngine) fireworksEngine = createFireworksEngine();
+    return fireworksEngine;
+  }
+
+  function triggerFireworks() {
+    const engine = ensureFireworksEngine();
+    if (!engine) return;
+    engine.launch();
+    if (!fireworksBtn) return;
+    fireworksBtn.classList.add('bn-active');
+    if (fireworksActiveTimer) clearTimeout(fireworksActiveTimer);
+    fireworksActiveTimer = setTimeout(() => {
+      fireworksBtn?.classList.remove('bn-active');
+      fireworksActiveTimer = null;
+    }, 320);
+  }
 
   initSubmittersSelector();
 
@@ -1646,6 +2008,25 @@
     wakeController.syncPinnedState();
     updateContainerState();
   });
+  if (fireworksBtn) {
+    const launchFromFireworksButton = (event) => {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      triggerFireworks();
+    };
+    fireworksBtn.addEventListener('click', launchFromFireworksButton);
+    fireworksBtn.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      launchFromFireworksButton(event);
+    });
+  }
+  window.addEventListener('pagehide', () => {
+    if (!fireworksEngine) return;
+    fireworksEngine.destroy();
+    fireworksEngine = null;
+  }, { once: true });
 
   function markOnce(el, key) {
     const k = `bn${key}`;
