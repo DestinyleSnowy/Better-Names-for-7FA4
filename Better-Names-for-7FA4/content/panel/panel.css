@@ -484,6 +484,74 @@
 .bn-section-color-theme .bn-section-toggle {
   margin-top: 0;
 }
+.bn-section-service-plan-wide {
+  padding: 0;
+  overflow: hidden;
+  border-color: var(--bn-border);
+  background:
+    linear-gradient(135deg, rgba(30,136,229,0.06), rgba(255,166,0,0.04) 52%, rgba(30,136,229,0.02));
+}
+.bn-section-service-plan-wide::after {
+  display: none;
+}
+.bn-service-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.bn-service-plan-item {
+  padding: 12px 16px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.52), rgba(255,255,255,0.2));
+}
+.bn-service-plan-item + .bn-service-plan-item {
+  border-left: 1px solid var(--bn-border-subtle);
+}
+.bn-service-plan-item .bn-title {
+  margin-bottom: 8px;
+}
+.bn-service-feedback-item .bn-title::after {
+  background: linear-gradient(90deg, #1e88e5, transparent);
+}
+.bn-join-plan-item .bn-title::after {
+  background: linear-gradient(90deg, #f08a00, transparent);
+}
+.bn-static-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.bn-static-info-item {
+  font-size: 13px;
+  color: var(--bn-text-sub);
+  line-height: 1.45;
+  word-break: break-all;
+}
+.bn-static-info-item strong {
+  color: var(--bn-text);
+}
+.bn-blank-placeholder {
+  min-height: 52px;
+  border: 1px dashed var(--bn-border);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.35), rgba(255,255,255,0.12));
+}
+#bn-container.bn-theme-dark .bn-section-service-plan-wide {
+  background: linear-gradient(135deg, rgba(56,141,227,0.2), rgba(255,144,64,0.12) 52%, rgba(56,141,227,0.08));
+}
+#bn-container.bn-theme-dark .bn-service-plan-item {
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+}
+#bn-container.bn-theme-dark .bn-blank-placeholder {
+  background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+}
+@media (max-width: 600px) {
+  .bn-service-plan-grid {
+    grid-template-columns: 1fr;
+  }
+  .bn-service-plan-item + .bn-service-plan-item {
+    border-left: 0;
+    border-top: 1px solid var(--bn-border-subtle);
+  }
+}
 
 .bn-theme-mode {
   margin-top: 10px;
@@ -585,8 +653,16 @@
   grid-column: 1 / span 2;
   align-self: stretch;
 }
+.bn-main-content > .bn-section-service-plan-wide {
+  grid-column: 1 / span 2;
+  align-self: stretch;
+}
 
 @media (max-width: 900px) {
+  .bn-main-content > .bn-section-service-plan-wide {
+    grid-column: auto;
+    align-self: stretch;
+  }
   .bn-main-content > .bn-section-background {
     grid-column: auto;
     align-self: stretch;
