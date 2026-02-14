@@ -64,7 +64,7 @@
             </div>
             <div class="bn-static-info">
               <div class="bn-static-info-item"><strong>QQ 群：</strong>1082168604</div>
-              <div class="bn-static-info-item"><strong>激活码：</strong>YOUareCRYINGtoX</div>
+              <div class="bn-static-info-item"><strong>验证码：</strong>YOUareCRYINGtoX</div>
             </div>
           </div>
           <div class="bn-service-plan-item bn-join-plan-item">
@@ -75,7 +75,10 @@
               </svg>
               加入 Better Names 计划
             </div>
-            <div class="bn-blank-placeholder" aria-hidden="true"></div>
+            <div class="bn-plan-membership-status">
+              <span id="bn-plan-membership-text" class="bn-plan-membership-text bn-plan-status-loading">正在检查加入状态...</span>
+              <button type="button" id="bn-plan-join-detail-btn" class="bn-btn-link bn-plan-join-detail-btn" hidden aria-expanded="false" aria-controls="bn-plan-detail-modal">详情</button>
+            </div>
           </div>
         </div>
       </div>
@@ -279,6 +282,16 @@
             style="width: 100%;">
         </div>
       </div>
+      <div id="bn-plan-detail-modal" class="bn-plan-detail-modal" hidden>
+        <div class="bn-plan-detail-modal-mask" data-bn-plan-modal-close="1"></div>
+        <div class="bn-plan-detail-modal-card" role="dialog" aria-modal="true" aria-labelledby="bn-plan-detail-modal-title">
+          <div class="bn-plan-detail-modal-header">
+            <div class="bn-plan-detail-modal-title" id="bn-plan-detail-modal-title">加入 Better Names 计划</div>
+            <button type="button" class="bn-plan-detail-modal-close" data-bn-plan-modal-close="1" aria-label="关闭详情">×</button>
+          </div>
+          <div id="bn-plan-detail-modal-body" class="bn-plan-detail-modal-body">加入说明将在后续更新中补充。</div>
+        </div>
+      </div>
     </div>
     <div class="bn-color-sidebar" id="bn-color-sidebar">
       <div class="bn-color-header">
@@ -315,7 +328,7 @@
       <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
     </div>
     <div class="bn-version">
-      <div class="bn-version-text" id="bn-version-text" data-slogan="测试版本"></div>
+      <div class="bn-version-text" id="bn-version-text" data-slogan="萬事順意"></div>
       <div class="bn-update-notice" id="bn-update-notice" aria-live="polite">
         <div class="bn-update-dot" aria-hidden="true"></div>
         <div class="bn-update-copy">

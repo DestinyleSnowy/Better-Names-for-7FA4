@@ -731,6 +731,12 @@
   const updateNoticeEl = document.getElementById('bn-update-notice');
   const updateVersionEl = document.getElementById('bn-update-version');
   const updateLinkEl = document.getElementById('bn-update-link');
+  const joinPlanStatusTextEl = container.querySelector('#bn-plan-membership-text');
+  const joinPlanDetailBtnEl = container.querySelector('#bn-plan-join-detail-btn');
+  const joinPlanModalEl = container.querySelector('#bn-plan-detail-modal');
+  const joinPlanModalBodyEl = container.querySelector('#bn-plan-detail-modal-body');
+  const joinPlanModalCloseEls = container.querySelectorAll('[data-bn-plan-modal-close="1"]');
+  const joinPlanModalCloseBtnEl = container.querySelector('.bn-plan-detail-modal-close');
   const UPDATE_NOTICE_WARNING_CLASS = 'bn-state-warning';
   const UPDATE_NOTICE_ERROR_CLASS = 'bn-state-error';
   if (!panel || !pinBtn || !trigger) {
@@ -4012,6 +4018,347 @@
     noticeEl.classList.add(nextClass);
   }
 
+  const JOIN_PLAN_DETAIL_TEXT = `加入 Better Names 计划将会把您的基本个人信息（姓名、班级、性别、用户名、邮箱、学校、座位、教练、电话号码）公开给也加入此项目的同学，所有加入此项目的人均可用 ./better_names 查看所有其他人的这些信息，以便 Better Names 的数据库更新。
+
+您可前往【修改资料】-> 【加入 Better Names】加入该计划，加入后接下来 90 天内不可以取消。
+
+我们强烈建议您参与此项目，因为此项目后续版本可能会禁止非计划内成员使用。`;
+  const JOIN_PLAN_STATUS_CLASSES = ['bn-plan-status-loading', 'bn-plan-status-success', 'bn-plan-status-danger'];
+  const JOIN_PLAN_MODAL_ANIMATION_MS = 230;
+  let joinPlanModalScrollRestore = null;
+  let joinPlanModalCloseTimer = null;
+  let joinPlanModalOpenRaf = 0;
+
+  function readElementPaddingRight(element) {
+    if (!element || typeof window.getComputedStyle !== 'function') return 0;
+    const raw = window.getComputedStyle(element).paddingRight;
+    const value = Number.parseFloat(raw);
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  function resolveViewportScrollbarWidth() {
+    const docEl = document.documentElement;
+    const viewportWidth = window.innerWidth || 0;
+    const contentWidth = docEl ? docEl.clientWidth : 0;
+    const scrollbarWidth = viewportWidth - contentWidth;
+    if (!Number.isFinite(scrollbarWidth)) return 0;
+    return Math.max(0, scrollbarWidth);
+  }
+
+  function lockJoinPlanModalScroll() {
+    if (joinPlanModalScrollRestore) return;
+    const docEl = document.documentElement;
+    const bodyEl = document.body;
+    const scrollbarWidth = resolveViewportScrollbarWidth();
+    joinPlanModalScrollRestore = {
+      docOverflow: docEl ? docEl.style.overflow : '',
+      bodyOverflow: bodyEl ? bodyEl.style.overflow : '',
+      bodyPaddingRight: bodyEl ? bodyEl.style.paddingRight : ''
+    };
+    if (docEl) docEl.style.overflow = 'hidden';
+    if (bodyEl) {
+      bodyEl.style.overflow = 'hidden';
+      if (scrollbarWidth > 0) {
+        const currentPadding = readElementPaddingRight(bodyEl);
+        bodyEl.style.paddingRight = `${currentPadding + scrollbarWidth}px`;
+      }
+    }
+  }
+
+  function unlockJoinPlanModalScroll() {
+    if (!joinPlanModalScrollRestore) return;
+    const docEl = document.documentElement;
+    const bodyEl = document.body;
+    if (docEl) docEl.style.overflow = joinPlanModalScrollRestore.docOverflow || '';
+    if (bodyEl) {
+      bodyEl.style.overflow = joinPlanModalScrollRestore.bodyOverflow || '';
+      bodyEl.style.paddingRight = joinPlanModalScrollRestore.bodyPaddingRight || '';
+    }
+    joinPlanModalScrollRestore = null;
+  }
+
+  function setJoinPlanStatus(kind, text) {
+    if (!joinPlanStatusTextEl) return;
+    joinPlanStatusTextEl.classList.remove(...JOIN_PLAN_STATUS_CLASSES);
+    const nextClass = kind === 'success'
+      ? 'bn-plan-status-success'
+      : (kind === 'danger' ? 'bn-plan-status-danger' : 'bn-plan-status-loading');
+    joinPlanStatusTextEl.classList.add(nextClass);
+    joinPlanStatusTextEl.textContent = text;
+  }
+
+  function setJoinPlanDetailVisibility(showButton, showPanel) {
+    if (joinPlanDetailBtnEl) {
+      joinPlanDetailBtnEl.hidden = !showButton;
+      if (!showButton) {
+        closeJoinPlanDetailModal(false);
+      }
+    }
+  }
+
+  function setJoinPlanDetailContent(text) {
+    if (!joinPlanModalBodyEl) return;
+    joinPlanModalBodyEl.textContent = (typeof text === 'string' && text.trim())
+      ? text.trim()
+      : JOIN_PLAN_DETAIL_TEXT;
+  }
+
+  function closeJoinPlanDetailModal(returnFocus = true) {
+    let unlockDelayed = false;
+    if (joinPlanModalOpenRaf) {
+      window.cancelAnimationFrame(joinPlanModalOpenRaf);
+      joinPlanModalOpenRaf = 0;
+    }
+    if (joinPlanModalCloseTimer) {
+      window.clearTimeout(joinPlanModalCloseTimer);
+      joinPlanModalCloseTimer = null;
+    }
+    if (joinPlanModalEl) {
+      const shouldAnimateClose = !joinPlanModalEl.hidden;
+      joinPlanModalEl.classList.remove('is-open');
+      if (shouldAnimateClose) {
+        unlockDelayed = true;
+        joinPlanModalEl.classList.add('is-closing');
+        joinPlanModalCloseTimer = window.setTimeout(() => {
+          if (!joinPlanModalEl) return;
+          joinPlanModalEl.hidden = true;
+          joinPlanModalEl.classList.remove('is-closing');
+          joinPlanModalCloseTimer = null;
+          unlockJoinPlanModalScroll();
+        }, JOIN_PLAN_MODAL_ANIMATION_MS);
+      } else {
+        joinPlanModalEl.hidden = true;
+        joinPlanModalEl.classList.remove('is-closing');
+      }
+    }
+    if (joinPlanDetailBtnEl) joinPlanDetailBtnEl.setAttribute('aria-expanded', 'false');
+    if (!unlockDelayed) {
+      unlockJoinPlanModalScroll();
+    }
+    if (returnFocus && joinPlanDetailBtnEl && !joinPlanDetailBtnEl.hidden) {
+      joinPlanDetailBtnEl.focus();
+    }
+  }
+
+  function openJoinPlanDetailModal() {
+    if (!joinPlanModalEl || !joinPlanDetailBtnEl || joinPlanDetailBtnEl.hidden) return;
+    if (joinPlanModalCloseTimer) {
+      window.clearTimeout(joinPlanModalCloseTimer);
+      joinPlanModalCloseTimer = null;
+    }
+    if (joinPlanModalOpenRaf) {
+      window.cancelAnimationFrame(joinPlanModalOpenRaf);
+      joinPlanModalOpenRaf = 0;
+    }
+    joinPlanModalEl.hidden = false;
+    joinPlanModalEl.classList.remove('is-closing');
+    joinPlanModalEl.classList.remove('is-open');
+    joinPlanModalOpenRaf = window.requestAnimationFrame(() => {
+      if (!joinPlanModalEl) return;
+      joinPlanModalEl.classList.add('is-open');
+      joinPlanModalOpenRaf = 0;
+    });
+    joinPlanDetailBtnEl.setAttribute('aria-expanded', 'true');
+    lockJoinPlanModalScroll();
+    if (joinPlanModalCloseBtnEl) {
+      joinPlanModalCloseBtnEl.focus();
+    }
+  }
+
+  function bindJoinPlanDetailToggle() {
+    if (!joinPlanDetailBtnEl || !joinPlanModalEl) return;
+    joinPlanDetailBtnEl.addEventListener('click', () => {
+      openJoinPlanDetailModal();
+    });
+    joinPlanModalCloseEls.forEach((el) => {
+      el.addEventListener('click', closeJoinPlanDetailModal);
+    });
+    document.addEventListener('keydown', (event) => {
+      if (!event || event.key !== 'Escape') return;
+      if (joinPlanModalEl.hidden) return;
+      closeJoinPlanDetailModal();
+    });
+  }
+
+  function resolveCurrentUserIdForJoinPlan() {
+    try {
+      if (typeof window.getCurrentUserId === 'function') {
+        const current = Number(window.getCurrentUserId());
+        if (Number.isFinite(current) && current > 0) return current;
+      }
+    } catch (_) { /* ignore */ }
+
+    const dropdown = document.querySelector('#user-dropdown');
+    if (dropdown && dropdown.dataset) {
+      const raw = dropdown.dataset.user_id
+        || dropdown.dataset.userId
+        || dropdown.getAttribute('data-user_id')
+        || dropdown.getAttribute('data-user-id');
+      if (raw && /^\d+$/.test(String(raw))) {
+        const value = Number(raw);
+        if (Number.isFinite(value) && value > 0) return value;
+      }
+    }
+
+    const link = document.querySelector('#user-dropdown a[href^="/user/"]');
+    if (link) {
+      const match = (link.getAttribute('href') || '').match(/\/user\/(\d+)/);
+      if (match) {
+        const value = Number(match[1]);
+        if (Number.isFinite(value) && value > 0) return value;
+      }
+    }
+    return NaN;
+  }
+
+  async function fetchBetterNamesUsers() {
+    const fetchJsonWithTimeout = async (url, timeoutMs = 7000) => {
+      if (typeof GM_xmlhttpRequest === 'function') {
+        return new Promise((resolve, reject) => {
+          GM_xmlhttpRequest({
+            url,
+            method: 'GET',
+            timeout: timeoutMs,
+            headers: { 'Cache-Control': 'no-cache' },
+            onload: (resp) => {
+              if (!resp || resp.status < 200 || resp.status >= 300) {
+                reject(new Error(`HTTP ${resp ? resp.status : '0'}`));
+                return;
+              }
+              try {
+                const payload = JSON.parse(resp.responseText || '');
+                resolve(payload);
+              } catch (_) {
+                reject(new Error('Invalid JSON payload'));
+              }
+            },
+            onerror: (err) => reject(new Error((err && err.error) || 'GM_xmlhttpRequest failed')),
+            ontimeout: () => reject(new Error('Request timeout')),
+          });
+        });
+      }
+
+      const controller = (typeof AbortController === 'function') ? new AbortController() : null;
+      let timeoutId = null;
+      try {
+        const opPromise = (async () => {
+          const response = await fetch(url, {
+            cache: 'no-store',
+            credentials: 'include',
+            signal: controller ? controller.signal : undefined
+          });
+          if (!response || !response.ok) {
+            throw new Error(`HTTP ${response ? response.status : '0'}`);
+          }
+          const rawText = await response.text();
+          let payload = null;
+          try {
+            payload = JSON.parse(rawText);
+          } catch (_) {
+            throw new Error('Invalid JSON payload');
+          }
+          return payload;
+        })();
+        const timeoutPromise = new Promise((_, rejectTimeout) => {
+          timeoutId = window.setTimeout(() => {
+            if (controller) {
+              try { controller.abort(); } catch (_) { /* ignore */ }
+            }
+            rejectTimeout(new Error('Request timeout'));
+          }, timeoutMs);
+        });
+        return await Promise.race([opPromise, timeoutPromise]);
+      } catch (error) {
+        if (error && error.name === 'AbortError') {
+          throw new Error('Request timeout');
+        }
+        throw error;
+      } finally {
+        if (timeoutId) window.clearTimeout(timeoutId);
+      }
+    };
+
+    const candidates = [];
+    const seen = new Set();
+    const pushCandidate = (value) => {
+      const text = typeof value === 'string' ? value.trim() : '';
+      if (!text || seen.has(text)) return;
+      seen.add(text);
+      candidates.push(text);
+    };
+    try { pushCandidate(new URL('./better_names', location.href).toString()); } catch (_) { /* ignore */ }
+    try { pushCandidate(new URL('better_names', location.href).toString()); } catch (_) { /* ignore */ }
+    try { pushCandidate(new URL('../better_names', location.href).toString()); } catch (_) { /* ignore */ }
+    try { pushCandidate(new URL('/better_names', location.origin).toString()); } catch (_) { /* ignore */ }
+
+    let lastError = null;
+    for (const url of candidates) {
+      try {
+        const payload = await fetchJsonWithTimeout(url, 2500);
+        if (!payload || typeof payload !== 'object') {
+          lastError = new Error('Invalid payload');
+          continue;
+        }
+        if (payload.success === false) {
+          lastError = new Error('API returned success=false');
+          continue;
+        }
+        return Array.isArray(payload.users) ? payload.users : [];
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    if (lastError) throw lastError;
+    return [];
+  }
+
+  function isUserInBetterNames(usersList, uid) {
+    if (!Array.isArray(usersList) || !Number.isFinite(uid)) return false;
+    return usersList.some((entry) => {
+      if (!entry || typeof entry !== 'object') return false;
+      const rawId = entry.id ?? entry.user_id ?? entry.uid;
+      const parsed = Number(rawId);
+      return Number.isFinite(parsed) && parsed === uid;
+    });
+  }
+
+  async function refreshJoinPlanStatus() {
+    if (!joinPlanStatusTextEl) return;
+    setJoinPlanStatus('loading', '正在检查加入状态...');
+    setJoinPlanDetailContent(JOIN_PLAN_DETAIL_TEXT);
+    setJoinPlanDetailVisibility(false, false);
+
+    const uid = resolveCurrentUserIdForJoinPlan();
+    if (!Number.isFinite(uid) || uid <= 0) {
+      setJoinPlanStatus('danger', '未识别当前用户，暂无法判断是否已加入');
+      setJoinPlanDetailContent(JOIN_PLAN_DETAIL_TEXT);
+      setJoinPlanDetailVisibility(true, false);
+      return;
+    }
+
+    try {
+      const usersList = await Promise.race([
+        fetchBetterNamesUsers(),
+        new Promise((_, reject) => {
+          window.setTimeout(() => reject(new Error('Join status check timeout')), 9000);
+        })
+      ]);
+      if (isUserInBetterNames(usersList, uid)) {
+        setJoinPlanStatus('success', '你已加入 Better Names 计划');
+        setJoinPlanDetailVisibility(false, false);
+      } else {
+        setJoinPlanStatus('danger', '你还未加入 Better Names 计划');
+        setJoinPlanDetailContent(JOIN_PLAN_DETAIL_TEXT);
+        setJoinPlanDetailVisibility(true, false);
+      }
+    } catch (error) {
+      console.warn('[BN] Failed to check Better Names plan status', error);
+      setJoinPlanStatus('danger', '你还未加入 Better Names 计划');
+      setJoinPlanDetailContent(JOIN_PLAN_DETAIL_TEXT);
+      setJoinPlanDetailVisibility(true, false);
+    }
+  }
+
   async function checkForPanelUpdates(noticeEl, remoteVersionEl) {
     const showManualSyncNotice = () => {
       if (!noticeEl) return;
@@ -4091,6 +4438,8 @@
         .catch(reject);
     });
   }
+  bindJoinPlanDetailToggle();
+  refreshJoinPlanStatus();
   // 初次遍历
   document.querySelectorAll(USER_LINK_SELECTOR).forEach(processUserLink);
   document.querySelectorAll('#vueAppFuckSafari > tbody > tr > td:nth-child(2) > a > span').forEach(processProblemTitle)
