@@ -1403,20 +1403,31 @@
       PIN: 'pin',
       TRIGGER: 'hover:trigger',
       PANEL: 'hover:panel',
+      BRIDGE: 'hover:bridge',
       FOCUS: 'focus',
     });
     const PANEL_HIDE_DELAY = 300;
     const HOVER_SUPPRESS_MS = 600;
     const DRAG_HOVER_SUPPRESS_MS = 260;
+    const HOVER_BRIDGE_PADDING = 2;
+    const HOVER_BRIDGE_GAP_MAX = 24;
     const wakeReasons = new Set();
 
     let pointerMovedSinceLoad = false;
+    let lastPointerClientX = null;
+    let lastPointerClientY = null;
     const nowTs = () => {
       if (typeof performance !== 'undefined' && performance.now) return performance.now();
       return Date.now();
     };
     const hoverSuppressUntil = nowTs() + HOVER_SUPPRESS_MS;
-    window.addEventListener('pointermove', () => { pointerMovedSinceLoad = true; }, { once: true, passive: true });
+    window.addEventListener('pointermove', (event) => {
+      pointerMovedSinceLoad = true;
+      if (!event) return;
+      if (!Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return;
+      lastPointerClientX = event.clientX;
+      lastPointerClientY = event.clientY;
+    }, { passive: true });
 
     let hideTimer = null;
     let initialRevealPending = true;
@@ -1472,11 +1483,48 @@
       updateContainerState();
     };
 
+    const isPointerInHoverBridge = () => {
+      if (!Number.isFinite(lastPointerClientX) || !Number.isFinite(lastPointerClientY)) return false;
+      let panelRect;
+      let triggerRect;
+      try {
+        panelRect = panel.getBoundingClientRect();
+        triggerRect = trigger.getBoundingClientRect();
+      } catch (_) {
+        return false;
+      }
+      if (!panelRect || !triggerRect) return false;
+      const px = lastPointerClientX;
+      const py = lastPointerClientY;
+
+      const overlapLeft = Math.max(panelRect.left, triggerRect.left) - HOVER_BRIDGE_PADDING;
+      const overlapRight = Math.min(panelRect.right, triggerRect.right) + HOVER_BRIDGE_PADDING;
+      if (overlapRight <= overlapLeft) return false;
+      if (px < overlapLeft || px > overlapRight) return false;
+
+      const panelAboveGap = triggerRect.top - panelRect.bottom;
+      if (panelAboveGap > 0 && panelAboveGap <= HOVER_BRIDGE_GAP_MAX) {
+        const bridgeTop = panelRect.bottom - HOVER_BRIDGE_PADDING;
+        const bridgeBottom = triggerRect.top + HOVER_BRIDGE_PADDING;
+        return py >= bridgeTop && py <= bridgeBottom;
+      }
+
+      const panelBelowGap = panelRect.top - triggerRect.bottom;
+      if (panelBelowGap > 0 && panelBelowGap <= HOVER_BRIDGE_GAP_MAX) {
+        const bridgeTop = triggerRect.bottom - HOVER_BRIDGE_PADDING;
+        const bridgeBottom = panelRect.top + HOVER_BRIDGE_PADDING;
+        return py >= bridgeTop && py <= bridgeBottom;
+      }
+
+      return false;
+    };
+
     const detectHoverReason = () => {
       if (isDragging || container.classList.contains('bn-dragging') || isHoverWakeBlocked()) return null;
       try {
         if (panel.matches(':hover')) return reasons.PANEL;
         if (trigger.matches(':hover')) return reasons.TRIGGER;
+        if (isPointerInHoverBridge()) return reasons.BRIDGE;
       } catch (_) { /* ignore */ }
       return null;
     };
@@ -1495,6 +1543,10 @@
         if (pinned || wakeReasons.size) return;
         const hoverReason = detectHoverReason();
         if (hoverReason) {
+          if (hoverReason === reasons.BRIDGE) {
+            scheduleHide();
+            return;
+          }
           if (canHonorHoverWake()) requestWake(hoverReason);
           return;
         }
