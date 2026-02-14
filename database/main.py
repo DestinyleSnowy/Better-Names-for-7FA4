@@ -8,6 +8,12 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 from bs4 import BeautifulSoup
+from user_db_crypto import (
+    encrypt_plain_users_payload,
+    get_fernet_from_env,
+    read_json,
+    read_uid_keys,
+)
 
 BASE = "http://jx.7fa4.cn:8888"
 
@@ -118,22 +124,13 @@ def extract_uid_and_colorkey_from_ranklist(html: str) -> Dict[int, str]:
 
 def load_existing_max_uid() -> int:
     path = DATA_DIR / "users.json"
-    if not path.exists():
-        return 0
-    try:
-        with path.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-    except Exception:
-        return 0
-    if isinstance(data, dict):
-        max_uid = 0
-        for key in data.keys():
-            try:
-                max_uid = max(max_uid, int(key))
-            except (TypeError, ValueError):
-                continue
-        return max_uid
-    return 0
+    max_uid = 0
+    for key in read_uid_keys(path):
+        try:
+            max_uid = max(max_uid, int(key))
+        except (TypeError, ValueError):
+            continue
+    return max_uid
 
 def extract_total_ranklist_pages(html: str) -> int:
     soup = BeautifulSoup(html, "lxml")
@@ -332,13 +329,20 @@ def apply_user_tags(users: Dict[int, Dict[str, str]], rules: Dict[str, Any]) -> 
 def write_outputs(users: Dict[int, Dict[str, str]]) -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     out_path = DATA_DIR / "users.json"
+    fernet = get_fernet_from_env(require=True)
+    existing_payload = read_json(out_path)
+    encrypted_payload = encrypt_plain_users_payload(
+        users,
+        fernet,
+        existing_payload=existing_payload,
+    )
     with out_path.open("w", encoding="utf-8") as f:
-        json.dump(users, f, ensure_ascii=False, indent=2)
+        json.dump(encrypted_payload, f, ensure_ascii=False, indent=2)
     try:
         rel = out_path.relative_to(Path.cwd())
     except ValueError:
         rel = out_path
-    print(f"✅ 已生成 {rel}")
+    print(f"✅ 已生成加密数据库 {rel}")
 
 async def main():
     print("开始抓取年级/颜色（/ranklist）...")

@@ -1,3 +1,4 @@
 aiohttp
 beautifulsoup4
 lxml
+cryptography

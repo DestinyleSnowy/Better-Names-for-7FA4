@@ -20,6 +20,8 @@ import shlex
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+from user_db_crypto import is_encrypted_payload, read_json, read_users_db_as_plain
+
 BASE_DIR = Path(__file__).resolve().parents[1] / "Better-Names-for-7FA4"
 SPECIAL_RULES_PATH = BASE_DIR / "data" / "special_users.json"
 USERS_JSON_PATH = BASE_DIR / "data" / "users.json"
@@ -66,13 +68,20 @@ def save_rules(rules: Dict) -> None:
 
 
 def load_user_db() -> Dict[str, Dict]:
-    if not USERS_JSON_PATH.exists():
+    raw = read_json(USERS_JSON_PATH)
+    if raw is None:
         return {}
+    encrypted = is_encrypted_payload(raw)
     try:
-        with USERS_JSON_PATH.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-            return data if isinstance(data, dict) else {}
-    except Exception:  # pragma: no cover - defensive, interactive tool
+        data = read_users_db_as_plain(
+            USERS_JSON_PATH,
+            require_key_for_encrypted=encrypted,
+        )
+        if encrypted:
+            print("[info] Loaded encrypted users DB.")
+        return data if isinstance(data, dict) else {}
+    except ValueError as exc:  # pragma: no cover - defensive, interactive tool
+        print(f"[warn] Failed to read users DB ({exc}).")
         return {}
 
 

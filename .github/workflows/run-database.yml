@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       JX_COOKIE: ${{ secrets.JX_COOKIE }}
+      USERS_DB_KEY: ${{ secrets.USERS_DB_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -42,5 +43,5 @@ jobs:
           ls -lah
           git status
           git add -A
-          git commit -m "Update users.json" || echo "No changes"
+          git commit -m "Update encrypted users database" || echo "No changes"
           git push
