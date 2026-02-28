@@ -159,6 +159,7 @@
   const SUBMITTERS_CONFIG_URL = 'submitter/submitters.json';
   const SUPPORTED_PORTS = new Set(['', '8888', '5283']);
   const SUPPORTED_HOSTS = new Set(['7fa4.cn', '10.210.57.10', '211.137.101.118']);
+<<<<<<< HEAD
   const REMOTE_VERSION_URL = 'http://jx.7fa4.cn:9080/yx/better-names-for-7fa4/-/raw/main/version';
   const REMOTE_VERSION_FALLBACK_URL = 'http://in.7fa4.cn:9080/yx/better-names-for-7fa4/-/raw/main/version';
   const REMOTE_VERSION_URLS = [REMOTE_VERSION_URL, REMOTE_VERSION_FALLBACK_URL];
@@ -166,6 +167,11 @@
   const VERSION_CANDIDATE_RE = /^v?\d+(?:\.\d+){1,3}(?:[-_][0-9A-Za-z.-]+)?$/;
   const VERSION_CANDIDATE_IN_LINE_RE = /(v?\d+(?:\.\d+){1,3}(?:[-_][0-9A-Za-z.-]+)?)/i;
   const UPDATE_PAGE_URL = 'http://jx.7fa4.cn:9080/yx/better-names-for-7fa4';
+=======
+  const REMOTE_VERSION_URL = '/yx/better-names-for-7fa4/-/raw/main/version';
+  const REMOTE_VERSION_PATTERN = /^\d+\.\d+\.\d+(?:\.\d+)?$/;
+  const UPDATE_PAGE_URL = '/yx/better-names-for-7fa4';
+>>>>>>> 41bf4e1 (更新)
   const UPDATE_MANUAL_SYNC_MESSAGE = '登录 Gitlab 同步最新版本';
   const manifestVersion = normalizeVersionString(readManifestVersion());
   const manifestVersionInfo = parseComparableVersion(manifestVersion);
@@ -5913,6 +5919,7 @@
 
   async function fetchRemotePanelVersion() {
     let lastError = null;
+<<<<<<< HEAD
     for (const baseUrl of REMOTE_VERSION_URLS) {
       if (!baseUrl) continue;
       try {
@@ -5924,6 +5931,17 @@
         continue;
       }
     }
+=======
+	try {
+		const rawText = await fetchRemotePanelVersionText(REMOTE_VERSION_URL);
+		const normalized = normalizeVersionString(typeof rawText === 'string' ? rawText : '');
+		if (normalized && REMOTE_VERSION_PATTERN.test(normalized)) {
+		  return normalized;
+		}
+	} catch (error) {
+		lastError = error;
+	}
+>>>>>>> 41bf4e1 (更新)
     if (lastError) throw lastError;
     return '';
   }
