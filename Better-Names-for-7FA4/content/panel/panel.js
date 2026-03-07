@@ -702,6 +702,7 @@
   const panel = document.getElementById('bn-panel');
   const pinBtn = document.getElementById('bn-pin');
   let fireworksBtn = document.getElementById('bn-fireworks');
+  const chatTrigger = document.getElementById('bn-chat-trigger');
   const trigger = document.getElementById('bn-trigger');
   const themeColorInput = document.getElementById('bn-theme-color');
   const themeColorHexInput = document.getElementById('bn-theme-color-hex');
@@ -737,6 +738,88 @@
   const joinPlanModalBodyEl = container.querySelector('#bn-plan-detail-modal-body');
   const joinPlanModalCloseEls = container.querySelectorAll('[data-bn-plan-modal-close="1"]');
   const joinPlanModalCloseBtnEl = container.querySelector('.bn-plan-detail-modal-close');
+  const chatWindowEl = container.querySelector('#bn-chat-window');
+  const chatWindowHeaderEl = container.querySelector('.bn-chat-window-header');
+  const chatWindowCloseBtnEl = container.querySelector('#bn-chat-window-close');
+  const chatWindowFullscreenBtnEl = container.querySelector('#bn-chat-window-fullscreen');
+  const chatGroupOpsToggleBtnEl = container.querySelector('#bn-chat-group-ops-toggle');
+  const chatGroupOpsPanelEl = container.querySelector('#bn-chat-group-ops-panel');
+  const chatGroupOpsCloseBtnEl = container.querySelector('#bn-chat-group-ops-close');
+  const chatResizeHandleEls = chatWindowEl ? Array.from(chatWindowEl.querySelectorAll('.bn-chat-resize-handle')) : [];
+  const chatSectionEl = container.querySelector('#bn-chat-section');
+  const chatRefreshBtnEl = container.querySelector('#bn-chat-refresh-btn');
+  const chatTokenBtnEl = container.querySelector('#bn-chat-token-btn');
+  const chatAutoRefreshInputEl = container.querySelector('#bn-chat-auto-refresh');
+  const chatIntervalSelectEl = container.querySelector('#bn-chat-interval');
+  const chatTokenDisplayEl = container.querySelector('#bn-chat-token-display');
+  const chatInfoBtnEl = container.querySelector('#bn-chat-info-btn');
+  const chatSearchInputEl = container.querySelector('#bn-chat-search');
+  const chatScopeTabEls = container.querySelectorAll('.bn-chat-scope-tab');
+  const chatConversationListEl = container.querySelector('#bn-chat-conversation-list');
+  const chatConversationEmptyEl = container.querySelector('#bn-chat-conversation-empty');
+  const chatCurrentTitleEl = container.querySelector('#bn-chat-current-title');
+  const chatCurrentMetaEl = container.querySelector('#bn-chat-current-meta');
+  const chatMessageListEl = container.querySelector('#bn-chat-message-list');
+  const chatLoadOlderBtnEl = container.querySelector('#bn-chat-load-older-btn');
+  const chatInputEl = container.querySelector('#bn-chat-input');
+  const chatInputCounterEl = container.querySelector('#bn-chat-input-counter');
+  const chatSendBtnEl = container.querySelector('#bn-chat-send-btn');
+  const chatStatusEl = container.querySelector('#bn-chat-status');
+  const chatGroupOpTypeEl = container.querySelector('#bn-chat-group-op-type');
+  const chatGroupOpGroupIdEl = container.querySelector('#bn-chat-group-op-group-id');
+  const chatGroupOpTargetIdEl = container.querySelector('#bn-chat-group-op-target-id');
+  const chatGroupOpTitleEl = container.querySelector('#bn-chat-group-op-title');
+  const chatGroupOpMuteEl = container.querySelector('#bn-chat-group-op-mute');
+  const chatGroupOpRunBtnEl = container.querySelector('#bn-chat-group-op-run-btn');
+  const chatGroupOpStatusEl = container.querySelector('#bn-chat-group-op-status');
+
+  const chatState = {
+    initialized: false,
+    loadingInfo: false,
+    loadingMessages: false,
+    loadingOlder: false,
+    sending: false,
+    autoRefreshTimer: null,
+    scope: 'all',
+    searchText: '',
+    activeKey: '',
+    info: null,
+    selfId: NaN,
+    selfName: '',
+    countLimit: 20,
+    messageLengthLimit: Infinity,
+    maxTokenCount: null,
+    recoverTime: null,
+    conversations: [],
+    conversationByKey: new Map(),
+    userNameById: new Map(),
+    groupById: new Map(),
+    messagesByKey: new Map(),
+    oldestSecByKey: new Map(),
+    tokenUsed: null,
+    tokenRemain: null,
+    requestSeq: 0,
+    lastInfoLoadedAt: 0,
+  };
+  const CHAT_WINDOW_EDGE_MARGIN = 8;
+  const CHAT_WINDOW_MIN_WIDTH = 560;
+  const CHAT_WINDOW_MIN_HEIGHT = 420;
+  let chatWindowInteractionState = null;
+  let chatWindowRestoreRect = null;
+
+  const CHAT_GROUP_OPERATION_RULES = {
+    setup: { needGroup: false, needTarget: false, needTitle: true, needMute: false },
+    leave: { needGroup: true, needTarget: false, needTitle: false, needMute: false },
+    set_title: { needGroup: true, needTarget: false, needTitle: true, needMute: false },
+    add_member: { needGroup: true, needTarget: true, needTitle: false, needMute: false },
+    del_member: { needGroup: true, needTarget: true, needTitle: false, needMute: false },
+    add_administrator: { needGroup: true, needTarget: true, needTitle: false, needMute: false },
+    del_administrator: { needGroup: true, needTarget: true, needTitle: false, needMute: false },
+    mute_member: { needGroup: true, needTarget: true, needTitle: false, needMute: true },
+    mute_group: { needGroup: true, needTarget: false, needTitle: false, needMute: true },
+    give_owner: { needGroup: true, needTarget: true, needTitle: false, needMute: false },
+  };
+
   const UPDATE_NOTICE_WARNING_CLASS = 'bn-state-warning';
   const UPDATE_NOTICE_ERROR_CLASS = 'bn-state-error';
   if (!panel || !pinBtn || !trigger) {
@@ -1599,7 +1682,12 @@
       showPanel();
     };
 
-    const onFocusIn = () => {
+    const onFocusIn = (event) => {
+      const target = event && event.target ? event.target : null;
+      if (target) {
+        if (chatTrigger && (target === chatTrigger || chatTrigger.contains(target))) return;
+        if (chatWindowEl && chatWindowEl.contains(target)) return;
+      }
       if (!panel.classList.contains('bn-show') && !canHonorHoverWake()) return;
       requestWake(reasons.FOCUS);
     };
@@ -1751,6 +1839,85 @@
     event.preventDefault();
     wakeController.toggleFromTrigger();
   });
+  if (chatTrigger) {
+    const onChatTrigger = (event) => {
+      if (isDragging || container.classList.contains('bn-dragging')) return;
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      if (!pinned && panel.classList.contains('bn-show')) {
+        panel.classList.remove('bn-show');
+        updateContainerState();
+      }
+      if (chatWindowEl && chatWindowEl.classList.contains('bn-show')) {
+        chatSetWindowVisible(false);
+      } else {
+        chatOpenWindow();
+      }
+    };
+    chatTrigger.addEventListener('click', onChatTrigger);
+    chatTrigger.addEventListener('keydown', (event) => {
+      if (!event || (event.key !== 'Enter' && event.key !== ' ')) return;
+      onChatTrigger(event);
+    });
+  }
+  if (chatWindowCloseBtnEl) {
+    chatWindowCloseBtnEl.addEventListener('click', (event) => {
+      event.preventDefault();
+      chatSetWindowVisible(false);
+    });
+  }
+  if (chatWindowFullscreenBtnEl) {
+    chatWindowFullscreenBtnEl.addEventListener('click', (event) => {
+      if (event) event.preventDefault();
+      chatSetFullscreen(!chatIsFullscreen());
+    });
+  }
+  if (chatGroupOpsToggleBtnEl) {
+    chatGroupOpsToggleBtnEl.addEventListener('click', (event) => {
+      if (event) event.preventDefault();
+      chatSetGroupOpsVisible(!chatWindowEl.classList.contains('bn-group-ops-open'));
+    });
+  }
+  if (chatGroupOpsCloseBtnEl) {
+    chatGroupOpsCloseBtnEl.addEventListener('click', (event) => {
+      if (event) event.preventDefault();
+      chatSetGroupOpsVisible(false);
+    });
+  }
+  if (chatWindowHeaderEl) {
+    chatWindowHeaderEl.addEventListener('pointerdown', (event) => {
+      if (!event) return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (target && target.closest('button, input, select, textarea, a, label')) return;
+      chatBeginWindowInteraction(event, 'move');
+    });
+    chatWindowHeaderEl.addEventListener('dblclick', (event) => {
+      const target = event && event.target instanceof Element ? event.target : null;
+      if (target && target.closest('button, input, select, textarea, a, label')) return;
+      chatSetFullscreen(!chatIsFullscreen());
+    });
+  }
+  chatResizeHandleEls.forEach((handle) => {
+    handle.addEventListener('pointerdown', (event) => {
+      const dir = handle.dataset && handle.dataset.dir ? String(handle.dataset.dir) : '';
+      if (!dir) return;
+      chatBeginWindowInteraction(event, 'resize', dir);
+    });
+  });
+  if (chatWindowEl) {
+    chatWindowEl.addEventListener('pointerdown', () => {
+      bringContainerToFront();
+    }, { passive: true });
+  }
+  window.addEventListener('resize', () => {
+    if (!chatWindowEl || !chatWindowIsVisible() || chatIsFullscreen()) return;
+    if (!chatWindowEl.style.left || !chatWindowEl.style.top) return;
+    chatApplyWindowRect(chatCaptureWindowRect(), { clamp: true });
+  });
+  chatUpdateFullscreenButton();
+  chatSetGroupOpsVisible(false);
   container.addEventListener('focusin', wakeController.onFocusIn);
   container.addEventListener('focusout', wakeController.onFocusOut);
 
@@ -4018,6 +4185,1347 @@
     noticeEl.classList.add(nextClass);
   }
 
+  function chatEscapeHtml(text) {
+    return String(text ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function chatToInteger(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return NaN;
+    return Math.trunc(num);
+  }
+
+  function chatNormalizeTimestampToSec(value) {
+    if (value == null || value === '') return Math.floor(Date.now() / 1000);
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      if (value > 1e10) return Math.floor(value / 1000);
+      return Math.floor(value);
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return Math.floor(Date.now() / 1000);
+      const num = Number(trimmed);
+      if (Number.isFinite(num)) {
+        if (num > 1e10) return Math.floor(num / 1000);
+        return Math.floor(num);
+      }
+      const parsed = Date.parse(trimmed);
+      if (Number.isFinite(parsed)) return Math.floor(parsed / 1000);
+    }
+    return Math.floor(Date.now() / 1000);
+  }
+
+  function chatFormatTimestamp(sec) {
+    const timestampMs = Math.max(0, chatNormalizeTimestampToSec(sec)) * 1000;
+    const date = new Date(timestampMs);
+    if (!Number.isFinite(date.getTime())) return '--';
+    try {
+      return date.toLocaleString('zh-CN', {
+        hour12: false,
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
+    } catch (_) {
+      return date.toISOString();
+    }
+  }
+
+  function chatSetStatus(text, level = 'info') {
+    if (!chatStatusEl) return;
+    chatStatusEl.textContent = String(text || '');
+    chatStatusEl.classList.remove('is-error', 'is-success');
+    if (level === 'error') chatStatusEl.classList.add('is-error');
+    if (level === 'success') chatStatusEl.classList.add('is-success');
+  }
+
+  function chatSetGroupOperationStatus(text, level = 'info') {
+    if (!chatGroupOpStatusEl) return;
+    chatGroupOpStatusEl.textContent = String(text || '');
+    chatGroupOpStatusEl.classList.remove('is-error', 'is-success');
+    if (level === 'error') chatGroupOpStatusEl.classList.add('is-error');
+    if (level === 'success') chatGroupOpStatusEl.classList.add('is-success');
+  }
+
+  function chatClampNumber(value, min, max) {
+    if (!Number.isFinite(value)) return min;
+    if (!Number.isFinite(min) || !Number.isFinite(max)) return value;
+    if (max < min) return min;
+    if (value < min) return min;
+    if (value > max) return max;
+    return value;
+  }
+
+  function chatGetViewportSize() {
+    const width = Math.max(320, window.innerWidth || document.documentElement.clientWidth || 320);
+    const height = Math.max(240, window.innerHeight || document.documentElement.clientHeight || 240);
+    return { width, height };
+  }
+
+  function chatGetWindowMinWidth(viewportWidth) {
+    const safeViewportWidth = Number.isFinite(viewportWidth) ? viewportWidth : chatGetViewportSize().width;
+    const dynamicFloor = Math.max(300, safeViewportWidth - CHAT_WINDOW_EDGE_MARGIN * 2);
+    return Math.min(CHAT_WINDOW_MIN_WIDTH, dynamicFloor);
+  }
+
+  function chatGetWindowMinHeight(viewportHeight) {
+    const safeViewportHeight = Number.isFinite(viewportHeight) ? viewportHeight : chatGetViewportSize().height;
+    const dynamicFloor = Math.max(240, safeViewportHeight - CHAT_WINDOW_EDGE_MARGIN * 2);
+    return Math.min(CHAT_WINDOW_MIN_HEIGHT, dynamicFloor);
+  }
+
+  function chatClampWindowRect(rect) {
+    const viewport = chatGetViewportSize();
+    const minWidth = chatGetWindowMinWidth(viewport.width);
+    const minHeight = chatGetWindowMinHeight(viewport.height);
+    const maxWidth = Math.max(minWidth, viewport.width - CHAT_WINDOW_EDGE_MARGIN * 2);
+    const maxHeight = Math.max(minHeight, viewport.height - CHAT_WINDOW_EDGE_MARGIN * 2);
+
+    const width = chatClampNumber(Number(rect && rect.width), minWidth, maxWidth);
+    const height = chatClampNumber(Number(rect && rect.height), minHeight, maxHeight);
+    const maxLeft = Math.max(CHAT_WINDOW_EDGE_MARGIN, viewport.width - CHAT_WINDOW_EDGE_MARGIN - width);
+    const maxTop = Math.max(CHAT_WINDOW_EDGE_MARGIN, viewport.height - CHAT_WINDOW_EDGE_MARGIN - height);
+    const left = chatClampNumber(Number(rect && rect.left), CHAT_WINDOW_EDGE_MARGIN, maxLeft);
+    const top = chatClampNumber(Number(rect && rect.top), CHAT_WINDOW_EDGE_MARGIN, maxTop);
+
+    return {
+      left,
+      top,
+      width,
+      height,
+    };
+  }
+
+  function chatApplyWindowRect(rect, options = {}) {
+    if (!chatWindowEl || !rect) return null;
+    const nextRect = options.clamp === false ? rect : chatClampWindowRect(rect);
+    chatWindowEl.style.left = `${Math.round(nextRect.left)}px`;
+    chatWindowEl.style.top = `${Math.round(nextRect.top)}px`;
+    chatWindowEl.style.width = `${Math.round(nextRect.width)}px`;
+    chatWindowEl.style.height = `${Math.round(nextRect.height)}px`;
+    chatWindowEl.style.right = 'auto';
+    chatWindowEl.style.bottom = 'auto';
+    return nextRect;
+  }
+
+  function chatCaptureWindowRect() {
+    if (!chatWindowEl) return null;
+    const rect = chatWindowEl.getBoundingClientRect();
+    if (!rect) return null;
+    return {
+      left: Number(rect.left) || 0,
+      top: Number(rect.top) || 0,
+      width: Number(rect.width) || CHAT_WINDOW_MIN_WIDTH,
+      height: Number(rect.height) || CHAT_WINDOW_MIN_HEIGHT,
+    };
+  }
+
+  function chatPrepareFloatingRect() {
+    if (!chatWindowEl || chatIsFullscreen()) return null;
+    const rect = chatCaptureWindowRect();
+    if (!rect) return null;
+    return chatApplyWindowRect(rect, { clamp: true });
+  }
+
+  function chatWindowIsVisible() {
+    return !!(chatWindowEl && chatWindowEl.classList.contains('bn-show'));
+  }
+
+  function chatIsFullscreen() {
+    return !!(chatWindowEl && chatWindowEl.classList.contains('bn-fullscreen'));
+  }
+
+  function chatUpdateFullscreenButton() {
+    if (!chatWindowFullscreenBtnEl) return;
+    const full = chatIsFullscreen();
+    chatWindowFullscreenBtnEl.setAttribute('aria-pressed', full ? 'true' : 'false');
+    chatWindowFullscreenBtnEl.setAttribute('title', full ? '退出全屏' : '全屏');
+    chatWindowFullscreenBtnEl.setAttribute('aria-label', full ? '退出全屏聊天室' : '全屏聊天室');
+    chatWindowFullscreenBtnEl.textContent = full ? '🗗' : '⛶';
+  }
+
+  function chatSetFullscreen(nextFullscreen) {
+    if (!chatWindowEl) return;
+    const next = !!nextFullscreen;
+    const current = chatIsFullscreen();
+    if (next === current) return;
+
+    chatStopWindowInteraction();
+    if (next) {
+      chatWindowRestoreRect = chatPrepareFloatingRect() || chatCaptureWindowRect();
+      chatWindowEl.classList.add('bn-fullscreen');
+    } else {
+      chatWindowEl.classList.remove('bn-fullscreen');
+      if (chatWindowRestoreRect) {
+        chatApplyWindowRect(chatWindowRestoreRect, { clamp: true });
+      }
+    }
+    chatUpdateFullscreenButton();
+  }
+
+  function chatSetGroupOpsVisible(visible) {
+    if (!chatWindowEl) return;
+    const nextVisible = !!visible && chatWindowIsVisible();
+    chatWindowEl.classList.toggle('bn-group-ops-open', nextVisible);
+    if (chatGroupOpsPanelEl) {
+      chatGroupOpsPanelEl.setAttribute('aria-hidden', nextVisible ? 'false' : 'true');
+    }
+    if (chatGroupOpsToggleBtnEl) {
+      chatGroupOpsToggleBtnEl.setAttribute('aria-expanded', nextVisible ? 'true' : 'false');
+      chatGroupOpsToggleBtnEl.textContent = nextVisible ? '收起管理' : '群组管理';
+    }
+  }
+
+  function chatResolveResizeRect(startRect, deltaX, deltaY, direction) {
+    let left = startRect.left;
+    let top = startRect.top;
+    let width = startRect.width;
+    let height = startRect.height;
+
+    if (direction.includes('e')) width = startRect.width + deltaX;
+    if (direction.includes('s')) height = startRect.height + deltaY;
+    if (direction.includes('w')) {
+      const rightEdge = startRect.left + startRect.width;
+      width = startRect.width - deltaX;
+      left = rightEdge - width;
+    }
+    if (direction.includes('n')) {
+      const bottomEdge = startRect.top + startRect.height;
+      height = startRect.height - deltaY;
+      top = bottomEdge - height;
+    }
+
+    return chatClampWindowRect({ left, top, width, height });
+  }
+
+  function chatStopWindowInteraction() {
+    if (!chatWindowInteractionState) return;
+    if (typeof chatWindowInteractionState.cleanup === 'function') {
+      chatWindowInteractionState.cleanup();
+    }
+    chatWindowInteractionState = null;
+    if (chatWindowEl) {
+      chatWindowEl.classList.remove('bn-moving', 'bn-resizing');
+    }
+  }
+
+  function chatBeginWindowInteraction(event, mode, direction = '') {
+    if (!chatWindowEl || !chatWindowIsVisible() || chatIsFullscreen()) return;
+    if (!event) return;
+    if (event.button != null && event.button !== 0) return;
+
+    const startRect = chatPrepareFloatingRect();
+    if (!startRect) return;
+    bringContainerToFront();
+
+    const pointerTarget = event.currentTarget;
+    const pointerId = Number.isFinite(event.pointerId) ? event.pointerId : null;
+    if (pointerTarget && typeof pointerTarget.setPointerCapture === 'function' && pointerId != null) {
+      try {
+        pointerTarget.setPointerCapture(pointerId);
+      } catch (_) {
+        // ignore pointer capture failures
+      }
+    }
+
+    const state = {
+      mode,
+      direction,
+      startRect,
+      startX: Number(event.clientX) || 0,
+      startY: Number(event.clientY) || 0,
+      pointerId,
+      pointerTarget,
+      cleanup: null,
+    };
+    chatWindowInteractionState = state;
+    chatWindowEl.classList.remove('bn-moving', 'bn-resizing');
+    chatWindowEl.classList.add(mode === 'resize' ? 'bn-resizing' : 'bn-moving');
+
+    const onPointerMove = (moveEvent) => {
+      if (!chatWindowInteractionState || chatWindowInteractionState !== state) return;
+      if (state.pointerId != null && moveEvent && moveEvent.pointerId != null && moveEvent.pointerId !== state.pointerId) return;
+      const deltaX = (Number(moveEvent.clientX) || 0) - state.startX;
+      const deltaY = (Number(moveEvent.clientY) || 0) - state.startY;
+      if (state.mode === 'resize') {
+        const nextRect = chatResolveResizeRect(state.startRect, deltaX, deltaY, state.direction || '');
+        chatApplyWindowRect(nextRect, { clamp: true });
+      } else {
+        const nextRect = chatClampWindowRect({
+          left: state.startRect.left + deltaX,
+          top: state.startRect.top + deltaY,
+          width: state.startRect.width,
+          height: state.startRect.height,
+        });
+        chatApplyWindowRect(nextRect, { clamp: true });
+      }
+      if (moveEvent && typeof moveEvent.preventDefault === 'function') moveEvent.preventDefault();
+    };
+
+    const onPointerUp = (upEvent) => {
+      if (state.pointerId != null && upEvent && upEvent.pointerId != null && upEvent.pointerId !== state.pointerId) return;
+      chatStopWindowInteraction();
+    };
+
+    const onPointerCancel = () => {
+      chatStopWindowInteraction();
+    };
+
+    state.cleanup = () => {
+      document.removeEventListener('pointermove', onPointerMove);
+      document.removeEventListener('pointerup', onPointerUp);
+      document.removeEventListener('pointercancel', onPointerCancel);
+      if (state.pointerTarget && typeof state.pointerTarget.releasePointerCapture === 'function' && state.pointerId != null) {
+        try {
+          state.pointerTarget.releasePointerCapture(state.pointerId);
+        } catch (_) {
+          // ignore release failures
+        }
+      }
+    };
+
+    document.addEventListener('pointermove', onPointerMove);
+    document.addEventListener('pointerup', onPointerUp);
+    document.addEventListener('pointercancel', onPointerCancel);
+    if (typeof event.preventDefault === 'function') event.preventDefault();
+  }
+
+  function chatSetWindowVisible(visible) {
+    const nextVisible = !!visible;
+    if (nextVisible && !pinned && panel.classList.contains('bn-show')) {
+      panel.classList.remove('bn-show');
+      updateContainerState();
+    }
+    if (!nextVisible) {
+      chatSetGroupOpsVisible(false);
+      chatSetFullscreen(false);
+      chatStopWindowInteraction();
+    }
+    if (chatWindowEl) {
+      chatWindowEl.classList.toggle('bn-show', nextVisible);
+      chatWindowEl.setAttribute('aria-hidden', nextVisible ? 'false' : 'true');
+    }
+    if (chatTrigger) {
+      chatTrigger.classList.toggle('bn-active', nextVisible);
+      chatTrigger.setAttribute('aria-expanded', nextVisible ? 'true' : 'false');
+    }
+    if (nextVisible) {
+      bringContainerToFront();
+      chatUpdateFullscreenButton();
+      chatStartAutoRefreshTimer();
+    } else {
+      chatStopAutoRefreshTimer();
+    }
+  }
+
+  async function chatOpenWindow() {
+    chatSetWindowVisible(true);
+    if (chatState.initialized || !chatHasValidUi()) return;
+    try {
+      await initChatroomFeature();
+    } catch (error) {
+      chatSetStatus(`聊天室初始化失败：${error && error.message ? error.message : '未知错误'}`, 'error');
+    }
+  }
+
+  function chatHasValidUi() {
+    return !!(chatWindowEl && chatSectionEl && chatConversationListEl && chatMessageListEl && chatInputEl);
+  }
+
+  function chatBuildRequestUrl(path, params = null) {
+    const base = new URL(path, location.origin);
+    if (params && typeof params === 'object') {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value == null || value === '') return;
+        base.searchParams.set(key, String(value));
+      });
+    }
+    return base.toString();
+  }
+
+  function chatBuildFormBody(data) {
+    const body = new URLSearchParams();
+    if (!data || typeof data !== 'object') return body.toString();
+    Object.entries(data).forEach(([key, value]) => {
+      if (value == null) return;
+      body.append(key, String(value));
+    });
+    return body.toString();
+  }
+
+  async function chatApiRequest(method, path, options = {}) {
+    const upperMethod = String(method || 'GET').toUpperCase();
+    const timeoutMs = Math.max(1000, Number(options.timeoutMs) || 12000);
+    const url = chatBuildRequestUrl(path, options.params);
+    const body = upperMethod === 'POST' ? chatBuildFormBody(options.data) : '';
+
+    const parsePayload = (rawText) => {
+      let payload = null;
+      try {
+        payload = JSON.parse(rawText || '');
+      } catch (_) {
+        throw new Error('返回内容不是合法 JSON');
+      }
+      if (!payload || typeof payload !== 'object') {
+        throw new Error('返回内容格式错误');
+      }
+      if (payload.success === false) {
+        const errMessage = payload.err && payload.err.message ? payload.err.message : '未知错误';
+        throw new Error(errMessage);
+      }
+      return payload;
+    };
+
+    if (typeof GM_xmlhttpRequest === 'function') {
+      return new Promise((resolve, reject) => {
+        GM_xmlhttpRequest({
+          method: upperMethod,
+          url,
+          timeout: timeoutMs,
+          headers: upperMethod === 'POST'
+            ? { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }
+            : undefined,
+          data: upperMethod === 'POST' ? body : undefined,
+          onload: (resp) => {
+            if (!resp || resp.status < 200 || resp.status >= 300) {
+              reject(new Error(`HTTP ${resp ? resp.status : 0}`));
+              return;
+            }
+            try {
+              const payload = parsePayload(resp.responseText || '');
+              resolve(payload);
+            } catch (err) {
+              reject(err);
+            }
+          },
+          onerror: (err) => reject(new Error((err && err.error) || '请求失败')),
+          ontimeout: () => reject(new Error('请求超时')),
+        });
+      });
+    }
+
+    const controller = (typeof AbortController === 'function') ? new AbortController() : null;
+    let timerId = null;
+    try {
+      const requestPromise = fetch(url, {
+        method: upperMethod,
+        cache: 'no-store',
+        credentials: 'include',
+        signal: controller ? controller.signal : undefined,
+        headers: upperMethod === 'POST'
+          ? { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }
+          : undefined,
+        body: upperMethod === 'POST' ? body : undefined,
+      });
+      const timeoutPromise = new Promise((_, reject) => {
+        timerId = window.setTimeout(() => {
+          if (controller) {
+            try { controller.abort(); } catch (_) { /* ignore */ }
+          }
+          reject(new Error('请求超时'));
+        }, timeoutMs);
+      });
+      const response = await Promise.race([requestPromise, timeoutPromise]);
+      if (!response || !response.ok) {
+        throw new Error(`HTTP ${response ? response.status : 0}`);
+      }
+      const rawText = await response.text();
+      return parsePayload(rawText);
+    } catch (error) {
+      if (error && error.name === 'AbortError') {
+        throw new Error('请求超时');
+      }
+      throw error;
+    } finally {
+      if (timerId) window.clearTimeout(timerId);
+    }
+  }
+
+  function chatGetChatsFromPayload(payload) {
+    if (!payload || typeof payload !== 'object') return [];
+    if (Array.isArray(payload.chat)) return payload.chat;
+    if (Array.isArray(payload.chats)) return payload.chats;
+    return [];
+  }
+
+  function chatResolveUserName(userId) {
+    const uid = chatToInteger(userId);
+    if (!Number.isFinite(uid)) return '未知用户';
+    if (chatState.userNameById.has(uid)) return chatState.userNameById.get(uid);
+    return `用户 ${uid}`;
+  }
+
+  function chatGetConversationByKey(key) {
+    if (!key || !chatState.conversationByKey.has(key)) return null;
+    return chatState.conversationByKey.get(key);
+  }
+
+  function chatGetMessageLengthLimit() {
+    if (!Number.isFinite(chatState.messageLengthLimit)) return Infinity;
+    return Math.max(1, Math.floor(chatState.messageLengthLimit));
+  }
+
+  function chatUpdateTokenDisplay() {
+    if (!chatTokenDisplayEl) return;
+    const maxValue = Number.isFinite(chatState.maxTokenCount) ? String(chatState.maxTokenCount) : '--';
+    const remainValue = Number.isFinite(chatState.tokenRemain) ? String(chatState.tokenRemain) : '--';
+    chatTokenDisplayEl.textContent = `Token：${remainValue} / ${maxValue}`;
+  }
+
+  function chatUpdateInputCounter() {
+    if (!chatInputCounterEl || !chatInputEl) return;
+    const limit = chatGetMessageLengthLimit();
+    const currentLength = chatInputEl.value.length;
+    const limitText = Number.isFinite(limit) ? String(limit) : '--';
+    chatInputCounterEl.textContent = `${currentLength} / ${limitText}`;
+    if (Number.isFinite(limit) && currentLength > limit) {
+      chatInputCounterEl.classList.add('is-overflow');
+    } else {
+      chatInputCounterEl.classList.remove('is-overflow');
+    }
+  }
+
+  function chatSetControlsDisabled(disabled) {
+    if (chatRefreshBtnEl) chatRefreshBtnEl.disabled = !!disabled;
+    if (chatTokenBtnEl) chatTokenBtnEl.disabled = !!disabled;
+    if (chatSendBtnEl) chatSendBtnEl.disabled = !!disabled;
+    if (chatLoadOlderBtnEl) chatLoadOlderBtnEl.disabled = !!disabled;
+  }
+
+  function chatGetFilteredConversations() {
+    const searchText = (chatState.searchText || '').trim().toLowerCase();
+    const scope = chatState.scope || 'all';
+    return chatState.conversations.filter((item) => {
+      if (!item) return false;
+      if (scope !== 'all' && item.type !== scope) return false;
+      if (!searchText) return true;
+      const name = String(item.name || '').toLowerCase();
+      const subtitle = String(item.subtitle || '').toLowerCase();
+      const idText = String(item.id || '');
+      return name.includes(searchText) || subtitle.includes(searchText) || idText.includes(searchText);
+    });
+  }
+
+  function chatRenderConversationList() {
+    if (!chatConversationListEl) return [];
+    const filtered = chatGetFilteredConversations();
+
+    chatConversationListEl.innerHTML = '';
+    filtered.forEach((item) => {
+      const entry = document.createElement('button');
+      entry.type = 'button';
+      entry.className = 'bn-chat-conversation-item';
+      if (item.key === chatState.activeKey) entry.classList.add('is-active');
+      entry.dataset.key = item.key;
+
+      const top = document.createElement('div');
+      top.className = 'bn-chat-conversation-top';
+
+      const name = document.createElement('div');
+      name.className = 'bn-chat-conversation-name';
+      name.textContent = item.name;
+
+      const tag = document.createElement('span');
+      tag.className = 'bn-chat-conversation-tag';
+      tag.textContent = item.type === 'group' ? '群聊' : '私聊';
+
+      top.appendChild(name);
+      top.appendChild(tag);
+
+      const subtitle = document.createElement('div');
+      subtitle.className = 'bn-chat-conversation-sub';
+      subtitle.textContent = item.subtitle || (item.type === 'group' ? '群组会话' : '好友会话');
+
+      entry.appendChild(top);
+      entry.appendChild(subtitle);
+      entry.addEventListener('click', () => {
+        chatSelectConversation(item.key, { forceRefresh: true });
+      });
+      chatConversationListEl.appendChild(entry);
+    });
+
+    if (chatConversationEmptyEl) chatConversationEmptyEl.hidden = filtered.length > 0;
+    return filtered;
+  }
+
+  function chatEnsureVisibleConversationAfterFilter({ autoSelect = false } = {}) {
+    const filtered = chatRenderConversationList();
+    const activeExists = filtered.some((item) => item && item.key === chatState.activeKey);
+    if (activeExists) return;
+    if (autoSelect && filtered.length > 0) {
+      chatSelectConversation(filtered[0].key, { forceRefresh: true });
+      return;
+    }
+    chatState.activeKey = '';
+    chatUpdateCurrentConversationHeader();
+    chatRenderMessages();
+  }
+
+  function chatUpdateCurrentConversationHeader() {
+    const current = chatGetConversationByKey(chatState.activeKey);
+    if (!current) {
+      if (chatCurrentTitleEl) chatCurrentTitleEl.textContent = '请选择会话';
+      if (chatCurrentMetaEl) chatCurrentMetaEl.textContent = '加载后可开始聊天';
+      return;
+    }
+    if (chatCurrentTitleEl) chatCurrentTitleEl.textContent = current.name || `会话 ${current.id}`;
+    const baseMeta = current.type === 'group'
+      ? `群组 ID: ${current.id}`
+      : `用户 ID: ${current.id}`;
+    const recoverText = Number.isFinite(chatState.recoverTime)
+      ? `，Token 恢复：${chatState.recoverTime}s`
+      : '';
+    if (chatCurrentMetaEl) chatCurrentMetaEl.textContent = `${baseMeta}${recoverText}`;
+  }
+
+  function chatNormalizeMessage(rawMessage, direction = '') {
+    const raw = rawMessage && typeof rawMessage === 'object' ? rawMessage : {};
+    const senderId = chatToInteger(raw.sender_id ?? raw.user_id ?? raw.uid ?? raw.from_id ?? raw.source_id);
+    const targetId = chatToInteger(raw.target_id ?? raw.group_id ?? raw.to_id);
+    const content = String(raw.content ?? raw.message ?? raw.text ?? '').trim();
+    const sec = chatNormalizeTimestampToSec(raw.timestamp ?? raw.send_time ?? raw.time ?? raw.created_at ?? raw.createdAt);
+    const baseId = raw.id ?? raw.chat_id ?? raw.message_id ?? raw.mid ?? '';
+    const syntheticId = `${baseId}|${senderId}|${targetId}|${sec}|${content}`;
+    const isSelf = Number.isFinite(chatState.selfId) && Number.isFinite(senderId) && senderId === chatState.selfId;
+    const actualDirection = direction || (isSelf ? 'out' : 'in');
+    return {
+      id: syntheticId,
+      senderId,
+      targetId,
+      content,
+      sec,
+      direction: actualDirection,
+      isSelf,
+      raw,
+    };
+  }
+
+  function chatCollectMessageIdCandidates(message) {
+    if (!message || typeof message !== 'object') return [];
+    const raw = message.raw && typeof message.raw === 'object' ? message.raw : {};
+    const out = [];
+    const push = (value) => {
+      const parsed = chatToInteger(value);
+      if (Number.isFinite(parsed) && parsed > 0) out.push(parsed);
+    };
+    push(message.senderId);
+    push(message.targetId);
+    push(raw.sender_id ?? raw.from_id ?? raw.source_id);
+    push(raw.target_id ?? raw.to_id ?? raw.receiver_id ?? raw.dest_id ?? raw.group_id);
+    push(raw.user_id ?? raw.uid ?? raw.friend_id ?? raw.other_id);
+    return out;
+  }
+
+  function chatMessageBelongsToConversation(message, conversation, directionHint = '') {
+    if (!message || !conversation) return false;
+    const convId = chatToInteger(conversation.id);
+    if (!Number.isFinite(convId) || convId <= 0) return false;
+    const ids = chatCollectMessageIdCandidates(message);
+    const selfId = Number.isFinite(chatState.selfId) && chatState.selfId > 0 ? chatState.selfId : NaN;
+    const sender = chatToInteger(message.senderId);
+    const target = chatToInteger(message.targetId);
+
+    if (conversation.type === 'group') {
+      if (Number.isFinite(target) && target === convId) return true;
+      return ids.some((value) => value === convId);
+    }
+
+    if (Number.isFinite(selfId)) {
+      if (Number.isFinite(sender) && Number.isFinite(target)) {
+        if (sender === selfId && target === convId) return true;
+        if (sender === convId && target === selfId) return true;
+      }
+      if (directionHint === 'in') {
+        if (Number.isFinite(sender) && sender === convId) return true;
+        if (Number.isFinite(target) && target === selfId && ids.includes(convId)) return true;
+      }
+      if (directionHint === 'out') {
+        if (Number.isFinite(target) && target === convId) return true;
+        if (Number.isFinite(sender) && sender === selfId && ids.includes(convId)) return true;
+      }
+      return false;
+    }
+
+    return ids.some((value) => value === convId);
+  }
+
+  function chatSortMessages(messages) {
+    return [...messages].sort((a, b) => {
+      const ta = chatToInteger(a && a.sec);
+      const tb = chatToInteger(b && b.sec);
+      if (ta !== tb) return ta - tb;
+      return String(a && a.id || '').localeCompare(String(b && b.id || ''));
+    });
+  }
+
+  function chatMergeMessages(existing, incoming) {
+    const map = new Map();
+    [...(Array.isArray(existing) ? existing : []), ...(Array.isArray(incoming) ? incoming : [])].forEach((item) => {
+      if (!item || typeof item !== 'object') return;
+      map.set(item.id, item);
+    });
+    const merged = chatSortMessages(Array.from(map.values()));
+    if (merged.length > 500) return merged.slice(merged.length - 500);
+    return merged;
+  }
+
+  function chatRenderMessages({ preserveScroll = false, forceScrollBottom = false } = {}) {
+    if (!chatMessageListEl) return;
+    const conv = chatGetConversationByKey(chatState.activeKey);
+    const currentMessages = conv ? (chatState.messagesByKey.get(conv.key) || []) : [];
+    const oldScrollHeight = chatMessageListEl.scrollHeight;
+    const oldScrollTop = chatMessageListEl.scrollTop;
+    const nearBottom = (oldScrollHeight - (oldScrollTop + chatMessageListEl.clientHeight)) < 36;
+
+    chatMessageListEl.innerHTML = '';
+    if (!conv) {
+      const placeholder = document.createElement('div');
+      placeholder.className = 'bn-chat-message-placeholder';
+      placeholder.textContent = '请选择一个会话开始聊天';
+      chatMessageListEl.appendChild(placeholder);
+      if (chatLoadOlderBtnEl) chatLoadOlderBtnEl.disabled = true;
+      return;
+    }
+
+    if (!currentMessages.length) {
+      const placeholder = document.createElement('div');
+      placeholder.className = 'bn-chat-message-placeholder';
+      placeholder.textContent = '暂无消息，发送一条试试吧';
+      chatMessageListEl.appendChild(placeholder);
+      if (chatLoadOlderBtnEl) chatLoadOlderBtnEl.disabled = chatState.loadingOlder || chatState.loadingMessages;
+      return;
+    }
+
+    currentMessages.forEach((message) => {
+      const row = document.createElement('div');
+      row.className = 'bn-chat-message';
+      if (message.isSelf) row.classList.add('is-self');
+      if (!message.content) row.classList.add('is-system');
+
+      const meta = document.createElement('div');
+      meta.className = 'bn-chat-message-meta';
+
+      const sender = document.createElement('span');
+      sender.className = 'bn-chat-message-sender';
+      if (message.isSelf) {
+        sender.textContent = '我';
+      } else if (Number.isFinite(message.senderId)) {
+        sender.textContent = chatResolveUserName(message.senderId);
+      } else {
+        sender.textContent = conv.type === 'group' ? '群消息' : (conv.name || '对方');
+      }
+
+      const ts = document.createElement('span');
+      ts.className = 'bn-chat-message-time';
+      ts.textContent = chatFormatTimestamp(message.sec);
+
+      meta.appendChild(sender);
+      meta.appendChild(ts);
+
+      const content = document.createElement('div');
+      content.className = 'bn-chat-message-content';
+      content.innerHTML = chatEscapeHtml(message.content || '[空消息]');
+
+      row.appendChild(meta);
+      row.appendChild(content);
+      chatMessageListEl.appendChild(row);
+    });
+
+    if (chatLoadOlderBtnEl) chatLoadOlderBtnEl.disabled = chatState.loadingOlder || chatState.loadingMessages;
+
+    if (forceScrollBottom || (!preserveScroll && nearBottom)) {
+      chatMessageListEl.scrollTop = chatMessageListEl.scrollHeight;
+      return;
+    }
+    if (preserveScroll) {
+      const nextScrollHeight = chatMessageListEl.scrollHeight;
+      const delta = nextScrollHeight - oldScrollHeight;
+      chatMessageListEl.scrollTop = Math.max(0, oldScrollTop + delta);
+    }
+  }
+
+  function chatExtractSelfId(userInfo) {
+    if (!userInfo || typeof userInfo !== 'object') return NaN;
+    const candidates = [userInfo.id, userInfo.user_id, userInfo.uid];
+    for (const value of candidates) {
+      const parsed = chatToInteger(value);
+      if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    }
+    return NaN;
+  }
+
+  function chatExtractFriendTargetId(friendInfo) {
+    if (!friendInfo || typeof friendInfo !== 'object') return NaN;
+    const nestedUser = friendInfo.user && typeof friendInfo.user === 'object' ? friendInfo.user : null;
+    const selfId = Number.isFinite(chatState.selfId) && chatState.selfId > 0 ? chatState.selfId : NaN;
+    const relationSource = chatToInteger(
+      friendInfo.source_id ?? friendInfo.sourceId ?? friendInfo.from_id ?? friendInfo.fromId ?? friendInfo.sender_id ?? friendInfo.senderId
+    );
+    const relationTarget = chatToInteger(
+      friendInfo.target_id ?? friendInfo.targetId ?? friendInfo.to_id ?? friendInfo.toId
+    );
+    if (Number.isFinite(selfId) && Number.isFinite(relationSource) && Number.isFinite(relationTarget)) {
+      if (relationSource === selfId && relationTarget > 0) return relationTarget;
+      if (relationTarget === selfId && relationSource > 0) return relationSource;
+    }
+
+    const candidates = [
+      relationTarget,
+      relationSource,
+      friendInfo.friend_id,
+      friendInfo.friendId,
+      friendInfo.other_id,
+      friendInfo.otherId,
+      friendInfo.user_id,
+      friendInfo.userId,
+      friendInfo.uid,
+      nestedUser ? (nestedUser.id ?? nestedUser.user_id ?? nestedUser.uid) : NaN,
+      friendInfo.id,
+    ];
+    for (const value of candidates) {
+      const parsed = chatToInteger(value);
+      if (!Number.isFinite(parsed) || parsed <= 0) continue;
+      if (Number.isFinite(selfId) && parsed === selfId) continue;
+      return parsed;
+    }
+    return NaN;
+  }
+
+  function chatExtractDisplayName(obj, fallback) {
+    if (!obj || typeof obj !== 'object') return fallback;
+    const candidates = [obj.real_name, obj.realName, obj.username, obj.name, obj.nickname, obj.title];
+    for (const value of candidates) {
+      const text = typeof value === 'string' ? value.trim() : '';
+      if (text) return text;
+    }
+    return fallback;
+  }
+
+  function chatRebuildStateFromInfo(payload) {
+    const info = payload && typeof payload === 'object' ? payload : {};
+    const limit = info.limit && typeof info.limit === 'object' ? info.limit : {};
+    const friends = Array.isArray(info.friends) ? info.friends : [];
+    const groups = Array.isArray(info.groups) ? info.groups : [];
+    const userInfo = info.user && typeof info.user === 'object' ? info.user : {};
+
+    chatState.info = info;
+    chatState.selfId = chatExtractSelfId(userInfo);
+    chatState.selfName = chatExtractDisplayName(userInfo, Number.isFinite(chatState.selfId) ? `用户 ${chatState.selfId}` : '我');
+    chatState.userNameById.clear();
+    if (Number.isFinite(chatState.selfId)) chatState.userNameById.set(chatState.selfId, chatState.selfName);
+    chatState.groupById.clear();
+
+    const countLimit = chatToInteger(limit.count_limit ?? limit.countLimit ?? 20);
+    const lengthLimit = chatToInteger(limit.message_length_limit ?? limit.length_limit ?? limit.lengthLimit);
+    const maxTokenCount = chatToInteger(limit.max_token_count ?? limit.maxTokenCount);
+    const recoverTime = chatToInteger(limit.recover_time ?? limit.recoverTime);
+    chatState.countLimit = Number.isFinite(countLimit) && countLimit > 0 ? countLimit : 20;
+    chatState.messageLengthLimit = Number.isFinite(lengthLimit) && lengthLimit > 0 ? lengthLimit : Infinity;
+    chatState.maxTokenCount = Number.isFinite(maxTokenCount) && maxTokenCount >= 0 ? maxTokenCount : null;
+    chatState.recoverTime = Number.isFinite(recoverTime) && recoverTime >= 0 ? recoverTime : null;
+
+    const conversations = [];
+    friends.forEach((friend) => {
+      if (!friend || typeof friend !== 'object') return;
+      const fid = chatExtractFriendTargetId(friend);
+      if (!Number.isFinite(fid) || fid <= 0) return;
+      const friendUserInfo = friend.user && typeof friend.user === 'object' ? friend.user : null;
+      const name = chatExtractDisplayName(friend, chatExtractDisplayName(friendUserInfo, `用户 ${fid}`));
+      const hasRealName = !!(
+        (typeof friend.real_name === 'string' && friend.real_name.trim())
+        || (typeof friend.realName === 'string' && friend.realName.trim())
+        || (friendUserInfo && typeof friendUserInfo.real_name === 'string' && friendUserInfo.real_name.trim())
+      );
+      const subtitle = hasRealName ? `已互加 · ID ${fid}` : `单向好友 · ID ${fid}`;
+      chatState.userNameById.set(fid, name);
+      conversations.push({
+        key: `user:${fid}`,
+        id: fid,
+        type: 'user',
+        name,
+        subtitle,
+      });
+    });
+
+    groups.forEach((group) => {
+      if (!group || typeof group !== 'object') return;
+      const gid = chatToInteger(group.id ?? group.group_id);
+      if (!Number.isFinite(gid) || gid <= 0) return;
+      const title = chatExtractDisplayName(group, `群组 ${gid}`);
+      const members = Array.isArray(group.members) ? group.members : [];
+      members.forEach((member) => {
+        const uid = chatToInteger(member && (member.id ?? member.user_id ?? member.uid));
+        if (!Number.isFinite(uid) || uid <= 0) return;
+        const memberName = chatExtractDisplayName(member, `用户 ${uid}`);
+        if (!chatState.userNameById.has(uid) || !chatState.userNameById.get(uid)) {
+          chatState.userNameById.set(uid, memberName);
+        }
+      });
+      chatState.groupById.set(gid, group);
+      conversations.push({
+        key: `group:${gid}`,
+        id: gid,
+        type: 'group',
+        name: title,
+        subtitle: `群成员 ${members.length || 0} 人 · ID ${gid}`,
+      });
+    });
+
+    conversations.sort((a, b) => {
+      if (a.type !== b.type) return a.type === 'group' ? -1 : 1;
+      return String(a.name || '').localeCompare(String(b.name || ''), 'zh-CN');
+    });
+
+    chatState.conversations = conversations;
+    chatState.conversationByKey = new Map(conversations.map(item => [item.key, item]));
+    chatState.lastInfoLoadedAt = Date.now();
+    chatUpdateTokenDisplay();
+    chatUpdateInputCounter();
+  }
+
+  async function chatLoadInfo({ silent = false, preserveSelection = true } = {}) {
+    if (!chatHasValidUi() || chatState.loadingInfo) return;
+    chatState.loadingInfo = true;
+    if (!silent) chatSetStatus('正在拉取好友和群组信息...');
+    try {
+      const payload = await chatApiRequest('GET', '/chat/info', { timeoutMs: 12000 });
+      chatRebuildStateFromInfo(payload);
+      const previousKey = preserveSelection ? chatState.activeKey : '';
+      const hasPrevious = previousKey && chatState.conversationByKey.has(previousKey);
+      chatRenderConversationList();
+
+      if (hasPrevious) {
+        chatState.activeKey = previousKey;
+      } else if (!chatState.activeKey || !chatState.conversationByKey.has(chatState.activeKey)) {
+        const first = chatState.conversations[0];
+        chatState.activeKey = first ? first.key : '';
+      }
+
+      chatUpdateCurrentConversationHeader();
+      chatRenderConversationList();
+      chatRenderMessages();
+      if (!silent) {
+        chatSetStatus(`列表已更新：${chatState.conversations.length} 个会话`, 'success');
+      }
+    } catch (error) {
+      chatSetStatus(`拉取列表失败：${error && error.message ? error.message : '未知错误'}`, 'error');
+    } finally {
+      chatState.loadingInfo = false;
+    }
+  }
+
+  async function chatFetchConversationMessages(conversation, endTimeSec = null) {
+    if (!conversation) return [];
+    const take = Math.max(1, Math.min(chatState.countLimit || 20, 100));
+    const commonParams = { target_id: conversation.id, take };
+    if (endTimeSec != null) commonParams.end_time = endTimeSec;
+
+    if (conversation.type === 'group') {
+      const payload = await chatApiRequest('GET', '/chat/chat', {
+        params: { ...commonParams, type: 'group' },
+        timeoutMs: 12000,
+      });
+      const groupMessages = chatGetChatsFromPayload(payload)
+        .map(message => chatNormalizeMessage(message))
+        .filter((message) => chatMessageBelongsToConversation(message, conversation, 'group'));
+      return chatSortMessages(groupMessages);
+    }
+
+    const [recvPayload, sentPayload] = await Promise.all([
+      chatApiRequest('GET', '/chat/chat', {
+        params: { ...commonParams, type: 'user' },
+        timeoutMs: 12000,
+      }),
+      chatApiRequest('GET', '/chat/chat', {
+        params: { ...commonParams, type: 'send' },
+        timeoutMs: 12000,
+      }),
+    ]);
+
+    const incomingMessages = chatGetChatsFromPayload(recvPayload)
+      .map(msg => chatNormalizeMessage(msg, 'in'))
+      .filter((message) => chatMessageBelongsToConversation(message, conversation, 'in'));
+    const outgoingMessages = chatGetChatsFromPayload(sentPayload)
+      .map(msg => chatNormalizeMessage(msg, 'out'))
+      .filter((message) => chatMessageBelongsToConversation(message, conversation, 'out'));
+    return chatSortMessages([...incomingMessages, ...outgoingMessages]);
+  }
+
+  async function chatRefreshMessages({ silent = false, preserveScroll = false } = {}) {
+    const conversation = chatGetConversationByKey(chatState.activeKey);
+    if (!conversation) {
+      chatRenderMessages();
+      return;
+    }
+    if (chatState.loadingMessages) return;
+
+    chatState.loadingMessages = true;
+    const seq = ++chatState.requestSeq;
+    if (!silent) chatSetStatus('正在刷新消息...');
+    try {
+      const latestMessages = await chatFetchConversationMessages(conversation);
+      if (seq !== chatState.requestSeq) return;
+      const existing = chatState.messagesByKey.get(conversation.key) || [];
+      const merged = chatMergeMessages(existing, latestMessages);
+      chatState.messagesByKey.set(conversation.key, merged);
+      const oldest = merged.length ? Math.min(...merged.map(item => chatNormalizeTimestampToSec(item.sec))) : null;
+      if (oldest != null && Number.isFinite(oldest)) {
+        chatState.oldestSecByKey.set(conversation.key, oldest);
+      }
+      chatRenderMessages({ preserveScroll, forceScrollBottom: !silent });
+      if (!silent) chatSetStatus(`消息已更新（${merged.length} 条）`, 'success');
+    } catch (error) {
+      if (seq !== chatState.requestSeq) return;
+      chatSetStatus(`刷新消息失败：${error && error.message ? error.message : '未知错误'}`, 'error');
+    } finally {
+      chatState.loadingMessages = false;
+    }
+  }
+
+  async function chatLoadOlderMessages() {
+    const conversation = chatGetConversationByKey(chatState.activeKey);
+    if (!conversation || chatState.loadingOlder) return;
+    const oldestSec = chatState.oldestSecByKey.get(conversation.key);
+    if (!Number.isFinite(oldestSec)) {
+      chatSetStatus('当前没有更早消息可加载');
+      return;
+    }
+    const endTimeSec = Math.max(0, Math.floor(oldestSec) - 1);
+
+    chatState.loadingOlder = true;
+    if (chatLoadOlderBtnEl) chatLoadOlderBtnEl.disabled = true;
+    chatSetStatus('正在加载更早消息...');
+    try {
+      const olderMessages = await chatFetchConversationMessages(conversation, endTimeSec);
+      const existing = chatState.messagesByKey.get(conversation.key) || [];
+      if (!olderMessages.length) {
+        chatSetStatus('没有更早消息了');
+        return;
+      }
+      const merged = chatMergeMessages(existing, olderMessages);
+      chatState.messagesByKey.set(conversation.key, merged);
+      const oldest = merged.length ? Math.min(...merged.map(item => chatNormalizeTimestampToSec(item.sec))) : null;
+      if (oldest != null && Number.isFinite(oldest)) {
+        chatState.oldestSecByKey.set(conversation.key, oldest);
+      }
+      chatRenderMessages({ preserveScroll: true });
+      chatSetStatus(`已加载更早消息 ${olderMessages.length} 条`, 'success');
+    } catch (error) {
+      chatSetStatus(`加载失败：${error && error.message ? error.message : '未知错误'}`, 'error');
+    } finally {
+      chatState.loadingOlder = false;
+      if (chatLoadOlderBtnEl) chatLoadOlderBtnEl.disabled = false;
+    }
+  }
+
+  function chatSelectConversation(key, { forceRefresh = false } = {}) {
+    if (!key || !chatState.conversationByKey.has(key)) return;
+    const changed = chatState.activeKey !== key;
+    chatState.activeKey = key;
+    chatRenderConversationList();
+    chatUpdateCurrentConversationHeader();
+    chatRenderMessages();
+    chatUpdateInputCounter();
+    chatStartAutoRefreshTimer();
+    if (changed || forceRefresh) {
+      chatRefreshMessages({ silent: false, preserveScroll: false });
+    }
+  }
+
+  function chatGetAutoRefreshIntervalMs() {
+    const fallback = 3000;
+    if (!chatIntervalSelectEl) return fallback;
+    const parsed = chatToInteger(chatIntervalSelectEl.value);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.min(20000, Math.max(1000, parsed));
+  }
+
+  function chatStopAutoRefreshTimer() {
+    if (chatState.autoRefreshTimer) {
+      window.clearInterval(chatState.autoRefreshTimer);
+      chatState.autoRefreshTimer = null;
+    }
+  }
+
+  function chatStartAutoRefreshTimer() {
+    chatStopAutoRefreshTimer();
+    if (!chatAutoRefreshInputEl || !chatAutoRefreshInputEl.checked) return;
+    if (!chatState.activeKey || !chatState.conversationByKey.has(chatState.activeKey)) return;
+    if (!chatWindowIsVisible()) return;
+    const intervalMs = chatGetAutoRefreshIntervalMs();
+    chatState.autoRefreshTimer = window.setInterval(() => {
+      if (!chatWindowIsVisible()) {
+        chatStopAutoRefreshTimer();
+        return;
+      }
+      if (chatState.loadingMessages || chatState.loadingOlder || chatState.sending) return;
+      chatRefreshMessages({ silent: true, preserveScroll: false });
+      if (Date.now() - chatState.lastInfoLoadedAt > 45000) {
+        chatLoadInfo({ silent: true, preserveSelection: true });
+      }
+    }, intervalMs);
+  }
+
+  async function chatQueryTokenCounts() {
+    chatSetStatus('正在查询 Token...');
+    try {
+      const payload = await chatApiRequest('POST', '/chat/chat', {
+        data: { type: 'none' },
+        timeoutMs: 12000,
+      });
+      const used = chatToInteger(payload.used_token_count);
+      const remain = chatToInteger(payload.remain_token_count);
+      chatState.tokenUsed = Number.isFinite(used) ? used : null;
+      chatState.tokenRemain = Number.isFinite(remain) ? remain : null;
+      chatUpdateTokenDisplay();
+      const usedText = Number.isFinite(chatState.tokenUsed) ? chatState.tokenUsed : '--';
+      const remainText = Number.isFinite(chatState.tokenRemain) ? chatState.tokenRemain : '--';
+      chatSetStatus(`Token 已更新：已用 ${usedText}，剩余 ${remainText}`, 'success');
+    } catch (error) {
+      chatSetStatus(`查询 Token 失败：${error && error.message ? error.message : '未知错误'}`, 'error');
+    }
+  }
+
+  async function chatSendMessage() {
+    const conversation = chatGetConversationByKey(chatState.activeKey);
+    if (!conversation) {
+      chatSetStatus('请先选择一个会话', 'error');
+      return;
+    }
+    if (!chatInputEl) return;
+
+    const content = chatInputEl.value;
+    if (!content || !content.trim()) {
+      chatSetStatus('消息不能为空', 'error');
+      return;
+    }
+    const limit = chatGetMessageLengthLimit();
+    if (Number.isFinite(limit) && content.length > limit) {
+      chatSetStatus(`消息长度超过限制（${content.length} / ${limit}）`, 'error');
+      return;
+    }
+
+    chatState.sending = true;
+    if (chatSendBtnEl) chatSendBtnEl.disabled = true;
+    chatSetStatus('正在发送消息...');
+    try {
+      const payload = await chatApiRequest('POST', '/chat/chat', {
+        data: {
+          type: conversation.type,
+          target_id: conversation.id,
+          content,
+        },
+        timeoutMs: 12000,
+      });
+
+      const used = chatToInteger(payload.used_token_count);
+      const remain = chatToInteger(payload.remain_token_count);
+      chatState.tokenUsed = Number.isFinite(used) ? used : chatState.tokenUsed;
+      chatState.tokenRemain = Number.isFinite(remain) ? remain : chatState.tokenRemain;
+      chatUpdateTokenDisplay();
+
+      chatInputEl.value = '';
+      chatUpdateInputCounter();
+      chatSetStatus('发送成功', 'success');
+      await chatRefreshMessages({ silent: true, preserveScroll: false });
+    } catch (error) {
+      chatSetStatus(`发送失败：${error && error.message ? error.message : '未知错误'}`, 'error');
+    } finally {
+      chatState.sending = false;
+      if (chatSendBtnEl) chatSendBtnEl.disabled = false;
+    }
+  }
+
+  function chatUpdateGroupOperationFields() {
+    const operation = chatGroupOpTypeEl ? chatGroupOpTypeEl.value : 'setup';
+    const rule = CHAT_GROUP_OPERATION_RULES[operation] || CHAT_GROUP_OPERATION_RULES.setup;
+    const toggleField = (inputEl, shouldShow) => {
+      if (!inputEl) return;
+      const fieldEl = typeof inputEl.closest === 'function' ? inputEl.closest('.bn-chat-group-field') : null;
+      const targetEl = fieldEl || inputEl;
+      const visible = !!shouldShow;
+      targetEl.hidden = !visible;
+      inputEl.disabled = !visible;
+    };
+    toggleField(chatGroupOpGroupIdEl, rule.needGroup);
+    toggleField(chatGroupOpTargetIdEl, rule.needTarget);
+    toggleField(chatGroupOpTitleEl, rule.needTitle);
+    toggleField(chatGroupOpMuteEl, rule.needMute);
+  }
+
+  function chatReadRequiredId(inputEl, fieldName) {
+    const parsed = chatToInteger(inputEl ? inputEl.value : NaN);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      throw new Error(`${fieldName} 必须是正整数`);
+    }
+    return parsed;
+  }
+
+  async function chatRunGroupOperation() {
+    const operation = chatGroupOpTypeEl ? chatGroupOpTypeEl.value : '';
+    if (!operation) {
+      chatSetGroupOperationStatus('请选择操作类型', 'error');
+      return;
+    }
+    const rule = CHAT_GROUP_OPERATION_RULES[operation];
+    if (!rule) {
+      chatSetGroupOperationStatus(`不支持的操作：${operation}`, 'error');
+      return;
+    }
+
+    let payload = { type: operation };
+    try {
+      if (rule.needGroup) payload.group_id = chatReadRequiredId(chatGroupOpGroupIdEl, 'group_id');
+      if (rule.needTarget) payload.target_id = chatReadRequiredId(chatGroupOpTargetIdEl, 'target_id');
+      if (rule.needTitle) {
+        const title = chatGroupOpTitleEl ? chatGroupOpTitleEl.value.trim() : '';
+        if (!title) throw new Error('title 不能为空');
+        payload.title = title;
+      }
+      if (rule.needMute) {
+        const mute = chatToInteger(chatGroupOpMuteEl ? chatGroupOpMuteEl.value : NaN);
+        if (!Number.isFinite(mute) || mute < 0) throw new Error('mute 必须是非负整数时间戳');
+        payload.mute = mute;
+      }
+    } catch (error) {
+      chatSetGroupOperationStatus(error.message || '参数错误', 'error');
+      return;
+    }
+
+    if (chatGroupOpRunBtnEl) chatGroupOpRunBtnEl.disabled = true;
+    chatSetGroupOperationStatus('正在执行操作...');
+    try {
+      await chatApiRequest('POST', '/chat/group', { data: payload, timeoutMs: 12000 });
+      chatSetGroupOperationStatus(`操作成功：${operation}`, 'success');
+      await chatLoadInfo({ silent: true, preserveSelection: true });
+      chatRenderConversationList();
+      chatUpdateCurrentConversationHeader();
+      if (chatState.activeKey && !chatState.conversationByKey.has(chatState.activeKey)) {
+        chatState.activeKey = '';
+        chatRenderMessages();
+      }
+    } catch (error) {
+      chatSetGroupOperationStatus(`操作失败：${error && error.message ? error.message : '未知错误'}`, 'error');
+    } finally {
+      if (chatGroupOpRunBtnEl) chatGroupOpRunBtnEl.disabled = false;
+    }
+  }
+
+  async function initChatroomFeature() {
+    if (!chatHasValidUi()) return;
+    if (chatState.initialized) return;
+    chatState.initialized = true;
+    chatSetControlsDisabled(false);
+
+    chatScopeTabEls.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        const scope = tab.dataset && tab.dataset.scope ? String(tab.dataset.scope) : 'all';
+        chatState.scope = (scope === 'group' || scope === 'user') ? scope : 'all';
+        chatScopeTabEls.forEach((item) => {
+          const isActive = item === tab;
+          item.classList.toggle('is-active', isActive);
+          item.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        });
+        chatEnsureVisibleConversationAfterFilter({ autoSelect: true });
+      });
+    });
+
+    if (chatSearchInputEl) {
+      chatSearchInputEl.addEventListener('input', () => {
+        chatState.searchText = chatSearchInputEl.value || '';
+        chatEnsureVisibleConversationAfterFilter({ autoSelect: false });
+      });
+    }
+
+    if (chatRefreshBtnEl) {
+      chatRefreshBtnEl.addEventListener('click', () => {
+        chatRefreshMessages({ silent: false, preserveScroll: false });
+      });
+    }
+
+    if (chatTokenBtnEl) {
+      chatTokenBtnEl.addEventListener('click', () => {
+        chatQueryTokenCounts();
+      });
+    }
+
+    if (chatInfoBtnEl) {
+      chatInfoBtnEl.addEventListener('click', () => {
+        chatLoadInfo({ silent: false, preserveSelection: true });
+      });
+    }
+
+    if (chatAutoRefreshInputEl) {
+      chatAutoRefreshInputEl.addEventListener('change', () => {
+        chatStartAutoRefreshTimer();
+      });
+    }
+    if (chatIntervalSelectEl) {
+      chatIntervalSelectEl.addEventListener('change', () => {
+        chatStartAutoRefreshTimer();
+      });
+    }
+
+    if (chatLoadOlderBtnEl) {
+      chatLoadOlderBtnEl.addEventListener('click', () => {
+        chatLoadOlderMessages();
+      });
+    }
+
+    if (chatInputEl) {
+      chatInputEl.addEventListener('input', chatUpdateInputCounter);
+      chatInputEl.addEventListener('keydown', (event) => {
+        if (!event) return;
+        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+          event.preventDefault();
+          chatSendMessage();
+        }
+      });
+    }
+
+    if (chatSendBtnEl) {
+      chatSendBtnEl.addEventListener('click', () => {
+        chatSendMessage();
+      });
+    }
+
+    if (chatGroupOpTypeEl) {
+      chatGroupOpTypeEl.addEventListener('change', chatUpdateGroupOperationFields);
+    }
+    if (chatGroupOpRunBtnEl) {
+      chatGroupOpRunBtnEl.addEventListener('click', () => {
+        chatRunGroupOperation();
+      });
+    }
+    chatUpdateGroupOperationFields();
+    chatUpdateInputCounter();
+    chatUpdateTokenDisplay();
+    chatRenderConversationList();
+    chatRenderMessages();
+    chatSetStatus('聊天室初始化中...');
+
+    await chatLoadInfo({ silent: false, preserveSelection: false });
+    if (chatState.activeKey) {
+      chatSelectConversation(chatState.activeKey, { forceRefresh: true });
+    } else if (chatState.conversations.length > 0) {
+      chatSelectConversation(chatState.conversations[0].key, { forceRefresh: true });
+    } else {
+      chatSetStatus('未发现可用会话，可点击“重载列表”重试');
+    }
+    chatStartAutoRefreshTimer();
+
+    window.addEventListener('pagehide', () => {
+      chatStopAutoRefreshTimer();
+    }, { once: true });
+  }
+
   const JOIN_PLAN_DETAIL_TEXT = `加入 Better Names 计划将会把您的基本个人信息（姓名、班级、性别、用户名、邮箱、学校、座位、教练、电话号码）公开给也加入此项目的同学，所有加入此项目的人均可用 ./better_names 查看所有其他人的这些信息，以便 Better Names 的数据库更新。
 
 您可前往【修改资料】-> 【加入 Better Names】加入该计划，加入后接下来 90 天内不可以取消。
@@ -4175,8 +5683,21 @@
     });
     document.addEventListener('keydown', (event) => {
       if (!event || event.key !== 'Escape') return;
-      if (joinPlanModalEl.hidden) return;
-      closeJoinPlanDetailModal();
+      if (!joinPlanModalEl.hidden) {
+        closeJoinPlanDetailModal();
+        return;
+      }
+      if (chatWindowIsVisible()) {
+        if (chatWindowEl.classList.contains('bn-group-ops-open')) {
+          chatSetGroupOpsVisible(false);
+          return;
+        }
+        if (chatIsFullscreen()) {
+          chatSetFullscreen(false);
+          return;
+        }
+        chatSetWindowVisible(false);
+      }
     });
   }
 
@@ -4440,6 +5961,7 @@
   }
   bindJoinPlanDetailToggle();
   refreshJoinPlanStatus();
+  chatSetWindowVisible(false);
   // 初次遍历
   document.querySelectorAll(USER_LINK_SELECTOR).forEach(processUserLink);
   document.querySelectorAll('#vueAppFuckSafari > tbody > tr > td:nth-child(2) > a > span').forEach(processProblemTitle)
