@@ -89,6 +89,39 @@ function restoreMathSegments(text, segments) {
   return output;
 }
 
+function sanitizeHtml(unsafeHtml) {
+  const template = document.createElement('template');
+  template.innerHTML = unsafeHtml;
+
+  const blockedTags = ['script', 'iframe', 'object', 'embed', 'link', 'meta', 'base', 'form'];
+  blockedTags.forEach((tag) => {
+    template.content.querySelectorAll(tag).forEach((node) => node.remove());
+  });
+
+  template.content.querySelectorAll('*').forEach((node) => {
+    Array.from(node.attributes).forEach(({ name, value }) => {
+      const attrName = name.toLowerCase();
+      if (attrName.startsWith('on') || attrName === 'srcdoc' || attrName === 'style') {
+        node.removeAttribute(name);
+        return;
+      }
+
+      if (attrName === 'href' || attrName === 'src' || attrName === 'xlink:href') {
+        const normalizedValue = (value || '').trim().toLowerCase();
+        if (
+          normalizedValue.startsWith('javascript:') ||
+          normalizedValue.startsWith('data:text/html') ||
+          normalizedValue.startsWith('data:image/svg')
+        ) {
+          node.removeAttribute(name);
+        }
+      }
+    });
+  });
+
+  return template.innerHTML;
+}
+
 // 1. 定义执行函数
 function doRender() {
   const elements = document.querySelectorAll(targetSelector);
@@ -110,7 +143,8 @@ function doRender() {
         ? protectMathSegments(text)
         : { placeholderText: text, segments: [] };
       const htmlResult = marked.parse(placeholderText);
-      el.innerHTML = restoreMathSegments(htmlResult, segments);
+      const restoredHtml = restoreMathSegments(htmlResult, segments);
+      el.innerHTML = sanitizeHtml(restoredHtml);
     }
 
     // --- 处理 LaTeX ---
