@@ -89,6 +89,15 @@ function restoreMathSegments(text, segments) {
   return output;
 }
 
+function escapeHtml(text) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // 1. 定义执行函数
 function doRender() {
   const elements = document.querySelectorAll(targetSelector);
@@ -109,7 +118,8 @@ function doRender() {
       const { placeholderText, segments } = hasMath
         ? protectMathSegments(text)
         : { placeholderText: text, segments: [] };
-      const htmlResult = marked.parse(placeholderText);
+      const safeMarkdownText = escapeHtml(placeholderText);
+      const htmlResult = marked.parse(safeMarkdownText);
       el.innerHTML = restoreMathSegments(htmlResult, segments);
     }
 
