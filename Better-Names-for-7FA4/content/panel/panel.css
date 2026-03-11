@@ -2497,3 +2497,7 @@ a[data-bn-quick-skip="1"] i.icon,
     margin-top: 10px;
     font-family: sans-serif;
 }
+
+body {
+	overflow-x: auto !important;
+}
