@@ -14,7 +14,6 @@
   const HI_TOILET_INTERVAL_MAX = 2000;
   const DEFAULT_THEME_MODE = 'light';
   const DEFAULT_THEME_COLOR = '#007bff';
-  const DEFAULT_SUBMITTER_ID = 'origin';
   const DEFAULT_MAX_UNITS = 10;
   const WIDTH_MODE_KEY = 'truncate.widthMode';
   const CORNER_KEY = 'bn.corner';
@@ -45,7 +44,6 @@
     enableTemplateBulkAdd: true,
     enableGuard: false,
     enableAutoRenew: false,
-    selectedSubmitter: DEFAULT_SUBMITTER_ID,
     'rankingFilter.enabled': true,
     'rankingFilter.columnSwitch.enabled': true,
     'rankingMerge.enabled': true,
@@ -156,7 +154,6 @@
   const enableTemplateBulkAdd = readConfigValue('enableTemplateBulkAdd');
   const enableGuard = readConfigValue('enableGuard');
   const enableAutoRenew = readConfigValue('enableAutoRenew');
-  const SUBMITTERS_CONFIG_URL = 'submitter/submitters.json';
   const SUPPORTED_PORTS = new Set(['', '8888', '5283']);
   const SUPPORTED_HOSTS = new Set(['7fa4.cn', '10.210.57.10', '211.137.101.118']);
   const REMOTE_VERSION_URL = 'http://jx.7fa4.cn:9080/yx/better-names-for-7fa4/-/raw/main/version';
@@ -174,7 +171,6 @@
     if (SUPPORTED_HOSTS.has(host)) return true;
     return host.endsWith('.7fa4.cn');
   };
-  const storedSelectedSubmitter = readConfigValue('selectedSubmitter');
   const enableRankingFilterSetting = readConfigValue('rankingFilter.enabled');
   const enableColumnSwitchSetting = readConfigValue('rankingFilter.columnSwitch.enabled') !== false;
   const enableMergeAssistantSetting = readConfigValue('rankingMerge.enabled') !== false;
@@ -262,7 +258,6 @@
     enableColumnSwitchSetting,
     enableMergeAssistantSetting,
   };
-  const submitterConfig = { selected: storedSelectedSubmitter };
   const quickSkipState = { raw: rawQuickSkip, migrated: quickSkipMigrated, enabled: enableQuickSkip };
   const layoutConfig = {
     pinned: !!readConfigValue('panelPinned'),
@@ -280,7 +275,6 @@
     hiToilet: hiToiletConfig,
     featureFlags,
     ranking: rankingConfig,
-    submitters: submitterConfig,
     quickSkip: quickSkipState,
     layout: layoutConfig,
     palette: paletteConfig,
@@ -1239,8 +1233,6 @@
     }, 320);
   }
 
-  initSubmittersSelector();
-
   function applyThemeMode(mode) {
     const nextMode = (mode === 'dark') ? 'dark' : 'light';
     currentThemeMode = nextMode;
@@ -1342,8 +1334,6 @@
   const chkRankingFilter = document.getElementById('bn-enable-ranking-filter');
   const chkColumnSwitch = document.getElementById('bn-enable-column-switch');
   const chkMergeAssistant = document.getElementById('bn-enable-merge-assistant');
-  const submitterSelect = document.getElementById('bn-submitter-select');
-  const submitterDescription = document.getElementById('bn-submitter-description');
   const chkUseColor = document.getElementById('bn-use-custom-color');
 
   const colorSidebar = document.getElementById('bn-color-sidebar');
@@ -1474,7 +1464,6 @@
     enableRankingFilter: enableRankingFilterSetting,
     columnSwitchEnabled: enableColumnSwitchSetting,
     mergeAssistantEnabled: enableMergeAssistantSetting,
-    selectedSubmitter: storedSelectedSubmitter,
     useCustomColors,
     themeColor,
     themeMode: currentThemeMode,
@@ -2304,8 +2293,6 @@
     } else if (originalConfig.bgSourceType !== 'remote' || currentBgUrl !== originalConfig.bgImageUrl) {
       bgSourceChanged = true;
     }
-    const submitterSelect = document.getElementById('bn-submitter-select');
-    const submitterInitialized = submitterSelect?.dataset?.bnInitialized === '1';
     const currentBtEnabled = getHiToiletEnabledState();
     const templateBulkAddChk = document.getElementById('bn-enable-template-bulk-add');
 
@@ -2338,7 +2325,6 @@
       (currentBgOpacity !== originalConfig.bgOpacity) ||
       (clampBlur(currentBgBlur) !== clampBlur(originalConfig.bgBlur)) ||
       (currentBtEnabled !== originalConfig.btEnabled) ||
-      (submitterInitialized && submitterSelect.value !== originalConfig.selectedSubmitter) ||
       (hiToiletIntervalInput && clampHiToiletInterval(hiToiletIntervalInput.value) !== originalConfig.btInterval) ||
       (getSelectedThemeMode() !== originalConfig.themeMode) ||
       themeColorChanged ||
@@ -2551,10 +2537,6 @@
     if (bgBlurInput) bgBlurInput.value = bgBlur;
     if (bgBlurValueSpan) bgBlurValueSpan.textContent = formatBlurText(bgBlur);
 
-    const selectedSubmitter = submitterSelect.value;
-    GM_setValue('selectedSubmitter', selectedSubmitter);
-    syncSubmitterState(selectedSubmitter);
-
     setTimeout(() => location.reload(), 50);
   };
 
@@ -2587,10 +2569,6 @@
     if (chkColumnSwitch) chkColumnSwitch.checked = originalConfig.columnSwitchEnabled;
     if (chkMergeAssistant) chkMergeAssistant.checked = originalConfig.mergeAssistantEnabled;
     chkUseColor.checked = originalConfig.useCustomColors;
-    if (submitterSelect) {
-      submitterSelect.value = originalConfig.selectedSubmitter;
-      updateSubmitterDescription(originalConfig.selectedSubmitter);
-    }
     if (hiToiletInput) hiToiletInput.checked = originalConfig.btEnabled;
     setHiToiletIntervalDisplay(originalConfig.btInterval);
     titleInp.disabled = !chkTitleTrEl.checked;
@@ -2842,53 +2820,6 @@
       .replace(/'/g, '&#39;');
   }
 
-  // Sanitize a small subset of HTML allowed in submitter descriptions.
-  // Only allow <a href="...">text</a> and strip other tags/attributes.
-  function sanitizeSubmitterDescription(raw) {
-    if (typeof raw !== 'string' || !raw) return '';
-    // Quick path: if there's no '<', it's safe text
-    if (raw.indexOf('<') === -1) return escapeHtml(raw);
-
-    try {
-      const doc = new DOMParser().parseFromString(raw, 'text/html');
-      const container = document.createElement('span');
-      for (const node of Array.from(doc.body.childNodes)) {
-        if (node.nodeType === Node.TEXT_NODE) {
-          container.appendChild(document.createTextNode(node.textContent || ''));
-          continue;
-        }
-        if (node.nodeType === Node.ELEMENT_NODE && node.tagName.toLowerCase() === 'a') {
-          const a = document.createElement('a');
-          const href = node.getAttribute('href') || '';
-          // Only allow http/https and relative URLs; normalize via URL when possible
-          try {
-            const url = new URL(href, location.href);
-            if (url.protocol === 'http:' || url.protocol === 'https:') {
-              a.href = url.toString();
-            } else {
-              // disallow other protocols
-              a.href = '#';
-            }
-          } catch (e) {
-            // malformed href -> treat as text
-            a.href = '#';
-          }
-          a.target = '_blank';
-          a.rel = 'noopener';
-          a.textContent = node.textContent || node.getAttribute('title') || a.href;
-          container.appendChild(a);
-          continue;
-        }
-        // For any other element, append its text content (safe)
-        container.appendChild(document.createTextNode(node.textContent || ''));
-      }
-      return container.innerHTML;
-    } catch (e) {
-      // Fallback: escape everything
-      return escapeHtml(raw);
-    }
-  }
-
   function truncateByUnits(str, maxU) {
     if (!isFinite(maxU)) return str;
     let used = 0, out = '';
@@ -2900,137 +2831,6 @@
       out += ch; used += w;
     }
     return out;
-  }
-
-  async function loadSubmittersConfig() {
-    try {
-      if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function') {
-        try {
-          const url = chrome.runtime.getURL('submitter/submitters.json');
-          debugLog('Loading submitters config from:', url);
-          const response = await fetch(url, { cache: 'no-store' });
-          if (response && response.ok) {
-            const config = await response.json();
-            debugLog('Successfully loaded submitters config');
-            return config;
-          }
-        } catch (err) {
-          console.warn('Failed to load submitters config via chrome.runtime.getURL:', err);
-        }
-      }
-      
-      try {
-        const response = await fetch('/submitter/submitters.json', { cache: 'no-store' });
-        if (response && response.ok) {
-          const config = await response.json();
-          debugLog('Successfully loaded submitters config from relative path');
-          return config;
-        }
-      } catch (err) {
-        console.warn('Failed to load submitters config from relative path:', err);
-      }
-      
-      throw new Error('All attempts to load submitters config failed');
-      
-    } catch (error) {
-      console.error('Error loading submitters config, using fallback:', error);
-      throw error;
-    }
-  }
-
-  async function initSubmittersSelector() {
-    const config = await loadSubmittersConfig();
-    const select = document.getElementById('bn-submitter-select');
-    const description = document.getElementById('bn-submitter-description');
-    
-    if (!select) return;
-    
-    const disabledOption = select.querySelector('option[value="none"]');
-    select.innerHTML = '';
-    if (disabledOption) {
-      select.appendChild(disabledOption);
-    } else {
-      const noneOption = document.createElement('option');
-      noneOption.value = 'none';
-      noneOption.textContent = '禁用';
-      select.appendChild(noneOption);
-    }
-    
-    config.submitters.forEach(submitter => {
-      const option = document.createElement('option');
-      option.value = submitter.id;
-      option.textContent = submitter.name;
-      option.dataset.description = submitter.description || '';
-      option.dataset.popup = submitter.popup || '';
-      select.appendChild(option);
-    });
-    const availableIds = new Set(config.submitters.map(submitter => submitter.id));
-    const defaultSubmitterId = config.default || DEFAULT_SUBMITTER_ID;
-    let initialSelection = storedSelectedSubmitter;
-    if (!initialSelection) {
-      initialSelection = defaultSubmitterId;
-    }
-    if (initialSelection !== 'none' && !availableIds.has(initialSelection)) {
-      initialSelection = availableIds.has(defaultSubmitterId)
-        ? defaultSubmitterId
-        : (config.submitters[0]?.id || 'none');
-    }
-    select.value = initialSelection;
-    updateSubmitterDescription(initialSelection);
-    if (initialSelection !== storedSelectedSubmitter) {
-      try { GM_setValue('selectedSubmitter', initialSelection); } catch (_) { /* ignore */ }
-    }
-    select.dataset.bnInitialized = '1';
-    checkChanged();
-
-    select.addEventListener('change', function() {
-      updateSubmitterDescription(this.value);
-      checkChanged();
-    });
-  }
-
-  function updateSubmitterDescription(selectedId) {
-    const description = document.getElementById('bn-submitter-description');
-    if (!description) return;
-    
-    if (selectedId === 'none') {
-      description.textContent = 'Submitter 功能已禁用';
-      description.className = 'bn-submitter-description bn-submitter-disabled';
-      return;
-    }
-    
-    const submitterSelect = document.getElementById('bn-submitter-select');
-    const selectedOption = submitterSelect?.querySelector(`option[value="${selectedId}"]`);
-    
-    if (selectedOption && selectedOption.dataset.description) {
-      const raw = selectedOption.dataset.description || '';
-      // Use a small sanitizer that allows only anchor tags; fall back to plain text
-      const safe = sanitizeSubmitterDescription(raw);
-      // If sanitizer returned a string with '<', it contains allowed HTML (anchors), set as HTML
-      if (safe.indexOf('<') !== -1) {
-        description.innerHTML = safe;
-      } else {
-        description.textContent = safe;
-      }
-      description.className = 'bn-submitter-description';
-    } else {
-      description.textContent = '未知的 Submitter';
-      description.className = 'bn-submitter-description bn-submitter-unknown';
-    }
-  }
-
-  function syncSubmitterState(selectedSubmitter) {
-    if (typeof chrome === 'undefined' || !chrome.runtime || typeof chrome.runtime.sendMessage !== 'function') return;
-    try {
-      const enabled = selectedSubmitter !== 'none';
-      chrome.runtime.sendMessage({ 
-        type: 'bn_toggle_submitter', 
-        enabled,
-        submitterId: selectedSubmitter
-      });
-    } catch (e) {
-      console.warn('Failed to sync submitter state:', e);
-    }
   }
 
   async function loadUsersData() {

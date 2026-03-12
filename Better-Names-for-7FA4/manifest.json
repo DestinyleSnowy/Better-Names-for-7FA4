@@ -4,7 +4,7 @@
   "version": "2026.06.16",
   "description": "强大的 7FA4 用户名与颜色映射插件",
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+    "extension_pages": "script-src 'self'; object-src 'self'"
   },
   "permissions": [
     "storage",
@@ -99,8 +99,7 @@
         "data/users.json",
         "data/special_users.json",
         "content/panel/panel.html",
-        "content/panel/avatar-blocker.js",
-        "submitter/submitters.json"
+        "content/panel/avatar-blocker.js"
       ],
       "matches": [
         "<all_urls>"

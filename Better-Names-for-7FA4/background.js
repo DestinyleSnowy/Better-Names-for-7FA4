@@ -7,7 +7,6 @@ self.addEventListener('activate', (e) => {
   e.waitUntil(self.clients.claim());
 });
 
-const DEFAULT_SUBMITTER_ID = 'origin';
 const DEFAULT_SUBMITTER_POPUP = 'submitter/submitter/popup.html';
 const AVATAR_BLOCK_RULE_ID = 1001;
 const AVATAR_BLOCK_URL_FILTER = '||gravatar.loli.net^';
@@ -90,35 +89,6 @@ function syncAvatarBlockingRuleFromStorage() {
   }
 }
 
-async function loadSubmittersConfig() {
-  const fallback = { submitters: [], default: DEFAULT_SUBMITTER_ID };
-  try {
-    const url = chrome.runtime.getURL('submitter/submitters.json');
-    const response = await fetch(url);
-    if (!response || !response.ok) return fallback;
-    const data = await response.json();
-    if (!data || typeof data !== 'object') return fallback;
-    if (!Array.isArray(data.submitters)) data.submitters = [];
-    if (!data.default) data.default = DEFAULT_SUBMITTER_ID;
-    return data;
-  } catch (e) {
-    console.error('Failed to load submitters config', e);
-    return fallback;
-  }
-}
-
-function findSubmitter(config, id) {
-  if (!config || !Array.isArray(config.submitters)) return null;
-  return config.submitters.find((s) => s && s.id === id) || null;
-}
-
-function resolveDefaultSubmitter(config) {
-  const defaultId = (config && config.default) || DEFAULT_SUBMITTER_ID;
-  const found = findSubmitter(config, defaultId);
-  const popup = (found && found.popup) ? found.popup : DEFAULT_SUBMITTER_POPUP;
-  return { id: found ? found.id : defaultId, popup };
-}
-
 function applySubmitterState(enabled, popup = DEFAULT_SUBMITTER_POPUP) {
   try {
     if (!chrome || !chrome.action) return;
@@ -139,58 +109,24 @@ function applySubmitterState(enabled, popup = DEFAULT_SUBMITTER_POPUP) {
   }
 }
 
-async function ensureSubmitterStateFromStorage() {
-  try {
-    if (!chrome || !chrome.storage || !chrome.storage.local) {
-      applySubmitterState(true, DEFAULT_SUBMITTER_POPUP);
-      return;
-    }
-    
-    const config = await loadSubmittersConfig();
-    const defaultSubmitter = resolveDefaultSubmitter(config);
-
-    chrome.storage.local.get(['selectedSubmitter'], (items) => {
-      try {
-        const hasStoredValue = items && Object.prototype.hasOwnProperty.call(items, 'selectedSubmitter');
-        const selectedSubmitter = hasStoredValue ? items.selectedSubmitter : defaultSubmitter.id;
-        const enabled = selectedSubmitter !== 'none';
-        let popup = defaultSubmitter.popup;
-        
-        if (enabled) {
-          const submitter = findSubmitter(config, selectedSubmitter);
-          if (submitter && submitter.popup) {
-            popup = submitter.popup;
-          }
-        }
-        
-        if (!hasStoredValue && selectedSubmitter && selectedSubmitter !== 'none') {
-          try { chrome.storage.local.set({ selectedSubmitter }); } catch (_) { /* ignore */ }
-        }
-        
-        applySubmitterState(enabled, popup);
-      } catch (e) {
-        applySubmitterState(true, defaultSubmitter.popup);
-      }
-    });
-  } catch (e) {
-    applySubmitterState(true, DEFAULT_SUBMITTER_POPUP);
-  }
+function forceSubmitterState() {
+  applySubmitterState(true, DEFAULT_SUBMITTER_POPUP);
 }
 
-ensureSubmitterStateFromStorage();
+forceSubmitterState();
 syncAvatarBlockingRuleFromStorage();
 refreshRankingMergePreference();
 
 if (chrome && chrome.runtime && chrome.runtime.onStartup) {
   chrome.runtime.onStartup.addListener(() => {
-    ensureSubmitterStateFromStorage();
+    forceSubmitterState();
     syncAvatarBlockingRuleFromStorage();
     refreshRankingMergePreference();
   });
 }
 if (chrome && chrome.runtime && chrome.runtime.onInstalled) {
   chrome.runtime.onInstalled.addListener(() => {
-    ensureSubmitterStateFromStorage();
+    forceSubmitterState();
     syncAvatarBlockingRuleFromStorage();
     refreshRankingMergePreference();
   });
@@ -198,15 +134,6 @@ if (chrome && chrome.runtime && chrome.runtime.onInstalled) {
 if (chrome && chrome.storage && chrome.storage.onChanged) {
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== 'local') return;
-
-    if (Object.prototype.hasOwnProperty.call(changes, 'selectedSubmitter')) {
-      const change = changes.selectedSubmitter;
-      const selectedSubmitter = change && Object.prototype.hasOwnProperty.call(change, 'newValue')
-        ? change.newValue
-        : 'none';
-      
-      ensureSubmitterStateFromStorage();
-    }
 
     if (Object.prototype.hasOwnProperty.call(changes, 'hideAvatar')) {
       const change = changes.hideAvatar;
@@ -228,15 +155,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || typeof msg !== 'object') return;
 
   if (msg.type === 'bn_toggle_submitter') {
-    const enabled = msg.enabled !== false;
-    const submitterId = msg.submitterId || 'none';
-    try {
-      chrome.storage.local.set({ selectedSubmitter: enabled ? submitterId : 'none' });
-    } catch (e) {
-      console.warn('Failed to save submitter state:', e);
-    }
-    ensureSubmitterStateFromStorage();
-    sendResponse({ ok: true });
+    forceSubmitterState();
+    sendResponse({ ok: true, forced: true });
     return true;
   }
 
