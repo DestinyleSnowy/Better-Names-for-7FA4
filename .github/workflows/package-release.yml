@@ -2,14 +2,46 @@ name: Package and Release to GitHub and GitLab
 
 on:
   push:
-    tags:
-      - '*'
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
+  sync-gitlab:
+    if: github.event_name == 'workflow_dispatch' || !startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Mirror repository to GitLab
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config --global user.name "yx"
+          git config --global user.email "yx@7fa4.cn"
+          git remote remove gitlab 2>/dev/null || true
+          git remote add gitlab http://oauth2:$GITLAB_TOKEN@jx.7fa4.cn:9080/yx/better-names-for-7fa4.git
+
+          git fetch --prune origin "+refs/heads/*:refs/remotes/origin/*" "+refs/tags/*:refs/tags/*"
+
+          while IFS= read -r branch; do
+            if [ "$branch" = "HEAD" ]; then
+              continue
+            fi
+
+            git branch --force "$branch" "refs/remotes/origin/$branch"
+          done < <(git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin)
+
+          git push --force --prune gitlab \
+            "+refs/heads/*:refs/heads/*" \
+            "+refs/tags/*:refs/tags/*"
+
   package-and-release:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
@@ -68,7 +100,7 @@ jobs:
           cd Better-Names-for-7FA4
           zip -r ../Better-Names-for-7FA4-${{ github.ref_name }}.zip .
 
-      - name: Push tag to GitLab
+      - name: Mirror repository to GitLab
         env:
           GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
         run: |
@@ -77,38 +109,20 @@ jobs:
           git config --global user.email "yx@7fa4.cn"
           git remote remove gitlab 2>/dev/null || true
           git remote add gitlab http://oauth2:$GITLAB_TOKEN@jx.7fa4.cn:9080/yx/better-names-for-7fa4.git
-          TAG_NAME="${GITHUB_REF#refs/tags/}"
-          git push gitlab "refs/tags/$TAG_NAME:refs/tags/$TAG_NAME"
 
-      - name: Sync repository to GitLab default branch
-        env:
-          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
-          DEFAULT_BRANCH: ${{ secrets.GITLAB_DEFAULT_BRANCH }}
-        run: |
-          set -euo pipefail
-          git config --global user.name "yx"
-          git config --global user.email "yx@7fa4.cn"
-          git remote remove gitlab 2>/dev/null || true
-          git remote add gitlab http://oauth2:$GITLAB_TOKEN@jx.7fa4.cn:9080/yx/better-names-for-7fa4.git
+          git fetch --prune origin "+refs/heads/*:refs/remotes/origin/*" "+refs/tags/*:refs/tags/*"
 
-          DEFAULT_BRANCH="${DEFAULT_BRANCH:-main}"
-          TAG="${GITHUB_REF#refs/tags/}"
-          SOURCE_COMMIT="$(git rev-parse HEAD)"
+          while IFS= read -r branch; do
+            if [ "$branch" = "HEAD" ]; then
+              continue
+            fi
 
-          if echo "$TAG" | grep -Eq '^[0-9]+(\.[0-9]+)*$'; then
-            VERSION="$TAG"
-          else
-            VERSION="${TAG##* }"
-          fi
+            git branch --force "$branch" "refs/remotes/origin/$branch"
+          done < <(git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin)
 
-          echo "Syncing commit $SOURCE_COMMIT to GitLab branch $DEFAULT_BRANCH"
-          echo "Will write version: $VERSION"
-
-          git checkout --force -B gitlab-sync "$SOURCE_COMMIT"
-          printf '%s\n' "$VERSION" > version
-          git add version
-          git commit -m "chore: sync $TAG to GitLab"
-          git push --force gitlab "HEAD:refs/heads/$DEFAULT_BRANCH"
+          git push --force --prune gitlab \
+            "+refs/heads/*:refs/heads/*" \
+            "+refs/tags/*:refs/tags/*"
 
       - name: Create GitLab Release
         env:
