@@ -124,7 +124,7 @@ jobs:
             "+refs/heads/*:refs/heads/*" \
             "+refs/tags/*:refs/tags/*"
 
-      - name: Create GitLab Release
+      - name: Create or Update GitLab Release
         env:
           GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
           GITLAB_URL: "http://jx.7fa4.cn:9080"
@@ -133,23 +133,64 @@ jobs:
           TAG_NAME="${GITHUB_REF#refs/tags/}"
           ZIP_FILE="Better-Names-for-7FA4-$TAG_NAME.zip"
           PROJECT_ID="yx%2Fbetter-names-for-7fa4"
+          RELEASES_API="$GITLAB_URL/api/v4/projects/$PROJECT_ID/releases"
 
-          UPLOAD_RESPONSE=$(curl -s --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+          upload_status=$(curl --silent --show-error \
+            --output /tmp/gitlab-upload-response.json \
+            --write-out "%{http_code}" \
+            --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
             --form "file=@$ZIP_FILE" \
             "$GITLAB_URL/api/v4/projects/$PROJECT_ID/uploads")
 
-          UPLOAD_MARKDOWN=$(echo "$UPLOAD_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin)['markdown'])")
+          if [[ ! "$upload_status" =~ ^2 ]]; then
+            echo "GitLab upload failed with HTTP $upload_status"
+            cat /tmp/gitlab-upload-response.json
+            exit 1
+          fi
 
-          curl --fail -sS --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+          UPLOAD_MARKDOWN=$(python3 -c "import json, pathlib; print(json.loads(pathlib.Path('/tmp/gitlab-upload-response.json').read_text(encoding='utf-8'))['markdown'])")
+          RELEASE_NAME="Better Names for 7FA4 $TAG_NAME"
+          RELEASE_DESCRIPTION="Automated release from GitHub Actions. Download: $UPLOAD_MARKDOWN"
+          export TAG_NAME RELEASE_NAME RELEASE_DESCRIPTION
+          TAG_NAME_ENCODED=$(python3 -c "import os, urllib.parse; print(urllib.parse.quote(os.environ['TAG_NAME'], safe=''))")
+          RELEASE_API="$RELEASES_API/$TAG_NAME_ENCODED"
+
+          existing_status=$(curl --silent \
+            --output /tmp/gitlab-release-existing.json \
+            --write-out "%{http_code}" \
+            --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+            "$RELEASE_API")
+
+          if [ "$existing_status" = "200" ]; then
+            METHOD="PUT"
+            TARGET_URL="$RELEASE_API"
+            PAYLOAD=$(python3 -c "import json, os; print(json.dumps({'name': os.environ['RELEASE_NAME'], 'description': os.environ['RELEASE_DESCRIPTION']}))")
+          elif [ "$existing_status" = "404" ]; then
+            METHOD="POST"
+            TARGET_URL="$RELEASES_API"
+            PAYLOAD=$(python3 -c "import json, os; print(json.dumps({'tag_name': os.environ['TAG_NAME'], 'name': os.environ['RELEASE_NAME'], 'description': os.environ['RELEASE_DESCRIPTION']}))")
+          else
+            echo "Failed to query GitLab release state for tag $TAG_NAME (HTTP $existing_status)"
+            cat /tmp/gitlab-release-existing.json
+            exit 1
+          fi
+
+          release_status=$(curl --silent --show-error \
+            --output /tmp/gitlab-release-response.json \
+            --write-out "%{http_code}" \
+            --request "$METHOD" \
+            --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
             --header "Content-Type: application/json" \
-            --data "{
-              \"tag_name\": \"$TAG_NAME\",
-              \"name\": \"Better Names for 7FA4 $TAG_NAME\",
-              \"description\": \"Automated release from GitHub Actions. Download: $UPLOAD_MARKDOWN\"
-            }" \
-            "$GITLAB_URL/api/v4/projects/$PROJECT_ID/releases" >/dev/null
+            --data "$PAYLOAD" \
+            "$TARGET_URL")
 
-          echo "GitLab release created successfully!"
+          if [[ ! "$release_status" =~ ^2 ]]; then
+            echo "GitLab release API failed with HTTP $release_status"
+            cat /tmp/gitlab-release-response.json
+            exit 1
+          fi
+
+          echo "GitLab release synchronized successfully!"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
