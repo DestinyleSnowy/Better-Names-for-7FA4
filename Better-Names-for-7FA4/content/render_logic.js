@@ -110,10 +110,18 @@ function sanitizeHtml(unsafeHtml) {
         const normalizedValue = (value || '').trim().toLowerCase();
         if (
           normalizedValue.startsWith('javascript:') ||
-          normalizedValue.startsWith('data:text/html') ||
-          normalizedValue.startsWith('data:image/svg')
+          normalizedValue.startsWith('vbscript:') ||
+          normalizedValue.startsWith('data:')
         ) {
-          node.removeAttribute(name);
+          const isSafeImageData =
+            normalizedValue.startsWith('data:image/png') ||
+            normalizedValue.startsWith('data:image/jpeg') ||
+            normalizedValue.startsWith('data:image/jpg') ||
+            normalizedValue.startsWith('data:image/gif') ||
+            normalizedValue.startsWith('data:image/webp');
+          if (!isSafeImageData) {
+            node.removeAttribute(name);
+          }
         }
       }
     });
