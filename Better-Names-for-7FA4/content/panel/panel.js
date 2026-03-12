@@ -3676,10 +3676,10 @@
     }
 
     const limitedName = truncateByUnits(combinedName || '', maxUserUnits);
-    const finalText = (img ? '\u00A0' : '') + escapeHtml(limitedName);
+    const finalText = (img ? '\u00A0' : '') + limitedName;
 
     Array.from(a.childNodes).forEach(n => { if (n.nodeType === Node.TEXT_NODE) n.remove(); });
-    a.insertAdjacentHTML('beforeend', finalText);
+    a.appendChild(document.createTextNode(finalText));
     renderUserTags(a, info?.tags);
   }
 
@@ -3687,9 +3687,7 @@
     if (!span || !span.matches('#vueAppFuckSafari > tbody > tr > td:nth-child(2) > a > span')) return;
     if (!markOnce(span, 'TitleDone')) return;
 
-    let prefix = '';
     const b = span.querySelector('b');
-    if (b) prefix = b.outerHTML + ' ';
 
     let text = '';
     span.childNodes.forEach(n => { if (n.nodeType === Node.TEXT_NODE) text += n.textContent; });
@@ -3698,7 +3696,7 @@
 
     const truncated = truncateByUnits(text, maxTitleUnits);
     Array.from(span.childNodes).forEach(n => { if (n.nodeType === Node.TEXT_NODE) n.remove(); });
-    span.innerHTML = prefix + truncated;
+    span.appendChild(document.createTextNode((b ? ' ' : '') + truncated));
 
     // BN PATCH: force uniform font size on submissions page when title truncation is enabled
     try {
