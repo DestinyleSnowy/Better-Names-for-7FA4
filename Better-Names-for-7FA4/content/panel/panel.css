@@ -99,6 +99,10 @@
   bottom: 56px;
   right: 0;
 }
+#bn-chat-trigger.has-unread {
+  border-color: rgba(226, 90, 62, 0.72);
+  box-shadow: 0 12px 28px rgba(226,90,62,0.26);
+}
 #bn-trigger:hover,
 #bn-chat-trigger:hover {
   background: var(--bn-hover-bg);
@@ -121,6 +125,29 @@
   width: 24px;
   height: 24px;
   display: block;
+}
+.bn-chat-trigger-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border-radius: 999px;
+  border: 2px solid var(--bn-surface);
+  background: linear-gradient(135deg, #f97316, #ef4444);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 15px;
+  text-align: center;
+  box-shadow: 0 10px 22px rgba(239,68,68,0.34);
+  animation: bn-chat-badge-pulse 1.8s ease-in-out infinite;
+}
+@keyframes bn-chat-badge-pulse {
+  0%, 100% { transform: scale(1); }
+  35% { transform: scale(1.08); }
+  60% { transform: scale(0.96); }
 }
 
 #bn-panel {
@@ -1688,11 +1715,24 @@
   background: rgba(30,136,229,0.14);
   box-shadow: inset 0 0 0 1px rgba(30,136,229,0.22);
 }
+.bn-chat-conversation-item.has-unread {
+  border-color: rgba(226, 90, 62, 0.42);
+  background:
+    linear-gradient(135deg, rgba(249,115,22,0.12), rgba(255,255,255,0) 42%),
+    var(--bn-surface);
+}
 .bn-chat-conversation-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+.bn-chat-conversation-meta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
 }
 .bn-chat-conversation-name {
   min-width: 0;
@@ -1711,12 +1751,36 @@
   color: var(--bn-text-muted);
   background: rgba(255,255,255,0.66);
 }
+.bn-chat-conversation-unread {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f97316, #ef4444);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 6px 16px rgba(239,68,68,0.2);
+}
 .bn-chat-conversation-sub {
   font-size: 11px;
   color: var(--bn-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+#bn-container.bn-theme-dark .bn-chat-conversation-item.has-unread {
+  border-color: rgba(248, 113, 113, 0.4);
+  background:
+    linear-gradient(135deg, rgba(248,113,113,0.12), rgba(255,255,255,0) 42%),
+    var(--bn-surface);
+}
+#bn-container.bn-theme-dark .bn-chat-trigger-badge,
+#bn-container.bn-theme-dark .bn-chat-conversation-unread {
+  border-color: var(--bn-surface);
+  box-shadow: 0 8px 18px rgba(248,113,113,0.24);
 }
 
 .bn-chat-main {

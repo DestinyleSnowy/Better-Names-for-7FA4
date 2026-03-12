@@ -706,6 +706,7 @@
   const pinBtn = document.getElementById('bn-pin');
   let fireworksBtn = document.getElementById('bn-fireworks');
   const chatTrigger = document.getElementById('bn-chat-trigger');
+  const chatTriggerBadge = document.getElementById('bn-chat-trigger-badge');
   const trigger = document.getElementById('bn-trigger');
   const themeColorInput = document.getElementById('bn-theme-color');
   const themeColorHexInput = document.getElementById('bn-theme-color-hex');
@@ -783,6 +784,10 @@
     loadingOlder: false,
     sending: false,
     autoRefreshTimer: null,
+    monitorTimer: null,
+    monitoring: false,
+    monitorCursor: 0,
+    activityHydrationSeq: 0,
     scope: 'all',
     searchText: '',
     activeKey: '',
@@ -799,6 +804,10 @@
     groupById: new Map(),
     messagesByKey: new Map(),
     oldestSecByKey: new Map(),
+    lastActivitySecByKey: new Map(),
+    unreadCountByKey: new Map(),
+    trackedConversationKeys: new Set(),
+    lastNotifiedMessageIdByKey: new Map(),
     tokenUsed: null,
     tokenRemain: null,
     requestSeq: 0,
@@ -807,6 +816,10 @@
   const CHAT_WINDOW_EDGE_MARGIN = 8;
   const CHAT_WINDOW_MIN_WIDTH = 560;
   const CHAT_WINDOW_MIN_HEIGHT = 420;
+  const CHAT_MONITOR_BATCH_SIZE = 3;
+  const CHAT_MONITOR_PROBE_TAKE = 5;
+  const CHAT_ACTIVITY_HYDRATE_BATCH_SIZE = 4;
+  const CHAT_ACTIVITY_PROBE_TAKE = 3;
   let chatWindowInteractionState = null;
   let chatWindowRestoreRect = null;
 
@@ -4522,9 +4535,15 @@
     if (nextVisible) {
       bringContainerToFront();
       chatUpdateFullscreenButton();
+      if (chatState.activeKey) chatMarkConversationRead(chatState.activeKey, { rerenderList: true });
       chatStartAutoRefreshTimer();
+      chatStartMonitorTimer();
+      if (chatState.initialized && chatState.activeKey && !chatState.loadingMessages) {
+        chatRefreshMessages({ silent: true, preserveScroll: false });
+      }
     } else {
       chatStopAutoRefreshTimer();
+      chatStartMonitorTimer();
     }
   }
 
@@ -4705,7 +4724,7 @@
   function chatGetFilteredConversations() {
     const searchText = (chatState.searchText || '').trim().toLowerCase();
     const scope = chatState.scope || 'all';
-    return chatState.conversations.filter((item) => {
+    return chatSortConversations(chatState.conversations.filter((item) => {
       if (!item) return false;
       if (scope !== 'all' && item.type !== scope) return false;
       if (!searchText) return true;
@@ -4713,7 +4732,178 @@
       const subtitle = String(item.subtitle || '').toLowerCase();
       const idText = String(item.id || '');
       return name.includes(searchText) || subtitle.includes(searchText) || idText.includes(searchText);
+    }));
+  }
+
+  function chatFormatUnreadCount(count) {
+    const safe = Math.max(0, chatToInteger(count) || 0);
+    if (!safe) return '0';
+    return safe > 99 ? '99+' : String(safe);
+  }
+
+  function chatGetUnreadCount(key) {
+    if (!key || !chatState.unreadCountByKey.has(key)) return 0;
+    const count = chatToInteger(chatState.unreadCountByKey.get(key));
+    return Number.isFinite(count) && count > 0 ? count : 0;
+  }
+
+  function chatGetConversationLastActivitySec(key) {
+    if (!key || !chatState.lastActivitySecByKey.has(key)) return 0;
+    const sec = chatNormalizeTimestampToSec(chatState.lastActivitySecByKey.get(key));
+    return Number.isFinite(sec) && sec > 0 ? sec : 0;
+  }
+
+  function chatSortConversations(items) {
+    return [...(Array.isArray(items) ? items : [])].sort((a, b) => {
+      const ta = chatGetConversationLastActivitySec(a && a.key);
+      const tb = chatGetConversationLastActivitySec(b && b.key);
+      if (ta !== tb) return tb - ta;
+      const aName = String(a && a.name || '');
+      const bName = String(b && b.name || '');
+      return aName.localeCompare(bName, 'zh-CN');
     });
+  }
+
+  function chatResortConversationState() {
+    chatState.conversations = chatSortConversations(chatState.conversations);
+  }
+
+  function chatGetTotalUnreadCount() {
+    let total = 0;
+    chatState.unreadCountByKey.forEach((value) => {
+      const count = chatToInteger(value);
+      if (Number.isFinite(count) && count > 0) total += count;
+    });
+    return total;
+  }
+
+  function chatUpdateTriggerUnreadUi() {
+    if (!chatTrigger) return;
+    const totalUnread = chatGetTotalUnreadCount();
+    const hasUnread = totalUnread > 0;
+    const label = hasUnread ? `打开聊天室（${chatFormatUnreadCount(totalUnread)} 条新消息）` : '打开聊天室';
+    chatTrigger.classList.toggle('has-unread', hasUnread);
+    chatTrigger.setAttribute('aria-label', label);
+    chatTrigger.title = label;
+    if (chatTriggerBadge) {
+      chatTriggerBadge.hidden = !hasUnread;
+      chatTriggerBadge.textContent = chatFormatUnreadCount(totalUnread);
+    }
+  }
+
+  function chatUpdateUnreadUi({ rerenderList = true } = {}) {
+    chatUpdateTriggerUnreadUi();
+    if (rerenderList && chatConversationListEl) {
+      chatResortConversationState();
+      chatRenderConversationList();
+    }
+  }
+
+  function chatMarkConversationRead(key, { rerenderList = true } = {}) {
+    if (!key) return;
+    if (!chatState.unreadCountByKey.has(key)) {
+      if (!rerenderList) chatUpdateTriggerUnreadUi();
+      return;
+    }
+    chatState.unreadCountByKey.delete(key);
+    chatUpdateUnreadUi({ rerenderList });
+  }
+
+  function chatCleanupConversationCaches(validKeys) {
+    const keep = validKeys instanceof Set ? validKeys : new Set();
+    const cleanupMap = (map) => {
+      Array.from(map.keys()).forEach((key) => {
+        if (!keep.has(key)) map.delete(key);
+      });
+    };
+    cleanupMap(chatState.messagesByKey);
+    cleanupMap(chatState.oldestSecByKey);
+    cleanupMap(chatState.lastActivitySecByKey);
+    cleanupMap(chatState.unreadCountByKey);
+    cleanupMap(chatState.lastNotifiedMessageIdByKey);
+    Array.from(chatState.trackedConversationKeys.values()).forEach((key) => {
+      if (!keep.has(key)) chatState.trackedConversationKeys.delete(key);
+    });
+    if (chatState.monitorCursor >= keep.size) chatState.monitorCursor = 0;
+  }
+
+  function chatMaybeNotifyNewMessages(conversation, newMessages) {
+    if (!conversation || !Array.isArray(newMessages) || !newMessages.length) return;
+    if (typeof GM_notification !== 'function') return;
+    if (chatWindowIsVisible()) return;
+    const latest = newMessages[newMessages.length - 1];
+    if (!latest || latest.isSelf) return;
+    if (chatState.lastNotifiedMessageIdByKey.get(conversation.key) === latest.id) return;
+    chatState.lastNotifiedMessageIdByKey.set(conversation.key, latest.id);
+    const senderName = Number.isFinite(latest.senderId) ? chatResolveUserName(latest.senderId) : (conversation.name || '新消息');
+    const body = String(latest.content || '[空消息]').slice(0, 80);
+    const suffix = newMessages.length > 1 ? `（${newMessages.length} 条）` : '';
+    const message = conversation.type === 'group'
+      ? `${senderName}: ${body}${suffix}`
+      : `${body}${suffix}`;
+    GM_notification({
+      title: `聊天室新消息 · ${conversation.name || conversation.id}`,
+      text: message,
+      timeout: 5000,
+    });
+  }
+
+  function chatRememberConversationMessages(conversation, incomingMessages, {
+    trackUnread = false,
+    notify = false,
+    rerenderList = false,
+    updateOldest = true,
+  } = {}) {
+    if (!conversation) return { merged: [], newIncoming: [], hadBaseline: false };
+    const key = conversation.key;
+    const existing = chatState.messagesByKey.get(key) || [];
+    const hadBaseline = chatState.trackedConversationKeys.has(key);
+    const existingIds = hadBaseline ? new Set(existing.map(item => item && item.id)) : null;
+    const previousLatestSec = hadBaseline && existing.length
+      ? Math.max(...existing.map(item => chatNormalizeTimestampToSec(item && item.sec)))
+      : NaN;
+    const merged = chatMergeMessages(existing, incomingMessages);
+    chatState.messagesByKey.set(key, merged);
+    if (merged.length) {
+      const latestSec = Math.max(...merged.map(item => chatNormalizeTimestampToSec(item.sec)));
+      if (Number.isFinite(latestSec)) chatState.lastActivitySecByKey.set(key, latestSec);
+    }
+    if (updateOldest && merged.length) {
+      const oldest = Math.min(...merged.map(item => chatNormalizeTimestampToSec(item.sec)));
+      if (Number.isFinite(oldest)) chatState.oldestSecByKey.set(key, oldest);
+    }
+    chatState.trackedConversationKeys.add(key);
+
+    let newIncoming = [];
+    const shouldMarkRead = key === chatState.activeKey && chatWindowIsVisible();
+    if (trackUnread && hadBaseline && existingIds) {
+      newIncoming = incomingMessages.filter((item) => {
+        if (!item || item.isSelf) return false;
+        if (existingIds.has(item.id)) return false;
+        const currentSec = chatNormalizeTimestampToSec(item.sec);
+        if (!Number.isFinite(previousLatestSec)) return true;
+        if (!Number.isFinite(currentSec)) return true;
+        return currentSec >= previousLatestSec;
+      });
+      if (shouldMarkRead) {
+        chatState.unreadCountByKey.delete(key);
+      } else if (newIncoming.length) {
+        const nextUnread = chatGetUnreadCount(key) + newIncoming.length;
+        chatState.unreadCountByKey.set(key, nextUnread);
+      }
+      if (notify && newIncoming.length) {
+        chatMaybeNotifyNewMessages(conversation, newIncoming);
+      }
+    } else if (shouldMarkRead) {
+      chatState.unreadCountByKey.delete(key);
+    }
+
+    if (rerenderList) chatUpdateUnreadUi({ rerenderList: true });
+    else {
+      chatResortConversationState();
+      chatUpdateTriggerUnreadUi();
+    }
+    return { merged, newIncoming, hadBaseline };
   }
 
   function chatRenderConversationList() {
@@ -4726,6 +4916,8 @@
       entry.type = 'button';
       entry.className = 'bn-chat-conversation-item';
       if (item.key === chatState.activeKey) entry.classList.add('is-active');
+      const unreadCount = chatGetUnreadCount(item.key);
+      if (unreadCount > 0) entry.classList.add('has-unread');
       entry.dataset.key = item.key;
 
       const top = document.createElement('div');
@@ -4735,12 +4927,24 @@
       name.className = 'bn-chat-conversation-name';
       name.textContent = item.name;
 
+      const meta = document.createElement('div');
+      meta.className = 'bn-chat-conversation-meta';
+
       const tag = document.createElement('span');
       tag.className = 'bn-chat-conversation-tag';
       tag.textContent = item.type === 'group' ? '群聊' : '私聊';
 
+      meta.appendChild(tag);
+      if (unreadCount > 0) {
+        const unread = document.createElement('span');
+        unread.className = 'bn-chat-conversation-unread';
+        unread.textContent = chatFormatUnreadCount(unreadCount);
+        unread.setAttribute('aria-label', `${unreadCount} 条未读消息`);
+        meta.appendChild(unread);
+      }
+
       top.appendChild(name);
-      top.appendChild(tag);
+      top.appendChild(meta);
 
       const subtitle = document.createElement('div');
       subtitle.className = 'bn-chat-conversation-sub';
@@ -4885,7 +5089,8 @@
     const currentMessages = conv ? (chatState.messagesByKey.get(conv.key) || []) : [];
     const oldScrollHeight = chatMessageListEl.scrollHeight;
     const oldScrollTop = chatMessageListEl.scrollTop;
-    const nearBottom = (oldScrollHeight - (oldScrollTop + chatMessageListEl.clientHeight)) < 36;
+    const nearLatest = oldScrollTop < 36;
+    const renderMessages = [...currentMessages].reverse();
 
     chatMessageListEl.innerHTML = '';
     if (!conv) {
@@ -4906,7 +5111,7 @@
       return;
     }
 
-    currentMessages.forEach((message) => {
+    renderMessages.forEach((message) => {
       const row = document.createElement('div');
       row.className = 'bn-chat-message';
       if (message.isSelf) row.classList.add('is-self');
@@ -4943,15 +5148,17 @@
 
     if (chatLoadOlderBtnEl) chatLoadOlderBtnEl.disabled = chatState.loadingOlder || chatState.loadingMessages;
 
-    if (forceScrollBottom || (!preserveScroll && nearBottom)) {
-      chatMessageListEl.scrollTop = chatMessageListEl.scrollHeight;
+    if (forceScrollBottom || (!preserveScroll && nearLatest)) {
+      chatMessageListEl.scrollTop = 0;
       return;
     }
+    const nextScrollHeight = chatMessageListEl.scrollHeight;
     if (preserveScroll) {
-      const nextScrollHeight = chatMessageListEl.scrollHeight;
-      const delta = nextScrollHeight - oldScrollHeight;
-      chatMessageListEl.scrollTop = Math.max(0, oldScrollTop + delta);
+      chatMessageListEl.scrollTop = oldScrollTop;
+      return;
     }
+    const delta = nextScrollHeight - oldScrollHeight;
+    chatMessageListEl.scrollTop = delta > 0 ? Math.max(0, oldScrollTop + delta) : oldScrollTop;
   }
 
   function chatExtractSelfId(userInfo) {
@@ -5011,6 +5218,38 @@
     return fallback;
   }
 
+  function chatExtractConversationActivitySec(obj) {
+    if (!obj || typeof obj !== 'object') return NaN;
+    const candidates = [
+      obj.last_message_time,
+      obj.lastMessageTime,
+      obj.last_message_at,
+      obj.lastMessageAt,
+      obj.last_chat_time,
+      obj.lastChatTime,
+      obj.last_chat_at,
+      obj.lastChatAt,
+      obj.latest_message_time,
+      obj.latestMessageTime,
+      obj.latest_message_at,
+      obj.latestMessageAt,
+      obj.updated_at,
+      obj.updatedAt,
+      obj.timestamp,
+      obj.send_time,
+      obj.time,
+      obj.created_at,
+      obj.createdAt,
+      obj.last_message && (obj.last_message.timestamp ?? obj.last_message.send_time ?? obj.last_message.created_at),
+      obj.latest_message && (obj.latest_message.timestamp ?? obj.latest_message.send_time ?? obj.latest_message.created_at),
+    ];
+    for (const value of candidates) {
+      const sec = chatNormalizeTimestampToSec(value);
+      if (Number.isFinite(sec) && sec > 0) return sec;
+    }
+    return NaN;
+  }
+
   function chatRebuildStateFromInfo(payload) {
     const info = payload && typeof payload === 'object' ? payload : {};
     const limit = info.limit && typeof info.limit === 'object' ? info.limit : {};
@@ -5039,6 +5278,7 @@
       if (!friend || typeof friend !== 'object') return;
       const fid = chatExtractFriendTargetId(friend);
       if (!Number.isFinite(fid) || fid <= 0) return;
+      const key = `user:${fid}`;
       const friendUserInfo = friend.user && typeof friend.user === 'object' ? friend.user : null;
       const name = chatExtractDisplayName(friend, chatExtractDisplayName(friendUserInfo, `用户 ${fid}`));
       const hasRealName = !!(
@@ -5047,9 +5287,11 @@
         || (friendUserInfo && typeof friendUserInfo.real_name === 'string' && friendUserInfo.real_name.trim())
       );
       const subtitle = hasRealName ? `已互加 · ID ${fid}` : `单向好友 · ID ${fid}`;
+      const activitySec = chatExtractConversationActivitySec(friend) || chatExtractConversationActivitySec(friendUserInfo);
       chatState.userNameById.set(fid, name);
+      if (Number.isFinite(activitySec) && activitySec > 0) chatState.lastActivitySecByKey.set(key, activitySec);
       conversations.push({
-        key: `user:${fid}`,
+        key,
         id: fid,
         type: 'user',
         name,
@@ -5061,6 +5303,7 @@
       if (!group || typeof group !== 'object') return;
       const gid = chatToInteger(group.id ?? group.group_id);
       if (!Number.isFinite(gid) || gid <= 0) return;
+      const key = `group:${gid}`;
       const title = chatExtractDisplayName(group, `群组 ${gid}`);
       const members = Array.isArray(group.members) ? group.members : [];
       members.forEach((member) => {
@@ -5072,8 +5315,10 @@
         }
       });
       chatState.groupById.set(gid, group);
+      const activitySec = chatExtractConversationActivitySec(group);
+      if (Number.isFinite(activitySec) && activitySec > 0) chatState.lastActivitySecByKey.set(key, activitySec);
       conversations.push({
-        key: `group:${gid}`,
+        key,
         id: gid,
         type: 'group',
         name: title,
@@ -5081,16 +5326,16 @@
       });
     });
 
-    conversations.sort((a, b) => {
-      if (a.type !== b.type) return a.type === 'group' ? -1 : 1;
-      return String(a.name || '').localeCompare(String(b.name || ''), 'zh-CN');
-    });
+    const sortedConversations = chatSortConversations(conversations);
 
-    chatState.conversations = conversations;
-    chatState.conversationByKey = new Map(conversations.map(item => [item.key, item]));
+    const validKeys = new Set(sortedConversations.map(item => item.key));
+    chatCleanupConversationCaches(validKeys);
+    chatState.conversations = sortedConversations;
+    chatState.conversationByKey = new Map(sortedConversations.map(item => [item.key, item]));
     chatState.lastInfoLoadedAt = Date.now();
     chatUpdateTokenDisplay();
     chatUpdateInputCounter();
+    chatUpdateTriggerUnreadUi();
   }
 
   async function chatLoadInfo({ silent = false, preserveSelection = true } = {}) {
@@ -5114,6 +5359,8 @@
       chatUpdateCurrentConversationHeader();
       chatRenderConversationList();
       chatRenderMessages();
+      void chatHydrateConversationActivity({ force: !silent });
+      chatStartMonitorTimer();
       if (!silent) {
         chatSetStatus(`列表已更新：${chatState.conversations.length} 个会话`, 'success');
       }
@@ -5124,9 +5371,10 @@
     }
   }
 
-  async function chatFetchConversationMessages(conversation, endTimeSec = null) {
+  async function chatFetchConversationMessages(conversation, endTimeSec = null, takeOverride = null) {
     if (!conversation) return [];
-    const take = Math.max(1, Math.min(chatState.countLimit || 20, 100));
+    const preferredTake = Number.isFinite(takeOverride) ? takeOverride : (chatState.countLimit || 20);
+    const take = Math.max(1, Math.min(preferredTake, 100));
     const commonParams = { target_id: conversation.id, take };
     if (endTimeSec != null) commonParams.end_time = endTimeSec;
 
@@ -5161,6 +5409,25 @@
     return chatSortMessages([...incomingMessages, ...outgoingMessages]);
   }
 
+  async function chatFetchConversationProbeMessages(conversation) {
+    if (!conversation) return [];
+    if (conversation.type === 'group') {
+      return chatFetchConversationMessages(conversation, null, CHAT_MONITOR_PROBE_TAKE);
+    }
+    const payload = await chatApiRequest('GET', '/chat/chat', {
+      params: {
+        target_id: conversation.id,
+        take: CHAT_MONITOR_PROBE_TAKE,
+        type: 'user',
+      },
+      timeoutMs: 12000,
+    });
+    return chatSortMessages(chatGetChatsFromPayload(payload)
+      .map(msg => chatNormalizeMessage(msg, 'in'))
+      .filter((message) => chatMessageBelongsToConversation(message, conversation, 'in'))
+      .filter((message) => !message.isSelf));
+  }
+
   async function chatRefreshMessages({ silent = false, preserveScroll = false } = {}) {
     const conversation = chatGetConversationByKey(chatState.activeKey);
     if (!conversation) {
@@ -5175,13 +5442,11 @@
     try {
       const latestMessages = await chatFetchConversationMessages(conversation);
       if (seq !== chatState.requestSeq) return;
-      const existing = chatState.messagesByKey.get(conversation.key) || [];
-      const merged = chatMergeMessages(existing, latestMessages);
-      chatState.messagesByKey.set(conversation.key, merged);
-      const oldest = merged.length ? Math.min(...merged.map(item => chatNormalizeTimestampToSec(item.sec))) : null;
-      if (oldest != null && Number.isFinite(oldest)) {
-        chatState.oldestSecByKey.set(conversation.key, oldest);
-      }
+      const { merged } = chatRememberConversationMessages(conversation, latestMessages, {
+        trackUnread: true,
+        notify: silent,
+        rerenderList: true,
+      });
       chatRenderMessages({ preserveScroll, forceScrollBottom: !silent });
       if (!silent) chatSetStatus(`消息已更新（${merged.length} 条）`, 'success');
     } catch (error) {
@@ -5207,17 +5472,14 @@
     chatSetStatus('正在加载更早消息...');
     try {
       const olderMessages = await chatFetchConversationMessages(conversation, endTimeSec);
-      const existing = chatState.messagesByKey.get(conversation.key) || [];
       if (!olderMessages.length) {
         chatSetStatus('没有更早消息了');
         return;
       }
-      const merged = chatMergeMessages(existing, olderMessages);
-      chatState.messagesByKey.set(conversation.key, merged);
-      const oldest = merged.length ? Math.min(...merged.map(item => chatNormalizeTimestampToSec(item.sec))) : null;
-      if (oldest != null && Number.isFinite(oldest)) {
-        chatState.oldestSecByKey.set(conversation.key, oldest);
-      }
+      const { merged } = chatRememberConversationMessages(conversation, olderMessages, {
+        trackUnread: false,
+        rerenderList: false,
+      });
       chatRenderMessages({ preserveScroll: true });
       chatSetStatus(`已加载更早消息 ${olderMessages.length} 条`, 'success');
     } catch (error) {
@@ -5232,6 +5494,7 @@
     if (!key || !chatState.conversationByKey.has(key)) return;
     const changed = chatState.activeKey !== key;
     chatState.activeKey = key;
+    chatMarkConversationRead(key, { rerenderList: false });
     chatRenderConversationList();
     chatUpdateCurrentConversationHeader();
     chatRenderMessages();
@@ -5255,6 +5518,105 @@
       window.clearInterval(chatState.autoRefreshTimer);
       chatState.autoRefreshTimer = null;
     }
+  }
+
+  function chatStopMonitorTimer() {
+    if (chatState.monitorTimer) {
+      window.clearInterval(chatState.monitorTimer);
+      chatState.monitorTimer = null;
+    }
+  }
+
+  async function chatHydrateConversationActivity({ force = false } = {}) {
+    if (!chatState.conversations.length) return;
+    const seq = ++chatState.activityHydrationSeq;
+    const targets = (force ? chatState.conversations : chatState.conversations.filter((item) => (
+      chatGetConversationLastActivitySec(item && item.key) <= 0
+    )));
+    if (!targets.length) return;
+
+    for (let index = 0; index < targets.length; index += CHAT_ACTIVITY_HYDRATE_BATCH_SIZE) {
+      if (seq !== chatState.activityHydrationSeq) return;
+      const batch = targets.slice(index, index + CHAT_ACTIVITY_HYDRATE_BATCH_SIZE);
+      await Promise.all(batch.map(async (conversation) => {
+        try {
+          const recentMessages = await chatFetchConversationMessages(conversation, null, CHAT_ACTIVITY_PROBE_TAKE);
+          if (seq !== chatState.activityHydrationSeq || !recentMessages.length) return;
+          chatRememberConversationMessages(conversation, recentMessages, {
+            trackUnread: false,
+            notify: false,
+            rerenderList: false,
+            updateOldest: false,
+          });
+        } catch (_) {
+          // ignore single-conversation hydration failures
+        }
+      }));
+      if (seq !== chatState.activityHydrationSeq) return;
+      chatResortConversationState();
+      chatRenderConversationList();
+    }
+  }
+
+  async function chatProbeConversationForNewMessages(conversation) {
+    if (!conversation || !chatState.conversationByKey.has(conversation.key)) return;
+    const probeMessages = await chatFetchConversationProbeMessages(conversation);
+    const { hadBaseline, newIncoming } = chatRememberConversationMessages(conversation, probeMessages, {
+      trackUnread: true,
+      notify: true,
+      rerenderList: false,
+      updateOldest: false,
+    });
+    if (!hadBaseline || !newIncoming.length) return;
+    const latestMessages = await chatFetchConversationMessages(conversation);
+    chatRememberConversationMessages(conversation, latestMessages, {
+      trackUnread: true,
+      notify: false,
+      rerenderList: true,
+    });
+  }
+
+  async function chatRunMonitorTick() {
+    if (chatState.monitoring) return;
+    if (!chatAutoRefreshInputEl || !chatAutoRefreshInputEl.checked) return;
+    if (!chatState.conversations.length) return;
+    chatState.monitoring = true;
+    try {
+      const visible = chatWindowIsVisible();
+      const maxBatch = Math.min(CHAT_MONITOR_BATCH_SIZE, chatState.conversations.length);
+      const targets = [];
+      let attempts = 0;
+      while (targets.length < maxBatch && attempts < chatState.conversations.length) {
+        const index = chatState.monitorCursor % chatState.conversations.length;
+        const conversation = chatState.conversations[index];
+        chatState.monitorCursor = (chatState.monitorCursor + 1) % chatState.conversations.length;
+        attempts += 1;
+        if (!conversation) continue;
+        if (visible && conversation.key === chatState.activeKey) continue;
+        targets.push(conversation);
+      }
+      if (!targets.length) return;
+      await Promise.all(targets.map(conversation => chatProbeConversationForNewMessages(conversation)));
+      if (Date.now() - chatState.lastInfoLoadedAt > 45000) {
+        await chatLoadInfo({ silent: true, preserveSelection: true });
+      }
+    } catch (_) {
+      // keep monitor failures silent to avoid noisy status churn
+    } finally {
+      chatState.monitoring = false;
+    }
+  }
+
+  function chatStartMonitorTimer() {
+    chatStopMonitorTimer();
+    if (!chatState.initialized) return;
+    if (!chatAutoRefreshInputEl || !chatAutoRefreshInputEl.checked) return;
+    if (!chatState.conversations.length) return;
+    const intervalMs = chatGetAutoRefreshIntervalMs();
+    chatState.monitorTimer = window.setInterval(() => {
+      chatRunMonitorTick();
+    }, intervalMs);
+    chatRunMonitorTick();
   }
 
   function chatStartAutoRefreshTimer() {
@@ -5468,11 +5830,13 @@
     if (chatAutoRefreshInputEl) {
       chatAutoRefreshInputEl.addEventListener('change', () => {
         chatStartAutoRefreshTimer();
+        chatStartMonitorTimer();
       });
     }
     if (chatIntervalSelectEl) {
       chatIntervalSelectEl.addEventListener('change', () => {
         chatStartAutoRefreshTimer();
+        chatStartMonitorTimer();
       });
     }
 
@@ -5510,6 +5874,7 @@
     chatUpdateGroupOperationFields();
     chatUpdateInputCounter();
     chatUpdateTokenDisplay();
+    chatUpdateTriggerUnreadUi();
     chatRenderConversationList();
     chatRenderMessages();
     chatSetStatus('聊天室初始化中...');
@@ -5523,9 +5888,11 @@
       chatSetStatus('未发现可用会话，可点击“重载列表”重试');
     }
     chatStartAutoRefreshTimer();
+    chatStartMonitorTimer();
 
     window.addEventListener('pagehide', () => {
       chatStopAutoRefreshTimer();
+      chatStopMonitorTimer();
     }, { once: true });
   }
 
