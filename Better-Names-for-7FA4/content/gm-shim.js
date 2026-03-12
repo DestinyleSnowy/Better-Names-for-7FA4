@@ -17,21 +17,20 @@
     } catch (e) { cb({}); }
   }
 
+  const gmStore = Object.create(null);
+
   function gmLocalGet(key, defVal) {
     try {
-      const k = "__gm__" + key;
-      const v = localStorage.getItem(k);
-      if (v === null || v === undefined) return defVal;
-      try { return JSON.parse(v); } catch { return v; }
+      if (!Object.prototype.hasOwnProperty.call(gmStore, key)) return defVal;
+      const value = gmStore[key];
+      return value === undefined ? defVal : value;
     } catch (e) {
       return defVal;
     }
   }
   function gmLocalSet(key, value) {
     try {
-      const k = "__gm__" + key;
-      const v = (typeof value === 'string') ? value : JSON.stringify(value);
-      localStorage.setItem(k, v);
+      gmStore[key] = value;
       mirrorToChromeStorage(key, value);
     } catch (e) {}
   }
@@ -42,13 +41,7 @@
         try {
           if (all) {
             Object.keys(all).forEach(k => {
-              const lk = "__gm__" + k;
-              const v = all[k];
-              if (v === undefined) {
-                localStorage.removeItem(lk);
-              } else {
-                localStorage.setItem(lk, (typeof v === 'string') ? v : JSON.stringify(v));
-              }
+              gmStore[k] = all[k];
             });
           }
         } catch (e) {}
