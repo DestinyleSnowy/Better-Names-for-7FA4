@@ -454,6 +454,10 @@
   flex: 0 0 auto;
 }
 
+.bn-section-column-truncate .bn-section-color-theme {
+  flex: 1 1 auto;
+}
+
 .bn-color-sidebar {
   width: 480px; background: var(--bn-bg-subtle);
   border-left: 1px solid var(--bn-border-strong);
@@ -958,6 +962,31 @@
 .bn-ranking-options input[type="checkbox"] {
   width: 16px;
   height: 16px;
+}
+
+.bn-option-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bn-option-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bn-option-group + .bn-option-group {
+  padding-top: 12px;
+  border-top: 1px solid var(--bn-border-subtle);
+}
+
+.bn-option-group-title {
+  padding-left: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--bn-text-muted);
+  line-height: 1.4;
 }
 
 .bn-section-background {
