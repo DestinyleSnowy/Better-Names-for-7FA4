@@ -291,6 +291,8 @@
 
   const RENEW_PATH_RE = /^\/problems\/tag\/(\d+)\/?$/;
   const RENEW_SUFFIX_RE = /\/renew\/?$/;
+  const AUTO_RENEW_BLOCKED_PATH_RE = /^\/problems\/exercises\/?$/;
+  const JOIN_PLAN_STATUS_BLOCKED_PATH_RE = /^\/problems\/exercises\/?$/;
   const AUTO_RENEW_MEMORY_KEY = 'bn:autoRenew:lastRedirect';
   const AUTO_RENEW_MEMORY_TTL = 120000;
 
@@ -609,8 +611,9 @@
   }
 
   pruneAutoRenewMemory();
+  const autoRenewBlockedOnCurrentPage = AUTO_RENEW_BLOCKED_PATH_RE.test(location.pathname || '');
 
-  if (enableAutoRenew) {
+  if (enableAutoRenew && !autoRenewBlockedOnCurrentPage) {
     const redirectTarget = computeRenewUrl(location.href);
     if (redirectTarget && redirectTarget !== location.href) {
       const currentTagMatch = location.pathname.match(RENEW_PATH_RE);
@@ -2807,7 +2810,7 @@
     runHiToiletOnce();
   }
 
-  if (enableAutoRenew) initAutoRenew();
+  if (enableAutoRenew && !autoRenewBlockedOnCurrentPage) initAutoRenew();
 
   function unitOfCharByMode(codePoint, mode) {
     if (mode === 'char') return 1;
@@ -5800,17 +5803,9 @@
     };
 
     const candidates = [];
-    const seen = new Set();
-    const pushCandidate = (value) => {
-      const text = typeof value === 'string' ? value.trim() : '';
-      if (!text || seen.has(text)) return;
-      seen.add(text);
-      candidates.push(text);
-    };
-    try { pushCandidate(new URL('./better_names', location.href).toString()); } catch (_) { /* ignore */ }
-    try { pushCandidate(new URL('better_names', location.href).toString()); } catch (_) { /* ignore */ }
-    try { pushCandidate(new URL('../better_names', location.href).toString()); } catch (_) { /* ignore */ }
-    try { pushCandidate(new URL('/better_names', location.origin).toString()); } catch (_) { /* ignore */ }
+    try {
+      candidates.push(new URL('/better_names', location.origin).toString());
+    } catch (_) { /* ignore */ }
 
     let lastError = null;
     for (const url of candidates) {
@@ -5960,7 +5955,9 @@
     });
   }
   bindJoinPlanDetailToggle();
-  refreshJoinPlanStatus();
+  if (!JOIN_PLAN_STATUS_BLOCKED_PATH_RE.test(location.pathname || '')) {
+    refreshJoinPlanStatus();
+  }
   chatSetWindowVisible(false);
   // 初次遍历
   document.querySelectorAll(USER_LINK_SELECTOR).forEach(processUserLink);
