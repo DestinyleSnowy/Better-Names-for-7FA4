@@ -10,7 +10,6 @@
 - 修复点击学习会自动跳转到全部的问题。
 - 修复未转义的 DOM 重插入导致 7FA4 页面上出现存储型 XSS 漏洞的安全问题。
 - 修复基于 LocalStorage 的 GM 值允许存储 DOM XSS 攻击的安全问题。
-- 推送 release 时，将 Github 所有代码均同步至 Gitlab。
 - 关闭 GitHub 数据库自动更新的工作流（原因：cookie 没了）。
 - 修复存在的部分问题。
 
