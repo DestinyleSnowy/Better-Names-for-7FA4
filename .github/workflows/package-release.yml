@@ -2,46 +2,14 @@ name: Package and Release to GitHub and GitLab
 
 on:
   push:
+    tags:
+      - '*'
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  sync-gitlab:
-    if: github.event_name == 'workflow_dispatch' || !startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Mirror repository to GitLab
-        env:
-          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
-        run: |
-          set -euo pipefail
-          git config --global user.name "yx"
-          git config --global user.email "yx@7fa4.cn"
-          git remote remove gitlab 2>/dev/null || true
-          git remote add gitlab http://oauth2:$GITLAB_TOKEN@jx.7fa4.cn:9080/yx/better-names-for-7fa4.git
-
-          git fetch --prune origin "+refs/heads/*:refs/remotes/origin/*" "+refs/tags/*:refs/tags/*"
-
-          while IFS= read -r branch; do
-            if [ "$branch" = "HEAD" ]; then
-              continue
-            fi
-
-            git branch --force "$branch" "refs/remotes/origin/$branch"
-          done < <(git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin)
-
-          git push --force --prune gitlab \
-            "+refs/heads/*:refs/heads/*" \
-            "+refs/tags/*:refs/tags/*"
-
   package-and-release:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
@@ -100,7 +68,7 @@ jobs:
           cd Better-Names-for-7FA4
           zip -r ../Better-Names-for-7FA4-${{ github.ref_name }}.zip .
 
-      - name: Mirror repository to GitLab
+      - name: Push tag to GitLab
         env:
           GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
         run: |
@@ -109,22 +77,40 @@ jobs:
           git config --global user.email "yx@7fa4.cn"
           git remote remove gitlab 2>/dev/null || true
           git remote add gitlab http://oauth2:$GITLAB_TOKEN@jx.7fa4.cn:9080/yx/better-names-for-7fa4.git
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          git push gitlab "refs/tags/$TAG_NAME:refs/tags/$TAG_NAME"
 
-          git fetch --prune origin "+refs/heads/*:refs/remotes/origin/*" "+refs/tags/*:refs/tags/*"
+      - name: Sync repository to GitLab default branch
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          DEFAULT_BRANCH: ${{ secrets.GITLAB_DEFAULT_BRANCH }}
+        run: |
+          set -euo pipefail
+          git config --global user.name "yx"
+          git config --global user.email "yx@7fa4.cn"
+          git remote remove gitlab 2>/dev/null || true
+          git remote add gitlab http://oauth2:$GITLAB_TOKEN@jx.7fa4.cn:9080/yx/better-names-for-7fa4.git
 
-          while IFS= read -r branch; do
-            if [ "$branch" = "HEAD" ]; then
-              continue
-            fi
+          DEFAULT_BRANCH="${DEFAULT_BRANCH:-main}"
+          TAG="${GITHUB_REF#refs/tags/}"
+          SOURCE_COMMIT="$(git rev-parse HEAD)"
 
-            git branch --force "$branch" "refs/remotes/origin/$branch"
-          done < <(git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin)
+          if echo "$TAG" | grep -Eq '^[0-9]+(\.[0-9]+)*$'; then
+            VERSION="$TAG"
+          else
+            VERSION="${TAG##* }"
+          fi
 
-          git push --force --prune gitlab \
-            "+refs/heads/*:refs/heads/*" \
-            "+refs/tags/*:refs/tags/*"
+          echo "Syncing commit $SOURCE_COMMIT to GitLab branch $DEFAULT_BRANCH"
+          echo "Will write version: $VERSION"
 
-      - name: Create or Update GitLab Release
+          git checkout --force -B gitlab-sync "$SOURCE_COMMIT"
+          printf '%s\n' "$VERSION" > version
+          git add version
+          git commit -m "chore: sync $TAG to GitLab"
+          git push --force gitlab "HEAD:refs/heads/$DEFAULT_BRANCH"
+
+      - name: Create GitLab Release
         env:
           GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
           GITLAB_URL: "http://jx.7fa4.cn:9080"
@@ -133,64 +119,23 @@ jobs:
           TAG_NAME="${GITHUB_REF#refs/tags/}"
           ZIP_FILE="Better-Names-for-7FA4-$TAG_NAME.zip"
           PROJECT_ID="yx%2Fbetter-names-for-7fa4"
-          RELEASES_API="$GITLAB_URL/api/v4/projects/$PROJECT_ID/releases"
 
-          upload_status=$(curl --silent --show-error \
-            --output /tmp/gitlab-upload-response.json \
-            --write-out "%{http_code}" \
-            --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+          UPLOAD_RESPONSE=$(curl -s --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
             --form "file=@$ZIP_FILE" \
             "$GITLAB_URL/api/v4/projects/$PROJECT_ID/uploads")
 
-          if [[ ! "$upload_status" =~ ^2 ]]; then
-            echo "GitLab upload failed with HTTP $upload_status"
-            cat /tmp/gitlab-upload-response.json
-            exit 1
-          fi
+          UPLOAD_MARKDOWN=$(echo "$UPLOAD_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin)['markdown'])")
 
-          UPLOAD_MARKDOWN=$(python3 -c "import json, pathlib; print(json.loads(pathlib.Path('/tmp/gitlab-upload-response.json').read_text(encoding='utf-8'))['markdown'])")
-          RELEASE_NAME="Better Names for 7FA4 $TAG_NAME"
-          RELEASE_DESCRIPTION="Automated release from GitHub Actions. Download: $UPLOAD_MARKDOWN"
-          export TAG_NAME RELEASE_NAME RELEASE_DESCRIPTION
-          TAG_NAME_ENCODED=$(python3 -c "import os, urllib.parse; print(urllib.parse.quote(os.environ['TAG_NAME'], safe=''))")
-          RELEASE_API="$RELEASES_API/$TAG_NAME_ENCODED"
-
-          existing_status=$(curl --silent \
-            --output /tmp/gitlab-release-existing.json \
-            --write-out "%{http_code}" \
-            --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
-            "$RELEASE_API")
-
-          if [ "$existing_status" = "200" ]; then
-            METHOD="PUT"
-            TARGET_URL="$RELEASE_API"
-            PAYLOAD=$(python3 -c "import json, os; print(json.dumps({'name': os.environ['RELEASE_NAME'], 'description': os.environ['RELEASE_DESCRIPTION']}))")
-          elif [ "$existing_status" = "404" ]; then
-            METHOD="POST"
-            TARGET_URL="$RELEASES_API"
-            PAYLOAD=$(python3 -c "import json, os; print(json.dumps({'tag_name': os.environ['TAG_NAME'], 'name': os.environ['RELEASE_NAME'], 'description': os.environ['RELEASE_DESCRIPTION']}))")
-          else
-            echo "Failed to query GitLab release state for tag $TAG_NAME (HTTP $existing_status)"
-            cat /tmp/gitlab-release-existing.json
-            exit 1
-          fi
-
-          release_status=$(curl --silent --show-error \
-            --output /tmp/gitlab-release-response.json \
-            --write-out "%{http_code}" \
-            --request "$METHOD" \
-            --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+          curl --fail -sS --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
             --header "Content-Type: application/json" \
-            --data "$PAYLOAD" \
-            "$TARGET_URL")
+            --data "{
+              \"tag_name\": \"$TAG_NAME\",
+              \"name\": \"Better Names for 7FA4 $TAG_NAME\",
+              \"description\": \"Automated release from GitHub Actions. Download: $UPLOAD_MARKDOWN\"
+            }" \
+            "$GITLAB_URL/api/v4/projects/$PROJECT_ID/releases" >/dev/null
 
-          if [[ ! "$release_status" =~ ^2 ]]; then
-            echo "GitLab release API failed with HTTP $release_status"
-            cat /tmp/gitlab-release-response.json
-            exit 1
-          fi
-
-          echo "GitLab release synchronized successfully!"
+          echo "GitLab release created successfully!"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
