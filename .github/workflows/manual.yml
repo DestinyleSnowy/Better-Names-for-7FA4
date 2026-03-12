@@ -1,34 +1,131 @@
-# This is a basic workflow that is manually triggered
+name: Release Existing Tag
 
-name: Manual workflow
-permissions:
-  contents: none
-
-# Controls when the action will run. Workflow runs when manually triggered using the UI
-# or API.
 on:
   workflow_dispatch:
-    # Inputs the workflow accepts.
     inputs:
-      name:
-        # Friendly description to be shown in the UI instead of 'name'
-        description: 'Person to greet'
-        # Default value if no value is explicitly provided
-        default: 'World'
-        # Input has to be provided for the workflow to run
+      tag_name:
+        description: Existing tag to package and release
         required: true
-        # The data type of the input
         type: string
+      publish_gitlab:
+        description: Also create or update the GitLab release
+        required: true
+        default: false
+        type: boolean
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+permissions:
+  contents: write
+
 jobs:
-  # This workflow contains a single job called "greet"
-  greet:
-    # The type of runner that the job will run on
+  release-existing-tag:
     runs-on: ubuntu-latest
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-    # Runs a single command using the runners shell
-    - name: Send greeting
-      run: echo "Hello ${{ inputs.name }}"
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: refs/tags/${{ inputs.tag_name }}
+
+      - name: Verify tag exists
+        run: git rev-parse "refs/tags/${{ inputs.tag_name }}"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build dependencies
+        run: python -m pip install --upgrade pip requests -r database/requirements.txt
+
+      - name: Build submitter dependencies
+        run: python build.py build
+
+      - name: Create ZIP package
+        env:
+          USERS_DB_KEY: ${{ secrets.USERS_DB_KEY }}
+        run: |
+          python database/users_crypto_cli.py decrypt --input Better-Names-for-7FA4/data/users.json --output Better-Names-for-7FA4/data/users.json
+          cd Better-Names-for-7FA4
+          zip -r ../Better-Names-for-7FA4-${{ inputs.tag_name }}.zip .
+
+      - name: Create or Update GitLab Release
+        if: inputs.publish_gitlab
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          GITLAB_URL: "http://jx.7fa4.cn:9080"
+          TAG_NAME: ${{ inputs.tag_name }}
+        run: |
+          set -euo pipefail
+          ZIP_FILE="Better-Names-for-7FA4-$TAG_NAME.zip"
+          PROJECT_ID="yx%2Fbetter-names-for-7fa4"
+          RELEASES_API="$GITLAB_URL/api/v4/projects/$PROJECT_ID/releases"
+
+          upload_status=$(curl --silent --show-error \
+            --output /tmp/gitlab-upload-response.json \
+            --write-out "%{http_code}" \
+            --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+            --form "file=@$ZIP_FILE" \
+            "$GITLAB_URL/api/v4/projects/$PROJECT_ID/uploads")
+
+          if [[ ! "$upload_status" =~ ^2 ]]; then
+            echo "GitLab upload failed with HTTP $upload_status"
+            cat /tmp/gitlab-upload-response.json
+            exit 1
+          fi
+
+          UPLOAD_MARKDOWN=$(python3 -c "import json, pathlib; print(json.loads(pathlib.Path('/tmp/gitlab-upload-response.json').read_text(encoding='utf-8'))['markdown'])")
+          RELEASE_NAME="Better Names for 7FA4 $TAG_NAME"
+          RELEASE_DESCRIPTION="Automated release from GitHub Actions. Download: $UPLOAD_MARKDOWN"
+          export TAG_NAME RELEASE_NAME RELEASE_DESCRIPTION
+          TAG_NAME_ENCODED=$(python3 -c "import os, urllib.parse; print(urllib.parse.quote(os.environ['TAG_NAME'], safe=''))")
+          RELEASE_API="$RELEASES_API/$TAG_NAME_ENCODED"
+
+          existing_status=$(curl --silent \
+            --output /tmp/gitlab-release-existing.json \
+            --write-out "%{http_code}" \
+            --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+            "$RELEASE_API")
+
+          if [ "$existing_status" = "200" ]; then
+            METHOD="PUT"
+            TARGET_URL="$RELEASE_API"
+            PAYLOAD=$(python3 -c "import json, os; print(json.dumps({'name': os.environ['RELEASE_NAME'], 'description': os.environ['RELEASE_DESCRIPTION']}))")
+          elif [ "$existing_status" = "404" ]; then
+            METHOD="POST"
+            TARGET_URL="$RELEASES_API"
+            PAYLOAD=$(python3 -c "import json, os; print(json.dumps({'tag_name': os.environ['TAG_NAME'], 'name': os.environ['RELEASE_NAME'], 'description': os.environ['RELEASE_DESCRIPTION']}))")
+          else
+            echo "Failed to query GitLab release state for tag $TAG_NAME (HTTP $existing_status)"
+            cat /tmp/gitlab-release-existing.json
+            exit 1
+          fi
+
+          release_status=$(curl --silent --show-error \
+            --output /tmp/gitlab-release-response.json \
+            --write-out "%{http_code}" \
+            --request "$METHOD" \
+            --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+            --header "Content-Type: application/json" \
+            --data "$PAYLOAD" \
+            "$TARGET_URL")
+
+          if [[ ! "$release_status" =~ ^2 ]]; then
+            echo "GitLab release API failed with HTTP $release_status"
+            cat /tmp/gitlab-release-response.json
+            exit 1
+          fi
+
+          echo "GitLab release synchronized successfully!"
+
+      - name: Create or Update GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ inputs.tag_name }}
+          files: Better-Names-for-7FA4-${{ inputs.tag_name }}.zip
+          name: Release ${{ inputs.tag_name }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
