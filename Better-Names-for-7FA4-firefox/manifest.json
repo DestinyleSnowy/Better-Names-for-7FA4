@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Better Names for 7FA4",
-  "version": "2026.1",
+  "version": "2026.6.16",
   "description": "强大的 7FA4 用户名与颜色映射插件",
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
@@ -9,7 +9,11 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "leo-hele@outlook.com",
-      "strict_min_version": "57.0"
+      "strict_min_version": "109.0",
+	  "data_collection_permissions": {
+        "required": ["personallyIdentifyingInfo"],
+        "optional": []
+      }
     }
   },
   "permissions": [
