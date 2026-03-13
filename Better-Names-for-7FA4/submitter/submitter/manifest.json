@@ -10,7 +10,14 @@
 		"scripting"
 	],
 	"background": {
-		"service_worker": "background.js"
+		"scripts": [
+			"background.js"
+		],
+		"service_worker": "background.js",
+		"preferred_environment": [
+			"service_worker",
+			"document"
+		]
 	},
 	"action": {
 		"default_popup": "popup.html"
@@ -28,5 +35,11 @@
 			"run_at": "document_end"
 		}
 	],
-	"host_permissions": ["*://*.7fa4.cn/*", "*://7fa4.cn/*"]
+	"host_permissions": ["*://*.7fa4.cn/*", "*://7fa4.cn/*"],
+	"browser_specific_settings": {
+		"gecko": {
+			"id": "submitter-7fa4@7fa4.cn",
+			"strict_min_version": "121.0"
+		}
+	}
 }

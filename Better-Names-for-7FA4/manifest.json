@@ -28,7 +28,14 @@
     "http://gravatar.loli.net/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "scripts": [
+      "background.js"
+    ],
+    "service_worker": "background.js",
+    "preferred_environment": [
+      "service_worker",
+      "document"
+    ]
   },
   "content_scripts": [
     {
@@ -121,5 +128,11 @@
   },
   "action": {
     "default_popup": "submitter/submitter/popup.html"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "better-names-for-7fa4@7fa4.cn",
+      "strict_min_version": "121.0"
+    }
   }
 }
