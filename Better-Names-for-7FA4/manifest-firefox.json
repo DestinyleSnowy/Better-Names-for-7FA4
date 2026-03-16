@@ -8,9 +8,9 @@
   },
   "browser_specific_settings": {
     "gecko": {
-      "id": "leo-hele@outlook.com",
+      "id": "better-names-for-7fa4@7fa4.cn",
       "strict_min_version": "109.0",
-	  "data_collection_permissions": {
+      "data_collection_permissions": {
         "required": ["personallyIdentifyingInfo"],
         "optional": []
       }
@@ -22,39 +22,39 @@
     "storage",
     "notifications",
     "clipboardWrite",
-    "activeTab",
     "scripting",
+    "tabs",
     "declarativeNetRequest"
   ],
   "host_permissions": [
-    "http://*.7fa4.cn:8888/*",
-    "http://*.7fa4.cn:5283/*",
-    "http://*.7fa4.cn:9080/*",
-    "http://10.210.57.10:8888/*",
-    "http://10.210.57.10:5283/*",
-    "http://211.137.101.118:8888/*",
-    "http://211.137.101.118:5283/*",
-    "http://10.210.57.10:9080/*",
-    "http://211.137.101.118:9080/*",
-    "https://gravatar.loli.net/*",
-    "http://gravatar.loli.net/*"
+    "http://*.7fa4.cn/*",
+    "http://10.210.57.10/*",
+    "http://211.137.101.118/*",
+    "*://gravatar.loli.net/*"
   ],
   "background": {
     "scripts": [
-		"browser-polyfill.min.js",
-		"background.js"
-	]
+      "browser-polyfill.min.js",
+      "background.js"
+    ]
   },
   "web_accessible_resources": [
     {
       "resources": [
-		"browser-polyfill.min.js",
+        "browser-polyfill.min.js",
         "content/jquery.min.js",
         "data/users.json",
         "data/special_users.json",
+        "content/libs/marked.min.js",
+        "content/libs/katex/katex.min.js",
+        "content/libs/katex/auto-render.min.js",
+        "content/render_logic.js",
+        "content/panel/panel.js",
+        "content/panel/panel.css",
         "content/panel/panel.html",
         "content/panel/avatar-blocker.js",
-        "submitter/submitters.json"
+        "submitter/submitters.json",
+        "content/libs/katex/fonts/*"
       ],
       "matches": [
         "<all_urls>"
