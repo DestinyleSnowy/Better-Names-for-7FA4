@@ -2524,3 +2524,10 @@ a[data-bn-quick-skip="1"] i.icon,
 body {
 	overflow-x: auto !important;
 }
+
+.bn-img-lazy {
+  cursor: pointer;
+}
+.bn-img-lazy:after {
+  visibility: visible!important;
+}
