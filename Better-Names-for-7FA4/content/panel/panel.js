@@ -4207,6 +4207,11 @@
         noticeEl.classList.add(nextClass);
     }
     let access_src = new Map();
+    function CanShow(url) {
+        if (url.startsWith("data:")) return true;
+        const Abs = new URL(url, location.href);
+        return access_src.has(Abs.href);
+    }
     function WriteCleanHTML(el, HTML) {
         if (!el) return;
         const dirtyHTML = marked.parse(HTML);
@@ -4223,10 +4228,8 @@
         )
         el.innerHTML = cleanHTML;
         el.querySelectorAll("img").forEach(img => {
-            const Abs = new URL(img.dataset.src, location.href);
-            img.dataset.src = Abs.href;
-            if (access_src.has(Abs.href)) {
-                img.src = Abs.href;
+            if (CanShow(img.dataset.src)) {
+                img.src = img.dataset.src;
                 img.removeAttribute("data-src");
                 return;
             }
@@ -6443,5 +6446,64 @@
             e.target.classList.remove('bn-img-lazy');
             e.target.parentElement.removeAttribute("data-tooltip");
         }
+        if (e.target.classList.contains('bn-file')) {
+            const blob = new Blob([e.target.getAttribute("data-src")]);
+            const fileName = e.target.getAttribute("data-name");
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            a.target = "_blank";
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    });
+    const fileReader = new FileReader();
+    fileReader.onload = () => {
+        const base64 = fileReader.result;
+        if (base64.startsWith('data:image/')){
+            chatInputEl.value += `<div data-tooltip="${fileReader.file.name}"><img src="${base64}"></div>`
+        }else {
+            chatInputEl.value += `<span class="bn-file" data-src="${base64}" data-name="${fileReader.file.name}">${fileReader.file.name}（${fileReader.file.size} B）</span>`;
+        }
+        chatUpdateInputCounter();
+    }
+    fileReader.onerror = () => {
+        console.error('Error reading file:', fileReader.error);
+    }
+    chatInputEl.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        chatInputEl.classList.add('drag-over');
+    });
+    chatInputEl.addEventListener('dragleave', () => {
+        chatInputEl.classList.remove('drag-over');
+    });
+    chatInputEl.addEventListener("drop", (e) => {
+        e.preventDefault();
+        for (const file of e.dataTransfer.files) {
+            console.log("File Drop:", file);
+            fileReader.filename = file.name;
+            fileReader.readAsDataURL(file);
+        }
+    });
+    chatBox.addEventListener('paste', (e) => {
+        const items = e.clipboardData.items;
+        const files = [];
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (item.kind === 'file') {
+                const file = item.getAsFile();
+                if (file) files.push(file);
+            }
+        }
+        if (files.length) {
+            e.preventDefault(); // 阻止默认粘贴文本行为
+            for (const file of files) {
+                console.log("File Paste:", file);
+                fileReader.file = file;
+                fileReader.readAsDataURL(file);
+            }
+        }
+        // 如果没有文件，让浏览器正常粘贴文本
     });
 })();
