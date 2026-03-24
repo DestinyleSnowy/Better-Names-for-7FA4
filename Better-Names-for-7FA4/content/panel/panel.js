@@ -4217,7 +4217,6 @@
             }
         );
         // 输出安全 HTML
-        console.log("clean", cleanHTML);
         cleanHTML = cleanHTML.replaceAll(
             /(<img.*)src="((?:[^"\\]|\\.)*)"(.*>)/g,
             "$1data-src=$2$3"
@@ -4232,8 +4231,12 @@
                 return;
             }
             img.classList.add("bn-img-lazy");
-            img.setAttribute("data-tooltip", `点击加载${Abs.href}`)
             img.src = "/";
+            const showtext = `${img.dataset.src}，\n点击加载`;
+            const container = document.createElement("span");
+            container.dataset.tooltip = showtext;
+            img.parentNode.insertBefore(container, img);
+            container.appendChild(img);
         })
     }
 
@@ -5785,8 +5788,10 @@
                 payload.title = title;
             }
             if (rule.needMute) {
-                const mute = chatToInteger(chatGroupOpMuteEl ? chatGroupOpMuteEl.value : NaN);
-                if (!Number.isFinite(mute) || mute < 0) throw new Error('mute 必须是非负整数时间戳');
+                const time = chatToInteger(chatGroupOpMuteEl ? chatGroupOpMuteEl.value : NaN);
+                if (!Number.isFinite(time) || time < 0) throw new Error('time 必须是非负整数');
+                const mute = time+Math.floor(Date.now()/1000);
+                console.log("mute:", mute);
                 payload.mute = mute;
             }
         } catch (error) {
@@ -6436,6 +6441,7 @@
             e.target.src = e.target.getAttribute("data-src");
             access_src.set(e.target.src, true);
             e.target.classList.remove('bn-img-lazy');
+            e.target.parentElement.removeAttribute("data-tooltip");
         }
-    })
+    });
 })();
