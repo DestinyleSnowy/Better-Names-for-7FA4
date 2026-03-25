@@ -2534,11 +2534,10 @@ body {
 
 .bn-file {
   cursor: pointer;
-  color: #4b2c92;
+  color: #47d48b;
   font-size: 12px;
   line-height: 1.4;
  }
 .bn-file:hover {
   text-decoration: underline;
-  color: #3d237e;
 }

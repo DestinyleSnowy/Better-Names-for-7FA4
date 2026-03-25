@@ -5498,7 +5498,7 @@
         if (!conversation || chatState.loadingOlder) return;
         const oldestSec = chatState.oldestSecByKey.get(conversation.key);
         if (!Number.isFinite(oldestSec)) {
-            chatSetStatus('当前没有更早消息可加载');
+            chatSetStatus('没有更早消息了');
             return;
         }
         const endTimeSec = Math.max(0, Math.floor(oldestSec) - 1);
@@ -6447,9 +6447,8 @@
             e.target.parentElement.removeAttribute("data-tooltip");
         }
         if (e.target.classList.contains('bn-file')) {
-            const blob = new Blob([e.target.getAttribute("data-src")]);
-            const fileName = e.target.getAttribute("data-name");
-            const url = URL.createObjectURL(blob);
+            const fileName = e.target.dataset.name;
+            const url = e.target.dataset.src;
             const a = document.createElement('a');
             a.href = url;
             a.download = fileName;
@@ -6482,11 +6481,11 @@
         e.preventDefault();
         for (const file of e.dataTransfer.files) {
             console.log("File Drop:", file);
-            fileReader.filename = file.name;
+            fileReader.file = file;
             fileReader.readAsDataURL(file);
         }
     });
-    chatBox.addEventListener('paste', (e) => {
+    chatInputEl.addEventListener('paste', (e) => {
         const items = e.clipboardData.items;
         const files = [];
         for (let i = 0; i < items.length; i++) {
