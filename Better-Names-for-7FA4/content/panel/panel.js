@@ -3130,17 +3130,20 @@
         s = s.replace(/^(?:[ \t]*\n)+/, '');
         return s;
     }
-
+    function stripEnding(href){
+        return href.replace(/\/(\?.*)?$/, '');
+    }
     function findProblemActionLink() {
-        const direct = document.querySelector('div.ui.buttons.right.floated > a[href]');
-        if (direct) return direct;
-        for (const g of document.querySelectorAll('div.ui.center.aligned.grid')) {
-            const candBox = g.querySelector('div.ui.buttons.right.floated');
-            if (!candBox) continue;
-            const anchor = candBox.querySelector('a[href]');
-            if (anchor) return anchor;
-        }
-        return null;
+        const links = document.querySelectorAll("a");
+        let response = [];
+        const findHref =
+             stripEnding(location.href) +
+            "/markdown/html";
+        links.forEach(link => {
+            if (stripEnding(link.href) === findHref)
+                response.push(link);
+        })
+        return response.length ? response[0] : null;
     }
 
     function sliceDescriptionSection(markdown) {
