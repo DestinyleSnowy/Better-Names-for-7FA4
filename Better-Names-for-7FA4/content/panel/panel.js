@@ -831,6 +831,7 @@
     const chatGroupOpMuteEl = container.querySelector('#bn-chat-group-op-mute');
     const chatGroupOpRunBtnEl = container.querySelector('#bn-chat-group-op-run-btn');
     const chatGroupOpStatusEl = container.querySelector('#bn-chat-group-op-status');
+    const chatInputPreviewEl = container.querySelector('#bn-chat-preview');
 
     const chatState = {
         initialized: false,
@@ -4206,12 +4207,15 @@
         const nextClass = state === 'error' ? UPDATE_NOTICE_ERROR_CLASS : UPDATE_NOTICE_WARNING_CLASS;
         noticeEl.classList.add(nextClass);
     }
+
     let access_src = new Map();
+
     function CanShow(url) {
         if (url.startsWith("data:")) return true;
         const Abs = new URL(url, location.href);
         return access_src.has(Abs.href);
     }
+
     function WriteCleanHTML(el, HTML) {
         if (!el) return;
         const dirtyHTML = marked.parse(HTML);
@@ -4749,7 +4753,14 @@
             chatInputCounterEl.classList.remove('is-overflow');
         }
     }
-
+    
+    function chatUpdateInput(){
+        chatUpdateInputCounter();
+        chatInputPreviewEl.innerHTML = chatInputEl.value;
+        if (! chatInputPreviewEl.innerHTML.trim())
+            chatInputPreviewEl.innerHTML = "<span style=\"color: #1e2a40; opacity: 0.5; user-select: none; padding: 10px 10px;\">预览</span>";
+    }
+    
     function chatSetControlsDisabled(disabled) {
         if (chatRefreshBtnEl) chatRefreshBtnEl.disabled = !!disabled;
         if (chatTokenBtnEl) chatTokenBtnEl.disabled = !!disabled;
@@ -5370,7 +5381,7 @@
         chatState.conversationByKey = new Map(sortedConversations.map(item => [item.key, item]));
         chatState.lastInfoLoadedAt = Date.now();
         chatUpdateTokenDisplay();
-        chatUpdateInputCounter();
+        chatUpdateInput();
         chatUpdateTriggerUnreadUi();
     }
 
@@ -5534,7 +5545,7 @@
         chatRenderConversationList();
         chatUpdateCurrentConversationHeader();
         chatRenderMessages();
-        chatUpdateInputCounter();
+        chatUpdateInput();
         chatStartAutoRefreshTimer();
         if (changed || forceRefresh) {
             chatRefreshMessages({silent: false, preserveScroll: false});
@@ -5733,7 +5744,7 @@
             chatUpdateTokenDisplay();
 
             chatInputEl.value = '';
-            chatUpdateInputCounter();
+            chatUpdateInput();
             chatSetStatus('发送成功', 'success');
             await chatRefreshMessages({silent: true, preserveScroll: false});
         } catch (error) {
@@ -5793,7 +5804,7 @@
             if (rule.needMute) {
                 const time = chatToInteger(chatGroupOpMuteEl ? chatGroupOpMuteEl.value : NaN);
                 if (!Number.isFinite(time) || time < 0) throw new Error('time 必须是非负整数');
-                const mute = time+Math.floor(Date.now()/1000);
+                const mute = time + Math.floor(Date.now() / 1000);
                 console.log("mute:", mute);
                 payload.mute = mute;
             }
@@ -5885,7 +5896,7 @@
         }
 
         if (chatInputEl) {
-            chatInputEl.addEventListener('input', chatUpdateInputCounter);
+            chatInputEl.addEventListener('input', chatUpdateInput);
             chatInputEl.addEventListener('keydown', (event) => {
                 if (!event) return;
                 if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
@@ -5909,8 +5920,25 @@
                 chatRunGroupOperation();
             });
         }
+        // 选项卡切换事件
+        const tabBtns = document.querySelectorAll('.bn-chat-tab-btn');
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const tab = this.dataset.tab;
+
+                // 移除所有选项卡的激活状态
+                tabBtns.forEach(b => b.classList.remove('bn-chat-tab-active'));
+                document.querySelectorAll('.bn-chat-tab-panel').forEach(panel => {
+                    panel.classList.remove('bn-chat-tab-panel-active');
+                });
+
+                // 激活当前选项卡
+                this.classList.add('bn-chat-tab-active');
+                document.getElementById(`bn-chat-${tab}-tab`).classList.add('bn-chat-tab-panel-active');
+            });
+        });
         chatUpdateGroupOperationFields();
-        chatUpdateInputCounter();
+        chatUpdateInput();
         chatUpdateTokenDisplay();
         chatUpdateTriggerUnreadUi();
         chatRenderConversationList();
@@ -6460,12 +6488,12 @@
     const fileReader = new FileReader();
     fileReader.onload = () => {
         const base64 = fileReader.result;
-        if (base64.startsWith('data:image/')){
+        if (base64.startsWith('data:image/')) {
             chatInputEl.value += `<div data-tooltip="${fileReader.file.name}"><img src="${base64}"></div>`
-        }else {
+        } else {
             chatInputEl.value += `<span class="bn-file" data-src="${base64}" data-name="${fileReader.file.name}">${fileReader.file.name}（${fileReader.file.size} B）</span>`;
         }
-        chatUpdateInputCounter();
+        chatUpdateInput();
     }
     fileReader.onerror = () => {
         console.error('Error reading file:', fileReader.error);
