@@ -1,152 +1,221 @@
-(function() {
-  'use strict';
+(function () {
+    'use strict';
 
-  const hasChromeStorage = !!(typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local);
-  function mirrorToChromeStorage(key, value) {
-    try {
-      if (!hasChromeStorage) return;
-      const obj = {};
-      obj[key] = value;
-      chrome.storage.local.set(obj);
-    } catch (e) {}
-  }
-  function readFromChromeStorage(keys, cb) {
-    if (!hasChromeStorage) { cb({}); return; }
-    try {
-      chrome.storage.local.get(keys, cb);
-    } catch (e) { cb({}); }
-  }
+    const hasChromeStorage = !!(typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local);
 
-  const gmStore = Object.create(null);
-
-  function gmLocalGet(key, defVal) {
-    try {
-      if (!Object.prototype.hasOwnProperty.call(gmStore, key)) return defVal;
-      const value = gmStore[key];
-      return value === undefined ? defVal : value;
-    } catch (e) {
-      return defVal;
-    }
-  }
-  function gmLocalSet(key, value) {
-    try {
-      gmStore[key] = value;
-      mirrorToChromeStorage(key, value);
-    } catch (e) {}
-  }
-
-  const gmReadyPromise = new Promise((resolve) => {
-    try {
-      readFromChromeStorage(null, (all) => {
+    function mirrorToChromeStorage(key, value) {
         try {
-          if (all) {
-            Object.keys(all).forEach(k => {
-              gmStore[k] = all[k];
-            });
-          }
-        } catch (e) {}
-        resolve();
-      });
-    } catch (_) {
-      resolve();
-    }
-  });
-
-  window.__GM_ready = function() { return gmReadyPromise; };
-
-  function GM_addStyle(css) {
-    try {
-      const s = document.createElement('style');
-      s.textContent = css;
-      (document.head || document.documentElement).appendChild(s);
-      return s;
-    } catch (e) { return null; }
-  }
-
-  async function GM_setClipboard(text) {
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(String(text));
-        return;
-      }
-    } catch (e) {}
-    try {
-      const ta = document.createElement('textarea');
-      ta.value = String(text);
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      ta.remove();
-    } catch (e) {}
-  }
-
-  function GM_notification(details) {
-    try {
-      if (typeof details === 'string') details = { text: details };
-      const payload = {
-        title: details.title || 'Notification',
-        message: details.text || details.message || '',
-        iconUrl: details.image || details.icon || undefined
-      };
-      if (chrome && chrome.runtime && chrome.runtime.sendMessage) {
-        chrome.runtime.sendMessage({ type: 'gm_notify', payload });
-      } else if ('Notification' in window) {
-        if (Notification.permission === 'granted') {
-          new Notification(payload.title, { body: payload.message, icon: payload.iconUrl });
-        } else {
-          Notification.requestPermission().then(p => {
-            if (p === 'granted') new Notification(payload.title, { body: payload.message, icon: payload.iconUrl });
-          });
+            if (!hasChromeStorage) return;
+            const obj = {};
+            obj[key] = value;
+            chrome.storage.local.set(obj);
+        } catch (e) {
         }
-      } else {
-        alert(payload.title + "\n\n" + payload.message);
-      }
-    } catch (e) {}
-  }
-
-  function GM_xmlhttpRequest(details) {
-    const requestId = Math.random().toString(36).slice(2);
-    if (!(chrome && chrome.runtime && chrome.runtime.sendMessage)) {
-      const url = details.url;
-      const method = (details.method || 'GET').toUpperCase();
-      const headers = details.headers || {};
-      const body = details.data;
-      fetch(url, { method, headers, body, credentials: (details.anonymous ? 'omit' : 'include') })
-        .then(async resp => {
-          const text = await resp.text();
-          details.onload && details.onload({ responseText: text, status: resp.status, statusText: resp.statusText, responseHeaders: Array.from(resp.headers.entries()).map(([k,v])=>k+': '+v).join('\r\n') });
-        })
-        .catch(err => {
-          details.onerror && details.onerror({ error: String(err) });
-        });
-      return;
     }
-    chrome.runtime.sendMessage({ type: 'gm_xhr', requestId, details }, (resp) => {
-      if (!resp) return;
-      if (resp.ok) {
-        details.onload && details.onload({
-          responseText: resp.text,
-          status: resp.status,
-          statusText: resp.statusText,
-          responseHeaders: resp.headersRaw
-        });
-      } else {
-        details.onerror && details.onerror({ error: resp.error || 'GM_xmlhttpRequest failed' });
-      }
+
+    function readFromChromeStorage(keys, cb) {
+        if (!hasChromeStorage) {
+            cb({});
+            return;
+        }
+        try {
+            chrome.storage.local.get(keys, cb);
+        } catch (e) {
+            cb({});
+        }
+    }
+
+    const gmStore = Object.create(null);
+
+    function gmLocalGet(key, defVal) {
+        try {
+            if (!Object.prototype.hasOwnProperty.call(gmStore, key)) return defVal;
+            const value = gmStore[key];
+            return value === undefined ? defVal : value;
+        } catch (e) {
+            return defVal;
+        }
+    }
+
+    function gmLocalSet(key, value) {
+        try {
+            gmStore[key] = value;
+            mirrorToChromeStorage(key, value);
+        } catch (e) {
+        }
+    }
+
+    const gmReadyPromise = new Promise((resolve) => {
+        try {
+            readFromChromeStorage(null, (all) => {
+                try {
+                    if (all) {
+                        Object.keys(all).forEach(k => {
+                            gmStore[k] = all[k];
+                        });
+                    }
+                } catch (e) {
+                }
+                resolve();
+            });
+        } catch (_) {
+            resolve();
+        }
     });
-  }
 
-  window.GM_addStyle = GM_addStyle;
-  window.GM_setClipboard = GM_setClipboard;
-  window.GM_notification = GM_notification;
-  window.GM_xmlhttpRequest = GM_xmlhttpRequest;
-  window.GM_getValue = function(key, defVal) { return gmLocalGet(key, defVal); };
-  window.GM_setValue = function(key, val) { return gmLocalSet(key, val); };
+    window.__GM_ready = function () {
+        return gmReadyPromise;
+    };
 
-  window.GM = window.GM || {};
-  window.GM.addStyle = GM_addStyle;
-  window.GM.setClipboard = GM_setClipboard;
-  window.GM.xmlHttpRequest = GM_xmlhttpRequest;
-  window.GM.getValue = async (k, d) => gmLocalGet(k, d);
-  window.GM.setValue = async (k, v) => gmLocalSet(k, v);
+    function GM_addStyle(css) {
+        try {
+            const s = document.createElement('style');
+            s.textContent = css;
+            (document.head || document.documentElement).appendChild(s);
+            return s;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    async function GM_setClipboard(text) {
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(String(text));
+                return;
+            }
+        } catch (e) {
+        }
+        try {
+            const ta = document.createElement('textarea');
+            ta.value = String(text);
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            ta.remove();
+        } catch (e) {
+        }
+    }
+
+    function GM_notification(details) {
+        try {
+            if (typeof details === 'string') details = {text: details};
+            const payload = {
+                title: details.title || 'Notification',
+                message: details.text || details.message || '',
+                iconUrl: details.image || details.icon || undefined
+            };
+            if (chrome && chrome.runtime && chrome.runtime.sendMessage) {
+                chrome.runtime.sendMessage({type: 'gm_notify', payload});
+            } else if ('Notification' in window) {
+                if (Notification.permission === 'granted') {
+                    new Notification(payload.title, {body: payload.message, icon: payload.iconUrl});
+                } else {
+                    Notification.requestPermission().then(p => {
+                        if (p === 'granted') new Notification(payload.title, {
+                            body: payload.message,
+                            icon: payload.iconUrl
+                        });
+                    });
+                }
+            } else {
+                alert(payload.title + "\n\n" + payload.message);
+            }
+        } catch (e) {
+        }
+    }
+
+    function GM_xmlhttpRequest(details) {
+        const requestId = Math.random().toString(36).slice(2);
+        if (!(chrome && chrome.runtime && chrome.runtime.sendMessage)) {
+            const url = details.url;
+            const method = (details.method || 'GET').toUpperCase();
+            const headers = details.headers || {};
+            const body = details.data;
+            fetch(url, {method, headers, body, credentials: (details.anonymous ? 'omit' : 'include')})
+                .then(async resp => {
+                    const text = await resp.text();
+                    details.onload && details.onload({
+                        responseText: text,
+                        status: resp.status,
+                        statusText: resp.statusText,
+                        responseHeaders: Array.from(resp.headers.entries()).map(([k, v]) => k + ': ' + v).join('\r\n')
+                    });
+                })
+                .catch(err => {
+                    details.onerror && details.onerror({error: String(err)});
+                });
+            return;
+        }
+        chrome.runtime.sendMessage({type: 'gm_xhr', requestId, details}, (resp) => {
+            if (!resp) return;
+            if (resp.ok) {
+                details.onload && details.onload({
+                    responseText: resp.text,
+                    status: resp.status,
+                    statusText: resp.statusText,
+                    responseHeaders: resp.headersRaw
+                });
+            } else {
+                details.onerror && details.onerror({error: resp.error || 'GM_xmlhttpRequest failed'});
+            }
+        });
+    }
+
+    function CanShow(url) {
+        if (url.startsWith("data:")) return true;
+        const Abs = new URL(url, location.href);
+        return access_src.has(Abs.href);
+    }
+
+    function WriteCleanHTML(el, HTML) {
+        if (!el) return;
+        const dirtyHTML = marked.parse(HTML);
+        let cleanHTML = DOMPurify.sanitize(
+            dirtyHTML, {
+                FORBID_TAGS: ['style', 'link', 'aframe', 'script', 'frame'],
+                FORBID_ATTR: ["style", "onclick"]
+            }
+        );
+        // 输出安全 HTML
+        cleanHTML = cleanHTML.replaceAll(
+            /(<img.*)src="((?:[^"\\]|\\.)*)"(.*>)/g,
+            "$1data-src=$2$3"
+        )
+        el.innerHTML = cleanHTML;
+        el.querySelectorAll("img").forEach(img => {
+            if (CanShow(img.dataset.src)) {
+                img.src = img.dataset.src;
+                img.removeAttribute("data-src");
+                return;
+            }
+            img.classList.add("bn-img-lazy");
+            img.src = "/";
+            const showtext = `${img.dataset.src}，\n点击加载`;
+            const container = document.createElement("span");
+            container.dataset.tooltip = showtext;
+            img.parentNode.insertBefore(container, img);
+            container.appendChild(img);
+        })
+    }
+
+    window.CanShow = CanShow;
+    window.WriteCleanHTML = WriteCleanHTML;
+    window.GM_addStyle = GM_addStyle;
+    window.GM_setClipboard = GM_setClipboard;
+    window.GM_notification = GM_notification;
+    window.GM_xmlhttpRequest = GM_xmlhttpRequest;
+    window.GM_getValue = function (key, defVal) {
+        return gmLocalGet(key, defVal);
+    };
+    window.GM_setValue = function (key, val) {
+        return gmLocalSet(key, val);
+    };
+
+    window.GM = window.GM || {};
+    window.GM.addStyle = GM_addStyle;
+    window.GM.setClipboard = GM_setClipboard;
+    window.GM.xmlHttpRequest = GM_xmlhttpRequest;
+    window.GM.getValue = async (k, d) => gmLocalGet(k, d);
+    window.GM.setValue = async (k, v) => gmLocalSet(k, v);
 })();

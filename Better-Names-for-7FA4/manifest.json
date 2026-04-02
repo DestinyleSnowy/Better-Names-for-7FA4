@@ -28,14 +28,7 @@
     "http://gravatar.loli.net/*"
   ],
   "background": {
-    "scripts": [
-      "background.js"
-    ],
-    "service_worker": "background.js",
-    "preferred_environment": [
-      "service_worker",
-      "document"
-    ]
+    "page": "background.html"
   },
   "content_scripts": [
     {
@@ -96,9 +89,9 @@
         "content/libs/marked.min.js",
         "content/libs/katex/katex.min.js",
         "content/libs/katex/auto-render.min.js",
-        "content/render_logic.js" 
+        "content/render_logic.js"
       ],
-      "run_at": "document_idle" 
+      "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [

@@ -4213,43 +4213,6 @@
 
     let access_src = new Map();
 
-    function CanShow(url) {
-        if (url.startsWith("data:")) return true;
-        const Abs = new URL(url, location.href);
-        return access_src.has(Abs.href);
-    }
-
-    function WriteCleanHTML(el, HTML) {
-        if (!el) return;
-        const dirtyHTML = marked.parse(HTML);
-        let cleanHTML = DOMPurify.sanitize(
-            dirtyHTML, {
-                FORBID_TAGS: ['style', 'link', 'aframe', 'script', 'frame'],
-                FORBID_ATTR: ["style", "onclick"]
-            }
-        );
-        // 输出安全 HTML
-        cleanHTML = cleanHTML.replaceAll(
-            /(<img.*)src="((?:[^"\\]|\\.)*)"(.*>)/g,
-            "$1data-src=$2$3"
-        )
-        el.innerHTML = cleanHTML;
-        el.querySelectorAll("img").forEach(img => {
-            if (CanShow(img.dataset.src)) {
-                img.src = img.dataset.src;
-                img.removeAttribute("data-src");
-                return;
-            }
-            img.classList.add("bn-img-lazy");
-            img.src = "/";
-            const showtext = `${img.dataset.src}，\n点击加载`;
-            const container = document.createElement("span");
-            container.dataset.tooltip = showtext;
-            img.parentNode.insertBefore(container, img);
-            container.appendChild(img);
-        })
-    }
-
     function chatToInteger(value) {
         const num = Number(value);
         if (!Number.isFinite(num)) return NaN;
