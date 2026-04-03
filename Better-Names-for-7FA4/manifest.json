@@ -1,20 +1,19 @@
 {
   "manifest_version": 3,
   "name": "Better Names for 7FA4",
-  "version": "2026.6.16",
+  "version": "2026.06.16",
   "description": "强大的 7FA4 用户名与颜色映射插件",
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+    "extension_pages": "script-src 'self'; object-src 'self'"
   },
   "permissions": [
-    "webRequest",
     "storage",
     "notifications",
     "clipboardWrite",
     "activeTab",
     "scripting",
-    "tabs",
-    "declarativeNetRequest"
+    "declarativeNetRequest",
+    "webRequest"
   ],
   "host_permissions": [
     "http://*.7fa4.cn:8888/*",
@@ -30,24 +29,118 @@
     "http://gravatar.loli.net/*"
   ],
   "background": {
-    "service-worker": "background.js"
+    "scripts": [
+      "background.js"
+    ],
+    "service_worker": "background.js",
+    "preferred_environment": [
+      "service_worker",
+      "document"
+    ]
   },
-  "web_accessible_resources": [
+  "content_scripts": [
     {
-      "resources": [
-		"browser-polyfill.min.js",
-        "content/jquery.min.js",
-        "data/users.json",
-        "data/special_users.json",
+      "matches": [
+        "http://*.7fa4.cn:8888/*",
+        "http://*.7fa4.cn:5283/*",
+        "http://10.210.57.10:8888/*",
+        "http://10.210.57.10:5283/*",
+        "http://211.137.101.118:8888/*",
+        "http://211.137.101.118:5283/*"
+      ],
+      "exclude_matches": [
+        "http://*.7fa4.cn:9080/*",
+        "http://10.210.57.10:9080/*",
+        "http://211.137.101.118:9080/*"
+      ],
+      "css": [
+        "content/panel/panel.css",
+        "content/libs/katex/katex.min.css"
+      ],
+      "js": [
         "content/libs/marked.min.js",
         "content/libs/katex/katex.min.js",
         "content/libs/katex/auto-render.min.js",
-        "content/render_logic.js",
+        "content/libs/purify.min.js",
+        "content/gm-shim.js",
         "content/panel/panel.js",
-        "content/panel/panel.css",
+        "content/main.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "http://in.7fa4.cn:8888/user_plans/*",
+        "http://in.7fa4.cn:5283/user_plans/*",
+        "http://jx.7fa4.cn:8888/user_plans/*",
+        "http://jx.7fa4.cn:5283/user_plans/*",
+        "http://10.210.57.10:8888/user_plans/*",
+        "http://10.210.57.10:5283/user_plans/*",
+        "http://211.137.101.118:8888/user_plans/*",
+        "http://211.137.101.118:5283/user_plans/*",
+        "http://in.7fa4.cn:8888/review/user_tags/html?tag_id=*",
+        "http://in.7fa4.cn:5283/review/user_tags/html?tag_id=*",
+        "http://jx.7fa4.cn:8888/review/user_tags/html?tag_id=*",
+        "http://jx.7fa4.cn:5283/review/user_tags/html?tag_id=*",
+        "http://10.210.57.10:8888/review/user_tags/html?tag_id=*",
+        "http://10.210.57.10:5283/review/user_tags/html?tag_id=*",
+        "http://211.137.101.118:8888/review/user_tags/html?tag_id=*",
+        "http://211.137.101.118:5283/review/user_tags/html?tag_id=*"
+      ],
+      "exclude_matches": [
+        "http://in.7fa4.cn:9080/*",
+        "http://jx.7fa4.cn:9080/*",
+        "http://10.210.57.10:9080/*",
+        "http://211.137.101.118:9080/*"
+      ],
+      "css": [
+        "content/libs/katex/katex.min.css"
+      ],
+      "js": [
+        "content/libs/marked.min.js",
+        "content/libs/katex/katex.min.js",
+        "content/libs/katex/auto-render.min.js",
+        "content/render_logic.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "http://*.7fa4.cn:8888/user/*",
+        "http://*.7fa4.cn:5283/user/*",
+        "http://10.210.57.10:8888/user/*",
+        "http://10.210.57.10:5283/user/*",
+        "http://211.137.101.118:8888/user/*"
+      ],
+      "css": [
+        "content/libs/katex/katex.min.css"
+      ],
+      "js": [
+        "content/libs/marked.min.js",
+        "content/libs/katex/katex.min.js",
+        "content/libs/katex/auto-render.min.js",
+        "content/libs/purify.min.js",
+        "content/gm-shim.js",
+        "content/intercept_information.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "content/jquery.min.js",
+        "data/users.json",
+        "data/special_users.json",
         "content/panel/panel.html",
-        "content/panel/avatar-blocker.js",
-        "submitter/submitters.json",
+        "content/panel/avatar-blocker.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    },
+    {
+      "resources": [
         "content/libs/katex/fonts/*"
       ],
       "matches": [
@@ -62,5 +155,11 @@
   },
   "action": {
     "default_popup": "submitter/submitter/popup.html"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "better-names-for-7fa4@7fa4.cn",
+      "strict_min_version": "121.0"
+    }
   }
 }
