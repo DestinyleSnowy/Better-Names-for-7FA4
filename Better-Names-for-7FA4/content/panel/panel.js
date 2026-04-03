@@ -6452,21 +6452,63 @@
             URL.revokeObjectURL(url);
         }
     });
-    const fileReader = new FileReader();
-    fileReader.onload = () => {
-        const base64 = fileReader.result;
-        if (base64.startsWith('data:image/')) {
-            chatInputEl.value += `<div data-tooltip="${fileReader.file.name}"><img src="${base64}"></div>`
-        } else {
-            chatInputEl.value += `<span class="bn-file" data-src="${base64}" data-name="${fileReader.file.name}">${fileReader.file.name}（${fileReader.file.size} B）</span>`;
-        }
-        chatUpdateInput();
+    function uploadFile(file) {
+        const fileReader = new FileReader();
+        fileReader.onload = () => {
+            const base64 = fileReader.result;
+            let insertHtml = '';
+            if (base64.startsWith('data:image/')) {
+                insertHtml = `<div data-tooltip="${file.name}"><img src="${base64}"></div>`;
+            } else {
+                insertHtml = `<span class="bn-file" data-src="${base64}" data-name="${file.name}">${file.name}（${file.size} B）</span>`;
+            }
+
+            const el = chatInputEl;
+            // 保存当前滚动位置
+            const scrollTop = el.scrollTop;
+            const start = el.selectionStart ?? el.value.length;
+            const end = el.selectionEnd ?? el.value.length;
+            const oldValue = el.value;
+
+            // 在光标位置插入
+            const newValue = oldValue.substring(0, start) + insertHtml + oldValue.substring(end);
+            el.value = newValue;
+
+            // 恢复滚动位置，并将光标置于插入内容的末尾
+            el.scrollTop = scrollTop;
+            const newCursorPos = start + insertHtml.length;
+            el.setSelectionRange(newCursorPos, newCursorPos);
+
+            chatUpdateInput();
+        };
+        fileReader.onerror = () => {
+            console.error('Error reading file:', file, fileReader.error);
+        };
+        fileReader.readAsDataURL(file);
+        console.log("Added", file);
     }
-    fileReader.onerror = () => {
-        console.error('Error reading file:', fileReader.error);
+    function checkCursorToMouse(e){
+        // 强制获得焦点，以便设置光标位置
+        chatInputEl.focus();
+
+        // 根据鼠标坐标计算光标位置
+        if (document.caretPositionFromPoint) {
+            const caretPos = document.caretPositionFromPoint(e.clientX, e.clientY);
+            if (caretPos && caretPos.offsetNode === chatInputEl) {
+                const pos = caretPos.offset;
+                chatInputEl.setSelectionRange(pos, pos);
+            }
+        } else if (document.caretRangeFromPoint) {
+            const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+            if (range && range.startContainer === chatInputEl) {
+                const pos = range.startOffset;
+                chatInputEl.setSelectionRange(pos, pos);
+            }
+        }
     }
     chatInputEl.addEventListener('dragover', (e) => {
         e.preventDefault();
+        checkCursorToMouse(e);
         chatInputEl.classList.add('drag-over');
     });
     chatInputEl.addEventListener('dragleave', () => {
@@ -6474,11 +6516,10 @@
     });
     chatInputEl.addEventListener("drop", (e) => {
         e.preventDefault();
-        for (const file of e.dataTransfer.files) {
-            console.log("File Drop:", file);
-            fileReader.file = file;
-            fileReader.readAsDataURL(file);
-        }
+        checkCursorToMouse(e);
+        for (const file of e.dataTransfer.files)
+            uploadFile(file);
+        chatInputEl.classList.remove('drag-over');
     });
     chatInputEl.addEventListener('paste', (e) => {
         const items = e.clipboardData.items;
@@ -6493,9 +6534,7 @@
         if (files.length) {
             e.preventDefault(); // 阻止默认粘贴文本行为
             for (const file of files) {
-                console.log("File Paste:", file);
-                fileReader.file = file;
-                fileReader.readAsDataURL(file);
+                uploadFile(file);
             }
         }
         // 如果没有文件，让浏览器正常粘贴文本
