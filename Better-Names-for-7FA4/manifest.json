@@ -56,6 +56,8 @@
         "content/panel/panel.css"
       ],
       "js": [
+        "content/libs/marked.min.js",
+        "content/libs/purify.min.js",
         "content/gm-shim.js",
         "content/panel/panel.js",
         "content/main.js"
