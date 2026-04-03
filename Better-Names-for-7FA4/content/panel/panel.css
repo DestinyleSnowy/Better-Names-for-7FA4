@@ -203,7 +203,6 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    overflow-x: hidden;
     transform: scale(.95) translateY(10px);
     transform-origin: bottom right;
     opacity: 0;
@@ -2455,6 +2454,14 @@
     line-height: 1.4;
     background: var(--bn-bg);
     color: var(--bn-text);
+}
+
+/* 聊天输入框拖拽悬停效果 */
+#bn-chat-input.drag-over {
+    border: 2px dashed var(--bn-theme-color, #007bff) !important;
+    background-color: rgba(0, 123, 255, 0.05) !important;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2) inset !important;
+    transition: all 0.2s ease;
 }
 
 #bn-chat-preview {

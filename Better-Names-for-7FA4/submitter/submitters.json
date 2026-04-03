@@ -11,6 +11,27 @@
         "target": "submitter",
         "move": []
       }
+    },
+    {
+      "id": "rsubmitter",
+      "name": "rSubmitter",
+      "popup": "submitter/rsubmitter-7fa4/popup.html",
+      "description": "Rust 开发的 7fa4 提交器 (by <a href=\"https://github.com/fltLi\">@fltLi</a>)",
+      "package": {
+        "type": "release",
+        "repo": "https://github.com/fltLi/rsubmitter-7fa4",
+        "target": "rsubmitter-7fa4",
+        "move": [
+          {
+            "from": "rsubmitter-7fa4",
+            "to": "submitter/rsubmitter-7fa4"
+          },
+          {
+            "from": "wasm",
+            "to": "wasm"
+          }
+        ]
+      }
     }
   ],
   "default": "origin"

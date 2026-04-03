@@ -8,3 +8,4 @@ Thumbs.db
 *.decrypted.json
 __pycache__/
 *.pyc
+.idea/
