@@ -168,21 +168,41 @@
         return access_src.has(Abs.href);
     }
 
-    function WriteCleanHTML(el, HTML) {
+    function RenderMarkdown(el, md){
+        el.innerHTML = md;
+        renderMathInElement(el, {
+            delimiters: [
+                {left: '$$', right: '$$', display: true},   // 块级公式
+                {left: '$', right: '$', display: false},    // 行内公式
+                {left: '\\(', right: '\\)', display: false},
+                {left: '\\[', right: '\\]', display: true}
+            ],
+            throwOnError: false
+        });
+        el.innerHTML = marked.parse(
+            el.innerHTML,
+            {html: true}
+        );
+    }
+
+    function WriteCleanHTML(el, dirtyHTML) {
         if (!el) return;
-        const dirtyHTML = marked.parse(HTML);
         let cleanHTML = DOMPurify.sanitize(
             dirtyHTML, {
                 FORBID_TAGS: ['style', 'link', 'aframe', 'script', 'frame'],
                 FORBID_ATTR: ["style", "onclick"]
             }
         );
-        // 输出安全 HTML
         cleanHTML = cleanHTML.replaceAll(
-            /(<img.*)src="((?:[^"\\]|\\.)*)"(.*>)/g,
-            "$1data-src=$2$3"
+            /(<img.*)src=(.*>)/g,
+            "$1data-src=$2"
         )
-        el.innerHTML = cleanHTML;
+        cleanHTML = cleanHTML.replaceAll(
+            /![(.*)](.*)/g,
+            `<img alt="$1" data-src="$2">`
+        )
+        RenderMarkdown(el, cleanHTML);
+        // 输出安全 HTML
         el.querySelectorAll("img").forEach(img => {
             if (CanShow(img.dataset.src)) {
                 img.src = img.dataset.src;
@@ -199,6 +219,7 @@
         })
     }
 
+    window.RenderMarkdown = RenderMarkdown;
     window.CanShow = CanShow;
     window.WriteCleanHTML = WriteCleanHTML;
     window.GM_addStyle = GM_addStyle;

@@ -4212,6 +4212,7 @@
     }
 
     let access_src = new Map();
+    window.access_src = access_src;
 
     function chatToInteger(value) {
         const num = Number(value);
@@ -4722,7 +4723,7 @@
     
     function chatUpdateInput(){
         chatUpdateInputCounter();
-        chatInputPreviewEl.innerHTML = chatInputEl.value;
+        RenderMarkdown(chatInputPreviewEl, chatInputEl.value);
         if (! chatInputPreviewEl.innerHTML.trim())
             chatInputPreviewEl.innerHTML = "<span style=\"color: #1e2a40; opacity: 0.5; user-select: none; padding: 10px 10px;\">预览</span>";
     }

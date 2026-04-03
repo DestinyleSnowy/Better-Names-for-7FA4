@@ -42,12 +42,6 @@ style.textContent = katexFontFaces.map(([family, file, weight = 'normal', styleT
 `).join('\n');
 document.head.appendChild(style);
 
-// 同时确保加载原始 CSS
-const link = document.createElement('link');
-link.rel = 'stylesheet';
-link.href = chrome.runtime.getURL('content/libs/katex/katex.min.css');
-document.head.appendChild(link);
-
 const targetSelector = 'pre';
 
 const MATH_DELIMITERS = [

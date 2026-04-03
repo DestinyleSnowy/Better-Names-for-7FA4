@@ -12,7 +12,8 @@
     "clipboardWrite",
     "activeTab",
     "scripting",
-    "declarativeNetRequest"
+    "declarativeNetRequest",
+    "webRequest"
   ],
   "host_permissions": [
     "http://*.7fa4.cn:8888/*",
@@ -28,7 +29,14 @@
     "http://gravatar.loli.net/*"
   ],
   "background": {
-    "page": "background.html"
+    "scripts": [
+      "background.js"
+    ],
+    "service_worker": "background.js",
+    "preferred_environment": [
+      "service_worker",
+      "document"
+    ]
   },
   "content_scripts": [
     {
@@ -46,10 +54,13 @@
         "http://211.137.101.118:9080/*"
       ],
       "css": [
-        "content/panel/panel.css"
+        "content/panel/panel.css",
+        "content/libs/katex/katex.min.css"
       ],
       "js": [
         "content/libs/marked.min.js",
+        "content/libs/katex/katex.min.js",
+        "content/libs/katex/auto-render.min.js",
         "content/libs/purify.min.js",
         "content/gm-shim.js",
         "content/panel/panel.js",
@@ -92,6 +103,27 @@
         "content/render_logic.js"
       ],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "http://*.7fa4.cn:8888/user/*",
+        "http://*.7fa4.cn:5283/user/*",
+        "http://10.210.57.10:8888/user/*",
+        "http://10.210.57.10:5283/user/*",
+        "http://211.137.101.118:8888/user/*"
+      ],
+      "css": [
+        "content/libs/katex/katex.min.css"
+      ],
+      "js": [
+        "content/libs/marked.min.js",
+        "content/libs/katex/katex.min.js",
+        "content/libs/katex/auto-render.min.js",
+        "content/libs/purify.min.js",
+        "content/gm-shim.js",
+        "content/intercept_information.js"
+      ],
+      "run_at": "document_start"
     }
   ],
   "web_accessible_resources": [

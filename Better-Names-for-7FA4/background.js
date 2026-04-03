@@ -1726,27 +1726,3 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
         console.error('show-all tab onUpdated handler error', e);
     }
 });
-
-chrome.webRequest.onBeforeRequest.addListener((request, sender, sendResponse) => {
-    async (details) => {
-        if (details.url.includes("/user/")) {
-            try {
-                const response = await fetch(details.url);
-                let HTML = await response.text();
-                HTML = getCleanUserHTML(HTML);
-                return {
-                    redirectUrl: `data:text/html,${encodeURIComponent(HTML)}`
-                }
-            } catch (e){
-                console.error("Error Intercepting User's Information", e);
-            }
-        }
-    }
-})
-function getCleanUserHTML(HTML) {
-    const domParser = new DOMParser();
-    const doc = domParser.parseFromString(HTML, 'text/html');
-    const informationdiv = doc.querySelectorAll(".ui.bottom.attached.segment")[7];
-    WriteCleanHTML(informationdiv, informationdiv.innerHTML);
-    return doc.documentElement.outerHTML;
-}
