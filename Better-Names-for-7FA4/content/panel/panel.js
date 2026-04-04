@@ -147,7 +147,6 @@
     const maxTitleUnits = (storedTitleUnits === 'none') ? Infinity : parseInt(storedTitleUnits, 10);
     const maxUserUnits = (storedUserUnits === 'none') ? Infinity : parseInt(storedUserUnits, 10);
     let hideAvatar = readConfigValue('hideAvatar');
-    const AVATAR_PLACEHOLDER_SRC = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
     const enableCopy = readConfigValue('enableCopy');
     const enableDescCopy = readConfigValue('enableDescCopy');
     const hideOrig = readConfigValue('hideOrig');
@@ -185,8 +184,7 @@
     const enableMergeAssistantSetting = readConfigValue('rankingMerge.enabled') !== false;
     const enableVjLink = readConfigValue('enableVjLink');
     const hideDoneSkip = readConfigValue('hideDoneSkip');
-    let rawQuickSkip;
-    let quickSkipMigrated = false;
+    let rawQuickSkip, quickSkipMigrated;
     try {
         rawQuickSkip = readConfigValue('enableQuickSkip');
     } catch (err) {
@@ -561,7 +559,7 @@
             if (!isSupportedHostname(host)) return null;
             if (RENEW_SUFFIX_RE.test(url.pathname)) return null;
             const match = url.pathname.match(RENEW_PATH_RE);
-            if (!match || match[1] % 100 == 0) return null;
+            if (!match || match[1] % 100 === 0) return null;
             url.pathname = `/problems/tag/${match[1]}/renew`;
             return url.toString();
         } catch (err) {
@@ -1872,8 +1870,7 @@
             hexInputs[k].oninput = () => {
                 const v = hexInputs[k].value.trim();
                 if (/^#?[0-9a-fA-F]{6}$/.test(v)) {
-                    const val = v.startsWith('#') ? v : '#' + v;
-                    colorPickers[k].value = val;
+                    colorPickers[k].value = v.startsWith('#') ? v : '#' + v;
                 }
                 checkChanged();
             };
@@ -2420,7 +2417,7 @@
             (document.getElementById('bn-use-custom-color').checked !== originalConfig.useCustomColors) ||
             ((document.getElementById('bn-width-mode')?.value ?? originalConfig.widthMode) !== originalConfig.widthMode) ||
             (currentBgEnabled !== originalConfig.bgEnabled) ||
-            bgSourceChanged || (currentBgfillway != originalConfig.bgfillway) ||
+            bgSourceChanged || (currentBgfillway !== originalConfig.bgfillway) ||
             (currentBgOpacity !== originalConfig.bgOpacity) ||
             (clampBlur(currentBgBlur) !== clampBlur(originalConfig.bgBlur)) ||
             (currentBtEnabled !== originalConfig.btEnabled) ||
@@ -2955,15 +2952,6 @@
         return 4;
     }
 
-    function escapeHtml(text) {
-        return text
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-
     function truncateByUnits(str, maxU) {
         if (!isFinite(maxU)) return str;
         let used = 0, out = '';
@@ -3324,7 +3312,7 @@
 
             const separator = tooltip.includes('：') ? '：' : ':';
             const parts = tooltip.split(separator);
-            if (parts.length != 2) {
+            if (parts.length !== 2) {
                 return null;
             }
 
@@ -3371,7 +3359,7 @@
         vj.href = vjUrl;
         vj.target = '_blank';
         vj.rel = 'noopener';
-        if (result.oj != 'vj')
+        if (result.oj !== 'vj')
             vj.setAttribute('data-tooltip', `vj-${result.oj}-${lower}`);
         else
             vj.setAttribute('data-tooltip', `${result.oj}-${lower}`);
@@ -3449,7 +3437,6 @@
                     });
 
                     requestAnimationFrame(() => menu.classList.add('bn-show'));
-                    return;
                 }
             }
             // Not a user link -> fall through to native menu
@@ -3463,7 +3450,7 @@
         if (!normalized) return '';
         const fullIdx = normalized.indexOf('（');
         const halfIdx = normalized.indexOf('(');
-        let firstParenIdx = -1;
+        let firstParenIdx;
         if (fullIdx >= 0 && halfIdx >= 0) {
             firstParenIdx = Math.min(fullIdx, halfIdx);
         } else {
@@ -3553,7 +3540,7 @@
         if (!t) return false;
         const raw = typeof rawHref === 'string' ? rawHref.trim() : '';
         if (raw) {
-            let decoded = '';
+            let decoded;
             try {
                 decoded = decodeURIComponent(raw);
             } catch (_) {
@@ -3571,7 +3558,7 @@
 
     function isBareUserProfileHref(rawHref, uid) {
         if (!rawHref) return false;
-        let pathname = '';
+        let pathname;
         try {
             const url = new URL(rawHref, location.href);
             pathname = url.pathname || '';
@@ -3952,8 +3939,7 @@
             }
             if (hasMyTemplates) return true;
         }
-        if (table.querySelector('tbody#announces')) return true;
-        return false;
+        return !!(table.querySelector('tbody#announces'));
     }
 
     function ensureQuickSkipCellAt(tr, insertIndex) {
@@ -5463,6 +5449,7 @@
             });
             chatRenderMessages({preserveScroll, forceScrollBottom: !silent});
             if (!silent) chatSetStatus(`消息已更新（${merged.length} 条）`, 'success');
+            chatLoadOlderMessages();
         } catch (error) {
             if (seq !== chatState.requestSeq) return;
             chatSetStatus(`刷新消息失败：${error && error.message ? error.message : '未知错误'}`, 'error');
@@ -5490,7 +5477,7 @@
                 chatSetStatus('没有更早消息了');
                 return;
             }
-            const {merged} = chatRememberConversationMessages(conversation, olderMessages, {
+            chatRememberConversationMessages(conversation, olderMessages, {
                 trackUnread: false,
                 rerenderList: false,
             });
@@ -6321,7 +6308,6 @@
                 if (parsed) return parsed;
             } catch (error) {
                 lastError = error;
-                continue;
             }
         }
         if (lastError) throw lastError;
@@ -6372,9 +6358,7 @@
     applyHideDoneSkip(hideDoneSkip);
     applyTemplateBulkAddButton(enableTemplateBulkAdd);
     scheduleTemplateBulkButton(enableTemplateBulkAdd);
-    ;
 
-    let submittersConfig = null;
 
     // 批处理观察器（rAF 合批）
     let moQueue = new Set();
@@ -6456,9 +6440,9 @@
         const fileReader = new FileReader();
         fileReader.onload = () => {
             const base64 = fileReader.result;
-            let insertHtml = '';
+            let insertHtml;
             if (base64.startsWith('data:image/')) {
-                insertHtml = `<div data-tooltip="${file.name}"><img src="${base64}"></div>`;
+                insertHtml = `<div data-tooltip="${file.name}"><img src="${base64}" alt="${file.name}"></div>`;
             } else {
                 insertHtml = `<span class="bn-file" data-src="${base64}" data-name="${file.name}">${file.name}（${file.size} B）</span>`;
             }
@@ -6471,8 +6455,7 @@
             const oldValue = el.value;
 
             // 在光标位置插入
-            const newValue = oldValue.substring(0, start) + insertHtml + oldValue.substring(end);
-            el.value = newValue;
+            el.value = oldValue.substring(0, start) + insertHtml + oldValue.substring(end);
 
             // 恢复滚动位置，并将光标置于插入内容的末尾
             el.scrollTop = scrollTop;
