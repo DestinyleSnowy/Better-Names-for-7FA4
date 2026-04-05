@@ -3118,14 +3118,16 @@
         s = s.replace(/^(?:[ \t]*\n)+/, '');
         return s;
     }
-    function stripEnding(href){
+
+    function stripEnding(href) {
         return href.replace(/\/(\?.*)?$/, '');
     }
+
     function findProblemActionLink() {
         const links = document.querySelectorAll("a");
         let response = [];
         const findHref =
-             stripEnding(location.href) +
+            stripEnding(location.href) +
             "/markdown/html";
         links.forEach(link => {
             if (stripEnding(link.href) === findHref)
@@ -4706,14 +4708,14 @@
             chatInputCounterEl.classList.remove('is-overflow');
         }
     }
-    
-    function chatUpdateInput(){
+
+    function chatUpdateInput() {
         chatUpdateInputCounter();
         RenderMarkdown(chatInputPreviewEl, chatInputEl.value);
-        if (! chatInputPreviewEl.innerHTML.trim())
+        if (!chatInputPreviewEl.innerHTML.trim())
             chatInputPreviewEl.innerHTML = "<span style=\"color: #1e2a40; opacity: 0.5; user-select: none; padding: 10px 10px;\">预览</span>";
     }
-    
+
     function chatSetControlsDisabled(disabled) {
         if (chatRefreshBtnEl) chatRefreshBtnEl.disabled = !!disabled;
         if (chatTokenBtnEl) chatTokenBtnEl.disabled = !!disabled;
@@ -5090,7 +5092,7 @@
         const oldScrollHeight = chatMessageListEl.scrollHeight;
         const oldScrollTop = chatMessageListEl.scrollTop;
         const nearLatest = oldScrollTop < 36;
-        const renderMessages = [...currentMessages].reverse();
+        const renderMessages = currentMessages;
 
         chatMessageListEl.innerHTML = '';
         if (!conv) {
@@ -5449,7 +5451,6 @@
             });
             chatRenderMessages({preserveScroll, forceScrollBottom: !silent});
             if (!silent) chatSetStatus(`消息已更新（${merged.length} 条）`, 'success');
-            chatLoadOlderMessages();
         } catch (error) {
             if (seq !== chatState.requestSeq) return;
             chatSetStatus(`刷新消息失败：${error && error.message ? error.message : '未知错误'}`, 'error');
@@ -5483,12 +5484,21 @@
             });
             chatRenderMessages({preserveScroll: true});
             chatSetStatus(`已加载更早消息 ${olderMessages.length} 条`, 'success');
+            const lastmessage = chatMessageListEl.querySelectorAll('.bn-chat-message')[olderMessages.length];
+            console.log("last", lastmessage);
+            lastmessage.scrollIntoView({ behavior: 'instant', block: 'start' });
         } catch (error) {
             chatSetStatus(`加载失败：${error && error.message ? error.message : '未知错误'}`, 'error');
         } finally {
             chatState.loadingOlder = false;
             if (chatLoadOlderBtnEl) chatLoadOlderBtnEl.disabled = false;
         }
+    }
+
+    function chatMessagesScrollToBottom() {
+        chatMessageListEl.scrollTop = Math.min(200, chatMessageListEl.scrollHeight);
+        const lastElement = chatMessageListEl.lastElementChild;
+        lastElement.scrollIntoView({behavior: 'smooth', block: 'end'});
     }
 
     function chatSelectConversation(key, {forceRefresh = false} = {}) {
@@ -5502,7 +5512,9 @@
         chatUpdateInput();
         chatStartAutoRefreshTimer();
         if (changed || forceRefresh) {
-            chatRefreshMessages({silent: false, preserveScroll: false});
+            chatRefreshMessages(
+                {silent: false, preserveScroll: false}
+            ).then(chatMessagesScrollToBottom);
         }
     }
 
@@ -5706,6 +5718,7 @@
         } finally {
             chatState.sending = false;
             if (chatSendBtnEl) chatSendBtnEl.disabled = false;
+            chatMessagesScrollToBottom();
         }
     }
 
@@ -5877,7 +5890,7 @@
         // 选项卡切换事件
         const tabBtns = document.querySelectorAll('.bn-chat-tab-btn');
         tabBtns.forEach(btn => {
-            btn.addEventListener('click', function() {
+            btn.addEventListener('click', function () {
                 const tab = this.dataset.tab;
 
                 // 移除所有选项卡的激活状态
@@ -6436,6 +6449,7 @@
             URL.revokeObjectURL(url);
         }
     });
+
     function uploadFile(file) {
         const fileReader = new FileReader();
         fileReader.onload = () => {
@@ -6470,7 +6484,8 @@
         fileReader.readAsDataURL(file);
         console.log("Added", file);
     }
-    function checkCursorToMouse(e){
+
+    function checkCursorToMouse(e) {
         // 强制获得焦点，以便设置光标位置
         chatInputEl.focus();
 
@@ -6489,6 +6504,7 @@
             }
         }
     }
+
     chatInputEl.addEventListener('dragover', (e) => {
         e.preventDefault();
         checkCursorToMouse(e);
@@ -6521,5 +6537,24 @@
             }
         }
         // 如果没有文件，让浏览器正常粘贴文本
+    });
+    function checkLoad(){
+        // 如果正在加载，不再触发
+        if (chatState.loadingOlder || chatState.loadingMessages) return;
+        // 滚动条距离顶部的距离
+        const scrollTop = chatMessageListEl.scrollTop;
+        console.log("scrollTop", scrollTop);
+        // 阈值：当 scrollTop < 200px 时触发加载
+        const threshold = 100;
+
+        if (scrollTop < threshold)
+            chatLoadOlderMessages();
+    }
+    let checkLoadDebounceTimer = null;
+    chatMessageListEl.addEventListener('scroll', () => {
+        if (checkLoadDebounceTimer){
+            clearTimeout(checkLoadDebounceTimer);
+        }
+        checkLoadDebounceTimer = setTimeout(checkLoad, 100);
     });
 })();
