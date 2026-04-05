@@ -246,9 +246,50 @@
         postProcessRenderedImages(el);
     }
 
+    function removeFixed(el) {
+        const elements = el.querySelectorAll('*');
+        for (let elem of elements) {
+            elem.style.position = 'relative';
+        }
+    }
+
     function WriteCleanHTML(el, dirtyHTML) {
         if (!el) return;
+<<<<<<< HEAD
         RenderMarkdown(el, sanitizeRichHtml(dirtyHTML));
+=======
+        let cleanHTML = DOMPurify.sanitize(
+            dirtyHTML, {
+                FORBID_TAGS: ["style", "link", "aframe", "script", 'frame'],
+                FORBID_ATTR: ["style", "onclick", "id"]
+            }
+        );
+        cleanHTML = cleanHTML.replaceAll(
+            /(<img.*)src=(.*>)/g,
+            "$1data-src=$2"
+        )
+        cleanHTML = cleanHTML.replaceAll(
+            /![(.*)](.*)/g,
+            `<img alt="$1" data-src="$2">`
+        )
+        RenderMarkdown(el, cleanHTML);
+        // 输出安全 HTML
+        el.querySelectorAll("img").forEach(img => {
+            if (CanShow(img.dataset.src)) {
+                img.src = img.dataset.src;
+                img.removeAttribute("data-src");
+                return;
+            }
+            img.classList.add("bn-img-lazy");
+            img.src = "/";
+            const showtext = `${img.dataset.src}，\n点击加载`;
+            const container = document.createElement("span");
+            container.dataset.tooltip = showtext;
+            img.parentNode.insertBefore(container, img);
+            container.appendChild(img);
+        })
+        removeFixed(el);
+>>>>>>> a812624192473cfc0ec7b939755c7bc3647f086b
     }
 
     window.RenderMarkdown = RenderMarkdown;
