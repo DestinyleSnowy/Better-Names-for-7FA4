@@ -94,13 +94,17 @@
         "http://211.137.101.118:9080/*"
       ],
       "css": [
-        "content/libs/katex/katex.min.css"
+        "content/libs/katex/katex.min.css",
+        "content/panel/panel.css",
+        "content/user_tags/user_tags.css",
+        "content/user_tags/tag_details.css"
       ],
       "js": [
         "content/libs/marked.min.js",
         "content/libs/katex/katex.min.js",
         "content/libs/katex/auto-render.min.js",
-        "content/render_logic.js"
+        "content/render_logic.js",
+        "background.js"
       ],
       "run_at": "document_idle"
     },

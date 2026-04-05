@@ -6452,40 +6452,76 @@
             URL.revokeObjectURL(url);
         }
     });
-    function uploadFile(file) {
-        const fileReader = new FileReader();
-        fileReader.onload = () => {
-            const base64 = fileReader.result;
-            let insertHtml = '';
-            if (base64.startsWith('data:image/')) {
-                insertHtml = `<div data-tooltip="${file.name}"><img src="${base64}"></div>`;
-            } else {
-                insertHtml = `<span class="bn-file" data-src="${base64}" data-name="${file.name}">${file.name}（${file.size} B）</span>`;
+    function escapeHtml(text) {
+        return String(text ?? '').replace(/[&<>"']/g, (ch) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[ch]));
+    }
+    function readFileAsDataUrl(file) {
+        return new Promise((resolve, reject) => {
+            const fileReader = new FileReader();
+            fileReader.onload = () => resolve(fileReader.result);
+            fileReader.onerror = () => reject(fileReader.error || new Error('File read failed'));
+            fileReader.readAsDataURL(file);
+        });
+    }
+    function buildUploadHtml(file, base64) {
+        const safeName = escapeHtml(file.name);
+        if (typeof base64 !== 'string') return '';
+        if (base64.startsWith('data:image/')) {
+            return `<div data-tooltip="${safeName}"><img src="${base64}" alt="${safeName}"></div>`;
+        }
+        return `<span class="bn-file" data-src="${base64}" data-name="${safeName}">${safeName}（${file.size} B）</span>`;
+    }
+    function captureChatSelection() {
+        const el = chatInputEl;
+        return {
+            start: el.selectionStart ?? el.value.length,
+            end: el.selectionEnd ?? el.value.length,
+            scrollTop: el.scrollTop
+        };
+    }
+    function insertHtmlAtChatSelection(insertHtml, range = captureChatSelection()) {
+        const el = chatInputEl;
+        const scrollTop = range.scrollTop ?? el.scrollTop;
+        const start = range.start ?? (el.selectionStart ?? el.value.length);
+        const end = range.end ?? (el.selectionEnd ?? el.value.length);
+        const oldValue = el.value;
+        el.value = oldValue.substring(0, start) + insertHtml + oldValue.substring(end);
+        el.scrollTop = scrollTop;
+        const newCursorPos = start + insertHtml.length;
+        el.setSelectionRange(newCursorPos, newCursorPos);
+        chatUpdateInput();
+        return {
+            start: newCursorPos,
+            end: newCursorPos,
+            scrollTop
+        };
+    }
+    let chatUploadQueue = Promise.resolve();
+    async function uploadFiles(files, initialRange = captureChatSelection()) {
+        let range = initialRange;
+        for (const file of files) {
+            try {
+                const base64 = await readFileAsDataUrl(file);
+                const insertHtml = buildUploadHtml(file, base64);
+                if (!insertHtml) continue;
+                range = insertHtmlAtChatSelection(insertHtml, range);
+            } catch (error) {
+                console.error('Error reading file:', file, error);
             }
-
-            const el = chatInputEl;
-            // 保存当前滚动位置
-            const scrollTop = el.scrollTop;
-            const start = el.selectionStart ?? el.value.length;
-            const end = el.selectionEnd ?? el.value.length;
-            const oldValue = el.value;
-
-            // 在光标位置插入
-            const newValue = oldValue.substring(0, start) + insertHtml + oldValue.substring(end);
-            el.value = newValue;
-
-            // 恢复滚动位置，并将光标置于插入内容的末尾
-            el.scrollTop = scrollTop;
-            const newCursorPos = start + insertHtml.length;
-            el.setSelectionRange(newCursorPos, newCursorPos);
-
-            chatUpdateInput();
-        };
-        fileReader.onerror = () => {
-            console.error('Error reading file:', file, fileReader.error);
-        };
-        fileReader.readAsDataURL(file);
-        console.log("Added", file);
+        }
+    }
+    function queueUploadFiles(files) {
+        const normalizedFiles = Array.from(files || []);
+        if (!normalizedFiles.length) return Promise.resolve();
+        const initialRange = captureChatSelection();
+        chatUploadQueue = chatUploadQueue.catch(() => {}).then(() => uploadFiles(normalizedFiles, initialRange));
+        return chatUploadQueue;
     }
     function checkCursorToMouse(e){
         // 强制获得焦点，以便设置光标位置
@@ -6517,8 +6553,7 @@
     chatInputEl.addEventListener("drop", (e) => {
         e.preventDefault();
         checkCursorToMouse(e);
-        for (const file of e.dataTransfer.files)
-            uploadFile(file);
+        void queueUploadFiles(e.dataTransfer.files);
         chatInputEl.classList.remove('drag-over');
     });
     chatInputEl.addEventListener('paste', (e) => {
@@ -6533,9 +6568,7 @@
         }
         if (files.length) {
             e.preventDefault(); // 阻止默认粘贴文本行为
-            for (const file of files) {
-                uploadFile(file);
-            }
+            void queueUploadFiles(files);
         }
         // 如果没有文件，让浏览器正常粘贴文本
     });

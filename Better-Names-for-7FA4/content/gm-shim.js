@@ -162,61 +162,93 @@
         });
     }
 
-    function CanShow(url) {
-        if (url.startsWith("data:")) return true;
-        const Abs = new URL(url, location.href);
-        return access_src.has(Abs.href);
+    const RENDER_MATH_DELIMITERS = [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false},
+        {left: '\\(', right: '\\)', display: false},
+        {left: '\\[', right: '\\]', display: true}
+    ];
+
+    function getAccessSourceMap() {
+        if (window.access_src instanceof Map) return window.access_src;
+        const next = new Map();
+        window.access_src = next;
+        return next;
     }
 
-    function RenderMarkdown(el, md){
-        el.innerHTML = md;
-        renderMathInElement(el, {
-            delimiters: [
-                {left: '$$', right: '$$', display: true},   // 块级公式
-                {left: '$', right: '$', display: false},    // 行内公式
-                {left: '\\(', right: '\\)', display: false},
-                {left: '\\[', right: '\\]', display: true}
-            ],
-            throwOnError: false
+    function CanShow(url) {
+        if (typeof url !== 'string') return false;
+        const trimmed = url.trim();
+        if (!trimmed) return false;
+        if (trimmed.startsWith('data:')) return true;
+        try {
+            const abs = new URL(trimmed, location.href);
+            return getAccessSourceMap().has(abs.href);
+        } catch (error) {
+            return false;
+        }
+    }
+
+    function sanitizeRichHtml(unsafeHtml) {
+        if (typeof DOMPurify === 'undefined' || typeof DOMPurify.sanitize !== 'function') {
+            const fallback = document.createElement('div');
+            fallback.textContent = String(unsafeHtml ?? '');
+            return fallback.innerHTML;
+        }
+        return DOMPurify.sanitize(String(unsafeHtml ?? ''), {
+            FORBID_TAGS: ['style', 'link', 'aframe', 'script', 'frame', 'iframe', 'object', 'embed', 'form'],
+            FORBID_ATTR: ['style', 'onclick', 'onerror', 'onload', 'srcdoc']
         });
-        el.innerHTML = marked.parse(
-            el.innerHTML,
-            {html: true}
-        );
+    }
+
+    function postProcessRenderedImages(root) {
+        if (!root) return;
+        root.querySelectorAll('img').forEach((img) => {
+            const source = (img.getAttribute('src') || img.dataset.src || '').trim();
+            if (!source) {
+                img.remove();
+                return;
+            }
+            if (CanShow(source)) {
+                img.setAttribute('src', source);
+                img.removeAttribute('data-src');
+                img.classList.remove('bn-img-lazy');
+                return;
+            }
+            img.dataset.src = source;
+            img.removeAttribute('src');
+            img.classList.add('bn-img-lazy');
+            img.src = '/';
+            const showtext = `${source}，\n点击加载`;
+            const container = document.createElement('span');
+            container.dataset.tooltip = showtext;
+            img.parentNode.insertBefore(container, img);
+            container.appendChild(img);
+        });
+    }
+
+    function RenderMarkdown(el, md) {
+        if (!el) return;
+        const rawText = typeof md === 'string' ? md : String(md ?? '');
+        let renderedHtml = rawText;
+        if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
+            renderedHtml = marked.parse(rawText);
+        }
+        el.innerHTML = sanitizeRichHtml(renderedHtml);
+        if (typeof renderMathInElement === 'function') {
+            renderMathInElement(el, {
+                delimiters: RENDER_MATH_DELIMITERS,
+                ignoredTags: ['script', 'noscript', 'style', 'textarea', 'option', 'code'],
+                throwOnError: false,
+                strict: 'ignore'
+            });
+        }
+        postProcessRenderedImages(el);
     }
 
     function WriteCleanHTML(el, dirtyHTML) {
         if (!el) return;
-        let cleanHTML = DOMPurify.sanitize(
-            dirtyHTML, {
-                FORBID_TAGS: ['style', 'link', 'aframe', 'script', 'frame'],
-                FORBID_ATTR: ["style", "onclick"]
-            }
-        );
-        cleanHTML = cleanHTML.replaceAll(
-            /(<img.*)src=(.*>)/g,
-            "$1data-src=$2"
-        )
-        cleanHTML = cleanHTML.replaceAll(
-            /![(.*)](.*)/g,
-            `<img alt="$1" data-src="$2">`
-        )
-        RenderMarkdown(el, cleanHTML);
-        // 输出安全 HTML
-        el.querySelectorAll("img").forEach(img => {
-            if (CanShow(img.dataset.src)) {
-                img.src = img.dataset.src;
-                img.removeAttribute("data-src");
-                return;
-            }
-            img.classList.add("bn-img-lazy");
-            img.src = "/";
-            const showtext = `${img.dataset.src}，\n点击加载`;
-            const container = document.createElement("span");
-            container.dataset.tooltip = showtext;
-            img.parentNode.insertBefore(container, img);
-            container.appendChild(img);
-        })
+        RenderMarkdown(el, sanitizeRichHtml(dirtyHTML));
     }
 
     window.RenderMarkdown = RenderMarkdown;
