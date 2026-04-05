@@ -147,7 +147,6 @@
     const maxTitleUnits = (storedTitleUnits === 'none') ? Infinity : parseInt(storedTitleUnits, 10);
     const maxUserUnits = (storedUserUnits === 'none') ? Infinity : parseInt(storedUserUnits, 10);
     let hideAvatar = readConfigValue('hideAvatar');
-    const AVATAR_PLACEHOLDER_SRC = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
     const enableCopy = readConfigValue('enableCopy');
     const enableDescCopy = readConfigValue('enableDescCopy');
     const hideOrig = readConfigValue('hideOrig');
@@ -185,8 +184,7 @@
     const enableMergeAssistantSetting = readConfigValue('rankingMerge.enabled') !== false;
     const enableVjLink = readConfigValue('enableVjLink');
     const hideDoneSkip = readConfigValue('hideDoneSkip');
-    let rawQuickSkip;
-    let quickSkipMigrated = false;
+    let rawQuickSkip, quickSkipMigrated;
     try {
         rawQuickSkip = readConfigValue('enableQuickSkip');
     } catch (err) {
@@ -561,7 +559,7 @@
             if (!isSupportedHostname(host)) return null;
             if (RENEW_SUFFIX_RE.test(url.pathname)) return null;
             const match = url.pathname.match(RENEW_PATH_RE);
-            if (!match || match[1] % 100 == 0) return null;
+            if (!match || match[1] % 100 === 0) return null;
             url.pathname = `/problems/tag/${match[1]}/renew`;
             return url.toString();
         } catch (err) {
@@ -1872,8 +1870,7 @@
             hexInputs[k].oninput = () => {
                 const v = hexInputs[k].value.trim();
                 if (/^#?[0-9a-fA-F]{6}$/.test(v)) {
-                    const val = v.startsWith('#') ? v : '#' + v;
-                    colorPickers[k].value = val;
+                    colorPickers[k].value = v.startsWith('#') ? v : '#' + v;
                 }
                 checkChanged();
             };
@@ -2420,7 +2417,7 @@
             (document.getElementById('bn-use-custom-color').checked !== originalConfig.useCustomColors) ||
             ((document.getElementById('bn-width-mode')?.value ?? originalConfig.widthMode) !== originalConfig.widthMode) ||
             (currentBgEnabled !== originalConfig.bgEnabled) ||
-            bgSourceChanged || (currentBgfillway != originalConfig.bgfillway) ||
+            bgSourceChanged || (currentBgfillway !== originalConfig.bgfillway) ||
             (currentBgOpacity !== originalConfig.bgOpacity) ||
             (clampBlur(currentBgBlur) !== clampBlur(originalConfig.bgBlur)) ||
             (currentBtEnabled !== originalConfig.btEnabled) ||
@@ -2955,15 +2952,6 @@
         return 4;
     }
 
-    function escapeHtml(text) {
-        return text
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-
     function truncateByUnits(str, maxU) {
         if (!isFinite(maxU)) return str;
         let used = 0, out = '';
@@ -3130,14 +3118,16 @@
         s = s.replace(/^(?:[ \t]*\n)+/, '');
         return s;
     }
-    function stripEnding(href){
+
+    function stripEnding(href) {
         return href.replace(/\/(\?.*)?$/, '');
     }
+
     function findProblemActionLink() {
         const links = document.querySelectorAll("a");
         let response = [];
         const findHref =
-             stripEnding(location.href) +
+            stripEnding(location.href) +
             "/markdown/html";
         links.forEach(link => {
             if (stripEnding(link.href) === findHref)
@@ -3324,7 +3314,7 @@
 
             const separator = tooltip.includes('：') ? '：' : ':';
             const parts = tooltip.split(separator);
-            if (parts.length != 2) {
+            if (parts.length !== 2) {
                 return null;
             }
 
@@ -3371,7 +3361,7 @@
         vj.href = vjUrl;
         vj.target = '_blank';
         vj.rel = 'noopener';
-        if (result.oj != 'vj')
+        if (result.oj !== 'vj')
             vj.setAttribute('data-tooltip', `vj-${result.oj}-${lower}`);
         else
             vj.setAttribute('data-tooltip', `${result.oj}-${lower}`);
@@ -3449,7 +3439,6 @@
                     });
 
                     requestAnimationFrame(() => menu.classList.add('bn-show'));
-                    return;
                 }
             }
             // Not a user link -> fall through to native menu
@@ -3463,7 +3452,7 @@
         if (!normalized) return '';
         const fullIdx = normalized.indexOf('（');
         const halfIdx = normalized.indexOf('(');
-        let firstParenIdx = -1;
+        let firstParenIdx;
         if (fullIdx >= 0 && halfIdx >= 0) {
             firstParenIdx = Math.min(fullIdx, halfIdx);
         } else {
@@ -3553,7 +3542,7 @@
         if (!t) return false;
         const raw = typeof rawHref === 'string' ? rawHref.trim() : '';
         if (raw) {
-            let decoded = '';
+            let decoded;
             try {
                 decoded = decodeURIComponent(raw);
             } catch (_) {
@@ -3571,7 +3560,7 @@
 
     function isBareUserProfileHref(rawHref, uid) {
         if (!rawHref) return false;
-        let pathname = '';
+        let pathname;
         try {
             const url = new URL(rawHref, location.href);
             pathname = url.pathname || '';
@@ -3952,8 +3941,7 @@
             }
             if (hasMyTemplates) return true;
         }
-        if (table.querySelector('tbody#announces')) return true;
-        return false;
+        return !!(table.querySelector('tbody#announces'));
     }
 
     function ensureQuickSkipCellAt(tr, insertIndex) {
@@ -4720,14 +4708,14 @@
             chatInputCounterEl.classList.remove('is-overflow');
         }
     }
-    
-    function chatUpdateInput(){
+
+    function chatUpdateInput() {
         chatUpdateInputCounter();
         RenderMarkdown(chatInputPreviewEl, chatInputEl.value);
-        if (! chatInputPreviewEl.innerHTML.trim())
+        if (!chatInputPreviewEl.innerHTML.trim())
             chatInputPreviewEl.innerHTML = "<span style=\"color: #1e2a40; opacity: 0.5; user-select: none; padding: 10px 10px;\">预览</span>";
     }
-    
+
     function chatSetControlsDisabled(disabled) {
         if (chatRefreshBtnEl) chatRefreshBtnEl.disabled = !!disabled;
         if (chatTokenBtnEl) chatTokenBtnEl.disabled = !!disabled;
@@ -5104,7 +5092,7 @@
         const oldScrollHeight = chatMessageListEl.scrollHeight;
         const oldScrollTop = chatMessageListEl.scrollTop;
         const nearLatest = oldScrollTop < 36;
-        const renderMessages = [...currentMessages].reverse();
+        const renderMessages = currentMessages;
 
         chatMessageListEl.innerHTML = '';
         if (!conv) {
@@ -5490,18 +5478,27 @@
                 chatSetStatus('没有更早消息了');
                 return;
             }
-            const {merged} = chatRememberConversationMessages(conversation, olderMessages, {
+            chatRememberConversationMessages(conversation, olderMessages, {
                 trackUnread: false,
                 rerenderList: false,
             });
             chatRenderMessages({preserveScroll: true});
             chatSetStatus(`已加载更早消息 ${olderMessages.length} 条`, 'success');
+            const lastmessage = chatMessageListEl.querySelectorAll('.bn-chat-message')[olderMessages.length];
+            console.log("last", lastmessage);
+            lastmessage.scrollIntoView({ behavior: 'instant', block: 'start' });
         } catch (error) {
             chatSetStatus(`加载失败：${error && error.message ? error.message : '未知错误'}`, 'error');
         } finally {
             chatState.loadingOlder = false;
             if (chatLoadOlderBtnEl) chatLoadOlderBtnEl.disabled = false;
         }
+    }
+
+    function chatMessagesScrollToBottom() {
+        chatMessageListEl.scrollTop = Math.min(200, chatMessageListEl.scrollHeight);
+        const lastElement = chatMessageListEl.lastElementChild;
+        lastElement.scrollIntoView({behavior: 'smooth', block: 'end'});
     }
 
     function chatSelectConversation(key, {forceRefresh = false} = {}) {
@@ -5515,7 +5512,9 @@
         chatUpdateInput();
         chatStartAutoRefreshTimer();
         if (changed || forceRefresh) {
-            chatRefreshMessages({silent: false, preserveScroll: false});
+            chatRefreshMessages(
+                {silent: false, preserveScroll: false}
+            ).then(chatMessagesScrollToBottom);
         }
     }
 
@@ -5719,6 +5718,7 @@
         } finally {
             chatState.sending = false;
             if (chatSendBtnEl) chatSendBtnEl.disabled = false;
+            chatMessagesScrollToBottom();
         }
     }
 
@@ -5890,7 +5890,7 @@
         // 选项卡切换事件
         const tabBtns = document.querySelectorAll('.bn-chat-tab-btn');
         tabBtns.forEach(btn => {
-            btn.addEventListener('click', function() {
+            btn.addEventListener('click', function () {
                 const tab = this.dataset.tab;
 
                 // 移除所有选项卡的激活状态
@@ -6321,7 +6321,6 @@
                 if (parsed) return parsed;
             } catch (error) {
                 lastError = error;
-                continue;
             }
         }
         if (lastError) throw lastError;
@@ -6372,9 +6371,7 @@
     applyHideDoneSkip(hideDoneSkip);
     applyTemplateBulkAddButton(enableTemplateBulkAdd);
     scheduleTemplateBulkButton(enableTemplateBulkAdd);
-    ;
 
-    let submittersConfig = null;
 
     // 批处理观察器（rAF 合批）
     let moQueue = new Set();
@@ -6452,13 +6449,14 @@
             URL.revokeObjectURL(url);
         }
     });
+
     function uploadFile(file) {
         const fileReader = new FileReader();
         fileReader.onload = () => {
             const base64 = fileReader.result;
-            let insertHtml = '';
+            let insertHtml;
             if (base64.startsWith('data:image/')) {
-                insertHtml = `<div data-tooltip="${file.name}"><img src="${base64}"></div>`;
+                insertHtml = `<div data-tooltip="${file.name}"><img src="${base64}" alt="${file.name}"></div>`;
             } else {
                 insertHtml = `<span class="bn-file" data-src="${base64}" data-name="${file.name}">${file.name}（${file.size} B）</span>`;
             }
@@ -6471,8 +6469,7 @@
             const oldValue = el.value;
 
             // 在光标位置插入
-            const newValue = oldValue.substring(0, start) + insertHtml + oldValue.substring(end);
-            el.value = newValue;
+            el.value = oldValue.substring(0, start) + insertHtml + oldValue.substring(end);
 
             // 恢复滚动位置，并将光标置于插入内容的末尾
             el.scrollTop = scrollTop;
@@ -6487,7 +6484,8 @@
         fileReader.readAsDataURL(file);
         console.log("Added", file);
     }
-    function checkCursorToMouse(e){
+
+    function checkCursorToMouse(e) {
         // 强制获得焦点，以便设置光标位置
         chatInputEl.focus();
 
@@ -6506,6 +6504,7 @@
             }
         }
     }
+
     chatInputEl.addEventListener('dragover', (e) => {
         e.preventDefault();
         checkCursorToMouse(e);
@@ -6538,5 +6537,24 @@
             }
         }
         // 如果没有文件，让浏览器正常粘贴文本
+    });
+    function checkLoad(){
+        // 如果正在加载，不再触发
+        if (chatState.loadingOlder || chatState.loadingMessages) return;
+        // 滚动条距离顶部的距离
+        const scrollTop = chatMessageListEl.scrollTop;
+        console.log("scrollTop", scrollTop);
+        // 阈值：当 scrollTop < 200px 时触发加载
+        const threshold = 100;
+
+        if (scrollTop < threshold)
+            chatLoadOlderMessages();
+    }
+    let checkLoadDebounceTimer = null;
+    chatMessageListEl.addEventListener('scroll', () => {
+        if (checkLoadDebounceTimer){
+            clearTimeout(checkLoadDebounceTimer);
+        }
+        checkLoadDebounceTimer = setTimeout(checkLoad, 100);
     });
 })();

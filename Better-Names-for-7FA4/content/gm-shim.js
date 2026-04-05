@@ -185,12 +185,19 @@
         );
     }
 
+    function removeFixed(el) {
+        const elements = el.querySelectorAll('*');
+        for (let elem of elements) {
+            elem.style.position = 'relative';
+        }
+    }
+
     function WriteCleanHTML(el, dirtyHTML) {
         if (!el) return;
         let cleanHTML = DOMPurify.sanitize(
             dirtyHTML, {
-                FORBID_TAGS: ['style', 'link', 'aframe', 'script', 'frame'],
-                FORBID_ATTR: ["style", "onclick"]
+                FORBID_TAGS: ["style", "link", "aframe", "script", 'frame'],
+                FORBID_ATTR: ["style", "onclick", "id"]
             }
         );
         cleanHTML = cleanHTML.replaceAll(
@@ -217,6 +224,7 @@
             img.parentNode.insertBefore(container, img);
             container.appendChild(img);
         })
+        removeFixed(el);
     }
 
     window.RenderMarkdown = RenderMarkdown;
