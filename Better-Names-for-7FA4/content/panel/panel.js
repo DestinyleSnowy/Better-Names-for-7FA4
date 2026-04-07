@@ -5091,7 +5091,6 @@
         const currentMessages = conv ? (chatState.messagesByKey.get(conv.key) || []) : [];
         const oldScrollHeight = chatMessageListEl.scrollHeight;
         const oldScrollTop = chatMessageListEl.scrollTop;
-        const nearLatest = oldScrollTop < 36;
         const renderMessages = currentMessages;
 
         chatMessageListEl.innerHTML = '';
@@ -5150,7 +5149,7 @@
 
         if (chatLoadOlderBtnEl) chatLoadOlderBtnEl.disabled = chatState.loadingOlder || chatState.loadingMessages;
 
-        if (forceScrollBottom || (!preserveScroll && nearLatest)) {
+        if (forceScrollBottom || (!preserveScroll)) {
             chatMessageListEl.scrollTop = 0;
             return;
         }
@@ -5486,7 +5485,7 @@
             chatSetStatus(`已加载更早消息 ${olderMessages.length} 条`, 'success');
             const lastmessage = chatMessageListEl.querySelectorAll('.bn-chat-message')[olderMessages.length];
             console.log("last", lastmessage);
-            lastmessage.scrollIntoView({ behavior: 'instant', block: 'start' });
+            lastmessage.scrollIntoView({behavior: 'instant', block: 'start'});
         } catch (error) {
             chatSetStatus(`加载失败：${error && error.message ? error.message : '未知错误'}`, 'error');
         } finally {
@@ -5644,7 +5643,7 @@
                 return;
             }
             if (chatState.loadingMessages || chatState.loadingOlder || chatState.sending) return;
-            chatRefreshMessages({silent: true, preserveScroll: false});
+            chatRefreshMessages({silent: true, preserveScroll: true});
             if (Date.now() - chatState.lastInfoLoadedAt > 45000) {
                 chatLoadInfo({silent: true, preserveSelection: true});
             }
@@ -6608,21 +6607,22 @@
         }
         // 如果没有文件，让浏览器正常粘贴文本
     });
-    function checkLoad(){
+
+    function checkLoad() {
         // 如果正在加载，不再触发
         if (chatState.loadingOlder || chatState.loadingMessages) return;
         // 滚动条距离顶部的距离
         const scrollTop = chatMessageListEl.scrollTop;
-        console.log("scrollTop", scrollTop);
         // 阈值：当 scrollTop < 200px 时触发加载
         const threshold = 100;
 
         if (scrollTop < threshold)
             chatLoadOlderMessages();
     }
+
     let checkLoadDebounceTimer = null;
     chatMessageListEl.addEventListener('scroll', () => {
-        if (checkLoadDebounceTimer){
+        if (checkLoadDebounceTimer) {
             clearTimeout(checkLoadDebounceTimer);
         }
         checkLoadDebounceTimer = setTimeout(checkLoad, 100);

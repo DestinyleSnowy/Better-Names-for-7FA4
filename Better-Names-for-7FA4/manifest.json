@@ -55,12 +55,14 @@
       ],
       "css": [
         "content/panel/panel.css",
-        "content/libs/katex/katex.min.css"
+        "content/libs/katex/katex.min.css",
+        "content/libs/prism.css"
       ],
       "js": [
         "content/libs/marked.min.js",
         "content/libs/katex/katex.min.js",
         "content/libs/katex/auto-render.min.js",
+        "content/libs/prism.js",
         "content/libs/purify.min.js",
         "content/gm-shim.js",
         "content/panel/panel.js",
@@ -102,6 +104,7 @@
       "js": [
         "content/libs/marked.min.js",
         "content/libs/katex/katex.min.js",
+        "content/libs/prism.js",
         "content/libs/katex/auto-render.min.js",
         "content/render_logic.js",
         "background.js"
@@ -117,11 +120,13 @@
         "http://211.137.101.118:8888/user/*"
       ],
       "css": [
-        "content/libs/katex/katex.min.css"
+        "content/libs/katex/katex.min.css",
+        "content/libs/prism.css"
       ],
       "js": [
         "content/libs/marked.min.js",
         "content/libs/katex/katex.min.js",
+        "content/libs/prism.js",
         "content/libs/katex/auto-render.min.js",
         "content/libs/purify.min.js",
         "content/gm-shim.js",
