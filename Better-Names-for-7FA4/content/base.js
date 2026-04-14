@@ -1,7 +1,6 @@
 (function () {
     'use strict';
     marked.use({breaks: true});
-    Prism.manual = true;
 
     const hasChromeStorage = !!(typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local);
 
@@ -170,7 +169,7 @@
         return access_src.has(Abs.href);
     }
 
-    function RenderMarkdown(el, md){
+    function RenderMarkdown(el, md) {
         el.innerHTML = marked.parse(md);
         renderMathInElement(el, {
             delimiters: [
@@ -179,7 +178,8 @@
             ],
             throwOnError: false
         });
-        addPrism(el);
+        for (let elem of el.querySelectorAll("pre"))
+            addPrism(elem);
     }
 
     function removeFixed(el) {
@@ -189,14 +189,91 @@
         }
     }
 
-    function addPrism(el) {
-        const elements = el.querySelectorAll("pre");
-        for (let elem of elements) {
-            elem.classList.add("line-numbers");
-            elem.setAttribute("data-prismjs-copy", "复制");
-            Prism.highlightElement(elem);
-        }
+    function addPrism(pre) {
+        // console.log(pre.innerHTML);
+        // console.log("Adding Prism to", pre);
+        pre.classList.add("line-numbers");
     }
+
+    function downloadCode(codeElement, langClass) {
+        const codeContent = codeElement;
+        const {fileName, fileType, fileExt} = getSuffix(langClass);
+        const blob = new Blob([codeContent], {type: fileType});
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        link.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function getSuffix(langClass) {
+        const extMap = {
+            'python': 'py',
+            'javascript': 'js',
+            'c': 'c',
+            'cpp': 'cpp',
+            'java': 'java',
+            'bash': 'sh',
+            'typescript': 'ts',
+            'py': 'py', // 新增短名称映射
+            'js': 'js',
+            'html': 'html',
+            'css': 'css',
+            'txt': 'txt',
+            'shell': 'sh',
+            'text': 'txt',
+            'json': 'json',
+            'xml': 'xml',
+            'yaml': 'yaml',
+            'markdown': 'md',
+            'md': 'md',
+            'sql': 'sql',
+            'ruby': 'rb',
+            'php': 'php',
+            'go': 'go',
+            'perl': 'pl',
+            'rust': 'rs',
+            'kotlin': 'kt',
+            'swift': 'swift',
+            'dart': 'dart',
+            'lua': 'lua',
+            'sh': 'sh',
+            'powershell': 'ps1',
+            'haskell': 'hs',
+            'r': 'r',
+            'scala': 'scala',
+            'vb': 'vb',
+            'bat': 'bat',
+            'ps1': 'ps1',
+        };
+        // 修改类名解析逻辑
+        const lang = langClass ?
+            langClass.replace('language-', '')
+                .replace(/^html$/, 'markup')  // 转换html到markup
+                .toLowerCase()
+            : 'txt';
+        const fileExt = extMap[lang] || "txt";  // 优先使用映射表
+
+        // 设置MIME类型映射
+        const mimeTypes = {
+            js: 'application/javascript',
+            py: 'text/x-python',
+            html: 'text/html',
+            css: 'text/css',
+            txt: 'text/plain',
+            sh: 'text/x-shellscript',
+            ts: 'text/typescript',
+            c: 'text/x-c',
+            cpp: 'text/x-c++',
+            java: 'text/x-java-source'
+        };
+
+        const fileName = `code.${fileExt}`;
+        const fileType = mimeTypes[fileExt] || 'text/plain';
+        return {fileName, fileType, fileExt};
+    }
+
 
     function WriteCleanHTML(el, dirtyHTML) {
         if (!el) return;
@@ -239,23 +316,34 @@
             ],
             throwOnError: false
         });
-        addPrism(el);
+        for (let elem of el.querySelectorAll("pre"))
+            addPrism(elem);
     }
 
     window.RenderMarkdown = RenderMarkdown;
-    window.CanShow = CanShow;
+    window.addPrism = addPrism;
     window.WriteCleanHTML = WriteCleanHTML;
     window.GM_addStyle = GM_addStyle;
     window.GM_setClipboard = GM_setClipboard;
     window.GM_notification = GM_notification;
     window.GM_xmlhttpRequest = GM_xmlhttpRequest;
+    Prism.plugins.lineNumbers = true;
+    Prism.plugins.toolbar.registerButton('download', {
+        text: '下载代码',
+        onClick: function (env) {
+            downloadCode(env.code, env.language);
+        }
+    });
     window.GM_getValue = function (key, defVal) {
         return gmLocalGet(key, defVal);
     };
     window.GM_setValue = function (key, val) {
         return gmLocalSet(key, val);
     };
-
+    document.documentElement.setAttribute("data-prismjs-copy", "复制");
+    document.documentElement.setAttribute("data-prismjs-copy-error", "复制失败");
+    document.documentElement.setAttribute("data-prismjs-copy-success", "复制成功");
+    document.documentElement.setAttribute("data-prismjs-copy-timeout", 1000);
     window.GM = window.GM || {};
     window.GM.addStyle = GM_addStyle;
     window.GM.setClipboard = GM_setClipboard;

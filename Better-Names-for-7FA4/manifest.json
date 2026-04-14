@@ -64,7 +64,7 @@
         "content/libs/katex/auto-render.min.js",
         "content/libs/prism.js",
         "content/libs/purify.min.js",
-        "content/gm-shim.js",
+        "content/base.js",
         "content/panel/panel.js",
         "content/main.js"
       ],
@@ -129,7 +129,7 @@
         "content/libs/prism.js",
         "content/libs/katex/auto-render.min.js",
         "content/libs/purify.min.js",
-        "content/gm-shim.js",
+        "content/base.js",
         "content/intercept_information.js"
       ],
       "run_at": "document_start"

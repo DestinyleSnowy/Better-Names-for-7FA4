@@ -5147,6 +5147,7 @@
             chatMessageListEl.appendChild(row);
         });
 
+        Prism.highlightAll();
         if (chatLoadOlderBtnEl) chatLoadOlderBtnEl.disabled = chatState.loadingOlder || chatState.loadingMessages;
 
         if (forceScrollBottom || (!preserveScroll)) {
@@ -5472,6 +5473,7 @@
         if (chatLoadOlderBtnEl) chatLoadOlderBtnEl.disabled = true;
         chatSetStatus('正在加载更早消息...');
         try {
+            const oldScrollBottom = chatMessageListEl.scrollHeight - chatMessageListEl.scrollTop;
             const olderMessages = await chatFetchConversationMessages(conversation, endTimeSec);
             if (!olderMessages.length) {
                 chatSetStatus('没有更早消息了');
@@ -5483,9 +5485,7 @@
             });
             chatRenderMessages({preserveScroll: true});
             chatSetStatus(`已加载更早消息 ${olderMessages.length} 条`, 'success');
-            const lastmessage = chatMessageListEl.querySelectorAll('.bn-chat-message')[olderMessages.length];
-            console.log("last", lastmessage);
-            lastmessage.scrollIntoView({behavior: 'instant', block: 'start'});
+            chatMessageListEl.scrollTop = chatMessageListEl.scrollHeight - oldScrollBottom;
         } catch (error) {
             chatSetStatus(`加载失败：${error && error.message ? error.message : '未知错误'}`, 'error');
         } finally {
@@ -5495,9 +5495,7 @@
     }
 
     function chatMessagesScrollToBottom() {
-        chatMessageListEl.scrollTop = Math.min(200, chatMessageListEl.scrollHeight);
-        const lastElement = chatMessageListEl.lastElementChild;
-        lastElement.scrollIntoView({behavior: 'smooth', block: 'end'});
+        chatMessageListEl.scrollTop = chatMessageListEl.scrollHeight;
     }
 
     function chatSelectConversation(key, {forceRefresh = false} = {}) {
@@ -6523,13 +6521,23 @@
 
     function uploadFile(file) {
         const fileReader = new FileReader();
-        fileReader.onload = () => {
+        fileReader.onload = async () => {
             const base64 = fileReader.result;
             let insertHtml;
             if (base64.startsWith('data:image/')) {
                 insertHtml = `<div data-tooltip="${file.name}"><img src="${base64}" alt="${file.name}"></div>`;
+            } else if (base64.startsWith("data:text/") || base64.startsWith("data:application/json")) {
+                const res = await fetch(base64);
+                const content  = await res.text();
+                let lang;
+                if (base64.startsWith("data:application/json")) lang = "json";
+                else {
+                    const s = base64.match(/data:text\/([A-Za-z]+),/);
+                    lang = s[1];
+                }
+                insertHtml = `<pre data-tooltip="${file.name}" class="language-${lang}"><code>${content}</code></pre>`;
             } else {
-                insertHtml = `<span class="bn-file" data-src="${base64}" data-name="${file.name}">${file.name}（${file.size} B）</span>`;
+                insertHtml = `<a class="bn-file" href="${base64}" download="${file.name}">${file.name}（${file.size} B）</a>`;
             }
 
             const el = chatInputEl;
@@ -6627,4 +6635,10 @@
         }
         checkLoadDebounceTimer = setTimeout(checkLoad, 100);
     });
+    console.log(document.querySelectorAll("pre"));
+    for (let el of document.querySelectorAll("pre"))
+        addPrism(el);
+    setTimeout(Prism.highlightAll, 1000);
+    for (let el of document.querySelectorAll(`a[onclick="toggleFormattedCode()"]`))
+        el.remove();
 })();
