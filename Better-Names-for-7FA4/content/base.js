@@ -1,6 +1,7 @@
 (function () {
     'use strict';
     marked.use({breaks: true});
+    Prism.manual = true;
 
     const hasChromeStorage = !!(typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local);
 
@@ -192,6 +193,11 @@
     function addPrism(pre) {
         // console.log(pre.innerHTML);
         // console.log("Adding Prism to", pre);
+        pre.classList.remove("hljs");
+        pre.setAttribute("data-prismjs-copy", "复制");
+        pre.setAttribute("data-prismjs-copy-error", "复制失败");
+        pre.setAttribute("data-prismjs-copy-success", "复制成功");
+        pre.setAttribute("data-prismjs-copy-timeout", 1000);
         pre.classList.add("line-numbers");
     }
 
@@ -340,10 +346,6 @@
     window.GM_setValue = function (key, val) {
         return gmLocalSet(key, val);
     };
-    document.documentElement.setAttribute("data-prismjs-copy", "复制");
-    document.documentElement.setAttribute("data-prismjs-copy-error", "复制失败");
-    document.documentElement.setAttribute("data-prismjs-copy-success", "复制成功");
-    document.documentElement.setAttribute("data-prismjs-copy-timeout", 1000);
     window.GM = window.GM || {};
     window.GM.addStyle = GM_addStyle;
     window.GM.setClipboard = GM_setClipboard;

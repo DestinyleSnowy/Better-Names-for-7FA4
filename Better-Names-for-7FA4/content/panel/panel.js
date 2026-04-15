@@ -5147,7 +5147,7 @@
             chatMessageListEl.appendChild(row);
         });
 
-        Prism.highlightAll();
+        // Prism.highlightAll();
         if (chatLoadOlderBtnEl) chatLoadOlderBtnEl.disabled = chatState.loadingOlder || chatState.loadingMessages;
 
         if (forceScrollBottom || (!preserveScroll)) {
@@ -6635,10 +6635,16 @@
         }
         checkLoadDebounceTimer = setTimeout(checkLoad, 100);
     });
-    console.log(document.querySelectorAll("pre"));
+    // console.log(document.querySelectorAll("pre"));
     for (let el of document.querySelectorAll("pre"))
         addPrism(el);
-    setTimeout(Prism.highlightAll, 1000);
-    for (let el of document.querySelectorAll(`a[onclick="toggleFormattedCode()"]`))
-        el.remove();
+    Prism.highlightAll();
+    const el = document.querySelector(`a[onclick="toggleFormattedCode()"]`);
+    if (el){
+        const fa = document.getElementById("status_table");
+        fa.appendChild(el);
+        el.addEventListener("click", () => {
+            setTimeout(Prism.highlightAll, 100);
+        });
+    }
 })();
