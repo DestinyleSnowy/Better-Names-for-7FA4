@@ -4711,7 +4711,8 @@
 
     function chatUpdateInput() {
         chatUpdateInputCounter();
-        RenderMarkdown(chatInputPreviewEl, chatInputEl.value);
+        RenderMarkdown(chatInputPreviewEl, chatInputEl.value)
+        Prism.highlightAll();
         if (!chatInputPreviewEl.innerHTML.trim())
             chatInputPreviewEl.innerHTML = "<span style=\"color: #1e2a40; opacity: 0.5; user-select: none; padding: 10px 10px;\">预览</span>";
     }
@@ -5147,7 +5148,7 @@
             chatMessageListEl.appendChild(row);
         });
 
-        // Prism.highlightAll();
+        Prism.highlightAll();
         if (chatLoadOlderBtnEl) chatLoadOlderBtnEl.disabled = chatState.loadingOlder || chatState.loadingMessages;
 
         if (forceScrollBottom || (!preserveScroll)) {
@@ -5769,7 +5770,6 @@
                 const time = chatToInteger(chatGroupOpMuteEl ? chatGroupOpMuteEl.value : NaN);
                 if (!Number.isFinite(time) || time < 0) throw new Error('time 必须是非负整数');
                 const mute = time + Math.floor(Date.now() / 1000);
-                console.log("mute:", mute);
                 payload.mute = mute;
             }
         } catch (error) {
@@ -6532,10 +6532,10 @@
                 let lang;
                 if (base64.startsWith("data:application/json")) lang = "json";
                 else {
-                    const s = base64.match(/data:text\/([A-Za-z]+),/);
-                    lang = s[1];
+                    const s = file.name.split(".");
+                    lang = getLang(s[s.length-1]);
                 }
-                insertHtml = `<pre data-tooltip="${file.name}" class="language-${lang}"><code>${content}</code></pre>`;
+                insertHtml = `<pre data-download="${file.name}" class="language-${lang}"><code>${content}</code></pre>`;
             } else {
                 insertHtml = `<a class="bn-file" href="${base64}" download="${file.name}">${file.name}（${file.size} B）</a>`;
             }
@@ -6561,9 +6561,7 @@
             console.error('Error reading file:', file, fileReader.error);
         };
         fileReader.readAsDataURL(file);
-        console.log("Added", file);
->>>>>>> a812624192473cfc0ec7b939755c7bc3647f086b
-    }
+}
 
     function checkCursorToMouse(e) {
         // 强制获得焦点，以便设置光标位置
@@ -6635,9 +6633,10 @@
         }
         checkLoadDebounceTimer = setTimeout(checkLoad, 100);
     });
-    // console.log(document.querySelectorAll("pre"));
     for (let el of document.querySelectorAll("pre"))
         addPrism(el);
+    for (let el of document.querySelectorAll(".hljs"))
+        el.classList.remove("hljs");
     Prism.highlightAll();
     const el = document.querySelector(`a[onclick="toggleFormattedCode()"]`);
     if (el){

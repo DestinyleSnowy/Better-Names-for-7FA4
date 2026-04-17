@@ -193,7 +193,6 @@
     function addPrism(pre) {
         // console.log(pre.innerHTML);
         // console.log("Adding Prism to", pre);
-        pre.classList.remove("hljs");
         pre.setAttribute("data-prismjs-copy", "复制");
         pre.setAttribute("data-prismjs-copy-error", "复制失败");
         pre.setAttribute("data-prismjs-copy-success", "复制成功");
@@ -201,9 +200,11 @@
         pre.classList.add("line-numbers");
     }
 
-    function downloadCode(codeElement, langClass) {
+    function downloadCode(codeElement, langClass, fileName) {
+        console.log(fileName);
         const codeContent = codeElement;
-        const {fileName, fileType, fileExt} = getSuffix(langClass);
+        const {fileType, fileExt} = getSuffix(langClass);
+        if (! fileName) fileName = "code." + fileExt;
         const blob = new Blob([codeContent], {type: fileType});
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
@@ -275,11 +276,26 @@
             java: 'text/x-java-source'
         };
 
-        const fileName = `code.${fileExt}`;
         const fileType = mimeTypes[fileExt] || 'text/plain';
-        return {fileName, fileType, fileExt};
+        return {fileType, fileExt};
     }
 
+    function getLang(suffix){
+        const extMap = {
+            py: 'python',
+            js: 'javascript',
+            html: 'html',
+            css: 'css',
+            txt: 'text',
+            sh: 'shell',
+            ts: 'typescript',
+            c: 'c',
+            cpp: 'cpp',
+            java: 'java',
+            md: "markdown",
+        };
+        return extMap[suffix] || suffix;
+    }
 
     function WriteCleanHTML(el, dirtyHTML) {
         if (!el) return;
@@ -328,6 +344,7 @@
 
     window.RenderMarkdown = RenderMarkdown;
     window.addPrism = addPrism;
+    window.getLang = getLang;
     window.WriteCleanHTML = WriteCleanHTML;
     window.GM_addStyle = GM_addStyle;
     window.GM_setClipboard = GM_setClipboard;
@@ -337,7 +354,7 @@
     Prism.plugins.toolbar.registerButton('download', {
         text: '下载代码',
         onClick: function (env) {
-            downloadCode(env.code, env.language);
+            downloadCode(env.code, env.language, env.element.parentElement.dataset.download);
         }
     });
     window.GM_getValue = function (key, defVal) {
