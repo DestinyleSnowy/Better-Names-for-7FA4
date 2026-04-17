@@ -5486,6 +5486,7 @@
             });
             chatRenderMessages({preserveScroll: true});
             chatSetStatus(`已加载更早消息 ${olderMessages.length} 条`, 'success');
+            console.log("scroll bottom", oldScrollBottom);
             chatMessageListEl.scrollTop = chatMessageListEl.scrollHeight - oldScrollBottom;
         } catch (error) {
             chatSetStatus(`加载失败：${error && error.message ? error.message : '未知错误'}`, 'error');
@@ -5514,6 +5515,12 @@
                 {silent: false, preserveScroll: false}
             ).then(chatMessagesScrollToBottom);
         }
+        const name =key.startsWith("group") ? "group-id"
+                : "target-id";
+        const id = key.split(":")[1];
+        console.log("set", name, "to", id);
+        const input_value = document.getElementById("bn-chat-group-op-" + name);
+        input_value.value = id;
     }
 
     function chatGetAutoRefreshIntervalMs() {
@@ -6620,9 +6627,7 @@
         // 滚动条距离顶部的距离
         const scrollTop = chatMessageListEl.scrollTop;
         // 阈值：当 scrollTop < 200px 时触发加载
-        const threshold = 100;
-
-        if (scrollTop < threshold)
+        if (scrollTop < 200)
             chatLoadOlderMessages();
     }
 
