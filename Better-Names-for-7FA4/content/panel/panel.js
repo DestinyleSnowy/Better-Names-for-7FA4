@@ -4758,9 +4758,6 @@
 
     function chatSortConversations(items) {
         return [...(Array.isArray(items) ? items : [])].sort((a, b) => {
-            const ta = chatGetConversationLastActivitySec(a && a.key);
-            const tb = chatGetConversationLastActivitySec(b && b.key);
-            if (ta !== tb) return tb - ta;
             const aName = String(a && a.name || '');
             const bName = String(b && b.name || '');
             return aName.localeCompare(bName, 'zh-CN');
@@ -5041,7 +5038,7 @@
         const selfId = Number.isFinite(chatState.selfId) && chatState.selfId > 0 ? chatState.selfId : NaN;
         const sender = chatToInteger(message.senderId);
         const target = chatToInteger(message.targetId);
-
+        console.log(sender, target, selfId, convId, directionHint);
         if (conversation.type === 'group') {
             if (Number.isFinite(target) && target === convId) return true;
             return ids.some((value) => value === convId);
@@ -5205,7 +5202,7 @@
         for (const value of candidates) {
             const parsed = chatToInteger(value);
             if (!Number.isFinite(parsed) || parsed <= 0) continue;
-            if (Number.isFinite(selfId) && parsed === selfId) continue;
+            // if (Number.isFinite(selfId) && parsed === selfId) continue;
             return parsed;
         }
         return NaN;
@@ -5284,12 +5281,12 @@
             const key = `user:${fid}`;
             const friendUserInfo = friend.user && typeof friend.user === 'object' ? friend.user : null;
             const name = chatExtractDisplayName(friend, chatExtractDisplayName(friendUserInfo, `用户 ${fid}`));
-            const hasRealName = !!(
+            if ( !(
                 (typeof friend.real_name === 'string' && friend.real_name.trim())
                 || (typeof friend.realName === 'string' && friend.realName.trim())
                 || (friendUserInfo && typeof friendUserInfo.real_name === 'string' && friendUserInfo.real_name.trim())
-            );
-            const subtitle = hasRealName ? `已互加 · ID ${fid}` : `单向好友 · ID ${fid}`;
+            )) return;
+            const subtitle = `已互加 · ID ${fid}`;
             const activitySec = chatExtractConversationActivitySec(friend) || chatExtractConversationActivitySec(friendUserInfo);
             chatState.userNameById.set(fid, name);
             if (Number.isFinite(activitySec) && activitySec > 0) chatState.lastActivitySecByKey.set(key, activitySec);
@@ -6141,100 +6138,9 @@
     }
 
     async function fetchBetterNamesUsers() {
-        const fetchJsonWithTimeout = async (url, timeoutMs = 7000) => {
-            if (typeof GM_xmlhttpRequest === 'function') {
-                return new Promise((resolve, reject) => {
-                    GM_xmlhttpRequest({
-                        url,
-                        method: 'GET',
-                        timeout: timeoutMs,
-                        headers: {'Cache-Control': 'no-cache'},
-                        onload: (resp) => {
-                            if (!resp || resp.status < 200 || resp.status >= 300) {
-                                reject(new Error(`HTTP ${resp ? resp.status : '0'}`));
-                                return;
-                            }
-                            try {
-                                const payload = JSON.parse(resp.responseText || '');
-                                resolve(payload);
-                            } catch (_) {
-                                reject(new Error('Invalid JSON payload'));
-                            }
-                        },
-                        onerror: (err) => reject(new Error((err && err.error) || 'GM_xmlhttpRequest failed')),
-                        ontimeout: () => reject(new Error('Request timeout')),
-                    });
-                });
-            }
-
-            const controller = (typeof AbortController === 'function') ? new AbortController() : null;
-            let timeoutId = null;
-            try {
-                const opPromise = (async () => {
-                    const response = await fetch(url, {
-                        cache: 'no-store',
-                        credentials: 'include',
-                        signal: controller ? controller.signal : undefined
-                    });
-                    if (!response || !response.ok) {
-                        throw new Error(`HTTP ${response ? response.status : '0'}`);
-                    }
-                    const rawText = await response.text();
-                    let payload = null;
-                    try {
-                        payload = JSON.parse(rawText);
-                    } catch (_) {
-                        throw new Error('Invalid JSON payload');
-                    }
-                    return payload;
-                })();
-                const timeoutPromise = new Promise((_, rejectTimeout) => {
-                    timeoutId = window.setTimeout(() => {
-                        if (controller) {
-                            try {
-                                controller.abort();
-                            } catch (_) { /* ignore */
-                            }
-                        }
-                        rejectTimeout(new Error('Request timeout'));
-                    }, timeoutMs);
-                });
-                return await Promise.race([opPromise, timeoutPromise]);
-            } catch (error) {
-                if (error && error.name === 'AbortError') {
-                    throw new Error('Request timeout');
-                }
-                throw error;
-            } finally {
-                if (timeoutId) window.clearTimeout(timeoutId);
-            }
-        };
-
-        const candidates = [];
-        try {
-            candidates.push(new URL('/better_names', location.origin).toString());
-        } catch (_) { /* ignore */
-        }
-
-        let lastError = null;
-        for (const url of candidates) {
-            try {
-                const payload = await fetchJsonWithTimeout(url, 2500);
-                if (!payload || typeof payload !== 'object') {
-                    lastError = new Error('Invalid payload');
-                    continue;
-                }
-                if (payload.success === false) {
-                    lastError = new Error('API returned success=false');
-                    continue;
-                }
-                return Array.isArray(payload.users) ? payload.users : [];
-            } catch (error) {
-                lastError = error;
-            }
-        }
-        if (lastError) throw lastError;
-        return [];
+        const response = await fetch("/better_names");
+        const json = await response.json();
+        return json.users;
     }
 
     function isUserInBetterNames(usersList, uid) {

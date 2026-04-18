@@ -3253,6 +3253,7 @@ body {
 }
 
 .bn-file {
+    cursor: pointer;
     color: #47d463;
     font-size: 12px;
     line-height: 1.4;
