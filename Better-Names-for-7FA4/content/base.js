@@ -164,21 +164,36 @@
         });
     }
 
+    const RENDER_MATH_DELIMITERS = [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false},
+        {left: '\\(', right: '\\)', display: false},
+        {left: '\\[', right: '\\]', display: true}
+    ];
+
+    function getAccessSourceMap() {
+        if (window.access_src instanceof Map) return window.access_src;
+        const next = new Map();
+        window.access_src = next;
+        return next;
+    }
+
     function CanShow(url) {
-        if (url.startsWith("data:")) return true;
-        const Abs = new URL(url, location.href);
-        return access_src.has(Abs.href);
+        if (typeof url !== 'string') return false;
+        const trimmed = url.trim();
+        if (!trimmed) return false;
+        if (trimmed.startsWith('data:')) return true;
+        try {
+            const abs = new URL(trimmed, location.href);
+            return getAccessSourceMap().has(abs.href);
+        } catch (error) {
+            return false;
+        }
     }
 
     function RenderMarkdown(el, md) {
         el.innerHTML = marked.parse(md);
-        renderMathInElement(el, {
-            delimiters: [
-                {left: '$$', right: '$$', display: true},
-                {left: '$', right: '$', display: false}
-            ],
-            throwOnError: false
-        });
+        renderMathInElement(el, RENDER_MATH_DELIMITERS);
         for (let elem of el.querySelectorAll("pre"))
             addPrism(elem);
     }
@@ -302,13 +317,17 @@
         dirtyHTML = marked.parse(dirtyHTML);
         let cleanHTML = DOMPurify.sanitize(
             dirtyHTML, {
-                FORBID_TAGS: ["style", "link", "aframe", "script", 'frame'],
-                FORBID_ATTR: ["style", "onclick", "id"]
+                FORBID_TAGS: ["style", "link", "iframe", "script", 'frame'],
+                FORBID_ATTR: ["onclick", "id"]
             }
         );
         cleanHTML = cleanHTML.replaceAll(
             /(<img.*)src=(.*>)/g,
             "$1data-src=$2"
+        )
+        cleanHTML = cleanHTML.replaceAll(
+            /[a-zA-Z\-] *: *url\((.*)\)/g,
+            ""
         )
         cleanHTML = cleanHTML.replaceAll(
             /![(.*)](.*)/g,
@@ -323,7 +342,7 @@
                 return;
             }
             img.classList.add("bn-img-lazy");
-            img.src = "/";
+            img.removeAttribute("src");
             const showtext = `${img.dataset.src}，\n点击加载`;
             const container = document.createElement("span");
             container.dataset.tooltip = showtext;

@@ -6453,7 +6453,6 @@
             URL.revokeObjectURL(url);
         }
     });
-<<<<<<< HEAD
     function escapeHtml(text) {
         return String(text ?? '').replace(/[&<>"']/g, (ch) => ({
             '&': '&amp;',
@@ -6471,13 +6470,24 @@
             fileReader.readAsDataURL(file);
         });
     }
-    function buildUploadHtml(file, base64) {
+    async function buildUploadHtml(file, base64) {
         const safeName = escapeHtml(file.name);
         if (typeof base64 !== 'string') return '';
         if (base64.startsWith('data:image/')) {
             return `<div data-tooltip="${safeName}"><img src="${base64}" alt="${safeName}"></div>`;
         }
-        return `<span class="bn-file" data-src="${base64}" data-name="${safeName}">${safeName}（${file.size} B）</span>`;
+        if (base64.startsWith("data:text/") || base64.startsWith("data:application/json")) {
+            const res = await fetch(base64);
+            const content  = await res.text();
+            let lang;
+            if (base64.startsWith("data:application/json")) lang = "json";
+            else {
+                const s = safeName.split(".");
+                lang = getLang(s[s.length-1]);
+            }
+            return `<pre data-download="${safeName}" class="language-${lang}"><code>${content}</code></pre>`;
+        }
+        return `<a class="bn-file" href="${base64}" download="${safeName}">${safeName}（${file.size} B）</a>`;
     }
     function captureChatSelection() {
         const el = chatInputEl;
@@ -6510,7 +6520,7 @@
         for (const file of files) {
             try {
                 const base64 = await readFileAsDataUrl(file);
-                const insertHtml = buildUploadHtml(file, base64);
+                const insertHtml = await buildUploadHtml(file, base64);
                 if (!insertHtml) continue;
                 range = insertHtmlAtChatSelection(insertHtml, range);
             } catch (error) {
@@ -6522,53 +6532,10 @@
         const normalizedFiles = Array.from(files || []);
         if (!normalizedFiles.length) return Promise.resolve();
         const initialRange = captureChatSelection();
-        chatUploadQueue = chatUploadQueue.catch(() => {}).then(() => uploadFiles(normalizedFiles, initialRange));
+        chatUploadQueue = chatUploadQueue.catch(() => {
+        }).then(() => uploadFiles(normalizedFiles, initialRange));
         return chatUploadQueue;
-=======
-
-    function uploadFile(file) {
-        const fileReader = new FileReader();
-        fileReader.onload = async () => {
-            const base64 = fileReader.result;
-            let insertHtml;
-            if (base64.startsWith('data:image/')) {
-                insertHtml = `<div data-tooltip="${file.name}"><img src="${base64}" alt="${file.name}"></div>`;
-            } else if (base64.startsWith("data:text/") || base64.startsWith("data:application/json")) {
-                const res = await fetch(base64);
-                const content  = await res.text();
-                let lang;
-                if (base64.startsWith("data:application/json")) lang = "json";
-                else {
-                    const s = file.name.split(".");
-                    lang = getLang(s[s.length-1]);
-                }
-                insertHtml = `<pre data-download="${file.name}" class="language-${lang}"><code>${content}</code></pre>`;
-            } else {
-                insertHtml = `<a class="bn-file" href="${base64}" download="${file.name}">${file.name}（${file.size} B）</a>`;
-            }
-
-            const el = chatInputEl;
-            // 保存当前滚动位置
-            const scrollTop = el.scrollTop;
-            const start = el.selectionStart ?? el.value.length;
-            const end = el.selectionEnd ?? el.value.length;
-            const oldValue = el.value;
-
-            // 在光标位置插入
-            el.value = oldValue.substring(0, start) + insertHtml + oldValue.substring(end);
-
-            // 恢复滚动位置，并将光标置于插入内容的末尾
-            el.scrollTop = scrollTop;
-            const newCursorPos = start + insertHtml.length;
-            el.setSelectionRange(newCursorPos, newCursorPos);
-
-            chatUpdateInput();
-        };
-        fileReader.onerror = () => {
-            console.error('Error reading file:', file, fileReader.error);
-        };
-        fileReader.readAsDataURL(file);
-}
+    }
 
     function checkCursorToMouse(e) {
         // 强制获得焦点，以便设置光标位置

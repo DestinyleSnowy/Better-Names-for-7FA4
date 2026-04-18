@@ -97,17 +97,14 @@
       ],
       "css": [
         "content/libs/katex/katex.min.css",
-        "content/panel/panel.css",
-        "content/user_tags/user_tags.css",
-        "content/user_tags/tag_details.css"
+        "content/panel/panel.css"
       ],
       "js": [
         "content/libs/marked.min.js",
         "content/libs/katex/katex.min.js",
         "content/libs/prism.js",
         "content/libs/katex/auto-render.min.js",
-        "content/render_logic.js",
-        "background.js"
+        "content/render_logic.js"
       ],
       "run_at": "document_idle"
     },
