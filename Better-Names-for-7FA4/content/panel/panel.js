@@ -5051,11 +5051,11 @@
             }
             if (directionHint === 'in') {
                 if (Number.isFinite(sender) && sender === convId) return true;
-                if (Number.isFinite(target) && target === selfId && ids.includes(convId)) return true;
+                // if (Number.isFinite(target) && target === selfId && ids.includes(convId)) return true;
             }
             if (directionHint === 'out') {
                 if (Number.isFinite(target) && target === convId) return true;
-                if (Number.isFinite(sender) && sender === selfId && ids.includes(convId)) return true;
+                // if (Number.isFinite(sender) && sender === selfId && ids.includes(convId)) return true;
             }
             return false;
         }
