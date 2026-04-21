@@ -2,6 +2,7 @@ import type { DomAdapter, ExtensionApiAdapter, StorageAdapter } from '@shared/co
 
 export type AppRuntime = 'content' | 'popup' | 'worker';
 export type PageRoute = 'problem-list' | 'profile' | 'tag-detail' | 'unknown';
+export type FeatureId = 'panel' | 'userMapping' | 'ranking' | 'profile' | 'tags';
 
 export interface FeatureContext {
     runtime: AppRuntime;
@@ -12,6 +13,7 @@ export interface FeatureContext {
 }
 
 export interface FeatureDefinition {
+    id: FeatureId;
     name: string;
     routes?: PageRoute[];
     setup(context: FeatureContext): Promise<void> | void;

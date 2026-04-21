@@ -11,8 +11,7 @@
     "lib": [
       "ES2022",
       "DOM",
-      "DOM.Iterable",
-      "WebWorker"
+      "DOM.Iterable"
     ],
     "baseUrl": ".",
     "paths": {

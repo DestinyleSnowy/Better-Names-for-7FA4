@@ -1,7 +1,7 @@
 import type { StorageDefaults } from '@shared/types/storage';
 
 export const STORAGE_DEFAULTS: StorageDefaults = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     platform: {
         installedAt: null,
         installReason: null
@@ -9,6 +9,8 @@ export const STORAGE_DEFAULTS: StorageDefaults = {
     featureFlags: {
         panel: true,
         userMapping: true,
-        ranking: false
+        ranking: false,
+        profile: true,
+        tags: true
     }
 };

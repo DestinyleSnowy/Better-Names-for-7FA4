@@ -2,6 +2,7 @@ import type { FeatureDefinition } from '@shared/types/feature';
 
 export function createPanelFeature(): FeatureDefinition {
     return {
+        id: 'panel',
         name: 'panel',
         routes: ['problem-list', 'profile', 'tag-detail'],
         async setup(context) {

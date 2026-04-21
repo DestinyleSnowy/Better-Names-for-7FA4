@@ -1,14 +1,18 @@
+export interface FeatureFlags {
+    panel: boolean;
+    userMapping: boolean;
+    ranking: boolean;
+    profile: boolean;
+    tags: boolean;
+}
+
 export interface StorageSnapshot {
     schemaVersion: number;
     platform: {
         installedAt: string | null;
         installReason: string | null;
     };
-    featureFlags: {
-        panel: boolean;
-        userMapping: boolean;
-        ranking: boolean;
-    };
+    featureFlags: FeatureFlags;
 }
 
 export type StorageDefaults = StorageSnapshot;
