@@ -3043,10 +3043,10 @@
             let info = users[key];
             if (!info || typeof info !== 'object') {
                 info = {name: '', colorKey: 'uk'};
-                users[key] = info;
             }
             if (typeof info.name !== 'string') info.name = String(info.name || '');
             if (typeof info.colorKey !== 'string' || !info.colorKey) info.colorKey = 'uk';
+            users[key] = info;
             return info;
         };
 
@@ -3554,8 +3554,7 @@
         if (t.startsWith('//')) return true;
         if (/^www\./i.test(t)) return true;
         if (/\/user\/\d+/i.test(t)) return true;
-        if (/[?&](?:user_id|userId|uid)=\d+/i.test(t)) return true;
-        return false;
+        return (/[?&](?:user_id|userId|uid)=\d+/i.test(t));
     }
 
     function isBareUserProfileHref(rawHref, uid) {
@@ -5038,7 +5037,6 @@
         const selfId = Number.isFinite(chatState.selfId) && chatState.selfId > 0 ? chatState.selfId : NaN;
         const sender = chatToInteger(message.senderId);
         const target = chatToInteger(message.targetId);
-        console.log(sender, target, selfId, convId, directionHint);
         if (conversation.type === 'group') {
             if (Number.isFinite(target) && target === convId) return true;
             return ids.some((value) => value === convId);
@@ -5773,8 +5771,7 @@
             if (rule.needMute) {
                 const time = chatToInteger(chatGroupOpMuteEl ? chatGroupOpMuteEl.value : NaN);
                 if (!Number.isFinite(time) || time < 0) throw new Error('time 必须是非负整数');
-                const mute = time + Math.floor(Date.now() / 1000);
-                payload.mute = mute;
+                payload.mute = time + Math.floor(Date.now() / 1000)
             }
         } catch (error) {
             chatSetGroupOperationStatus(error.message || '参数错误', 'error');
@@ -5999,7 +5996,7 @@
         joinPlanStatusTextEl.textContent = text;
     }
 
-    function setJoinPlanDetailVisibility(showButton, showPanel) {
+    function setJoinPlanDetailVisibility(showButton) {
         if (joinPlanDetailBtnEl) {
             joinPlanDetailBtnEl.hidden = !showButton;
             if (!showButton) {
@@ -6360,13 +6357,9 @@
         }
     });
     function escapeHtml(text) {
-        return String(text ?? '').replace(/[&<>"']/g, (ch) => ({
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#39;'
-        }[ch]));
+        const el = document.createElement("div");
+        el.textContent = text;
+        return el.innerHTML;
     }
     function readFileAsDataUrl(file) {
         return new Promise((resolve, reject) => {
@@ -6426,8 +6419,11 @@
         for (const file of files) {
             try {
                 const base64 = await readFileAsDataUrl(file);
-                const insertHtml = await buildUploadHtml(file, base64);
+                let insertHtml = await buildUploadHtml(file, base64);
                 if (!insertHtml) continue;
+                if (chatInputEl.value.length + insertHtml.length){
+                    console.warn("[BN] 警告：文件过大");
+                }
                 range = insertHtmlAtChatSelection(insertHtml, range);
             } catch (error) {
                 console.error('Error reading file:', file, error);
