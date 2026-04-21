@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Better Names for 7FA4",
+  "version": "[TODO]",
+  "description": "Refactored manifest template placeholder",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  }
+}

@@ -1,0 +1,46 @@
+body {
+    margin: 0;
+    font-family: "Segoe UI", "PingFang SC", sans-serif;
+    background:
+        radial-gradient(circle at top left, rgba(245, 158, 11, 0.28), transparent 42%),
+        linear-gradient(180deg, #f8fafc, #e2e8f0);
+}
+
+#app {
+    width: 340px;
+    min-height: 260px;
+}
+
+.popup-shell {
+    padding: 20px;
+    color: #0f172a;
+}
+
+.popup-eyebrow {
+    margin: 0 0 8px;
+    color: #b45309;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.popup-title {
+    margin: 0 0 12px;
+    font-size: 26px;
+    line-height: 1.1;
+}
+
+.popup-copy {
+    margin: 0 0 16px;
+    color: #334155;
+}
+
+.popup-output {
+    margin: 0;
+    padding: 12px;
+    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.92);
+    color: #e2e8f0;
+    white-space: pre-wrap;
+}

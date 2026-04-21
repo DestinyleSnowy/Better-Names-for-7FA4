@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Better Names for 7FA4 Refactor",
+  "version": "0.1.0",
+  "description": "A ground-up MV3 refactor scaffold for the 7FA4 browser extension.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "http://*.7fa4.cn/*",
+    "http://10.210.57.10/*",
+    "http://211.137.101.118/*"
+  ],
+  "background": {
+    "service_worker": "worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Better Names for 7FA4 Refactor",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*.7fa4.cn/*",
+        "http://10.210.57.10/*",
+        "http://211.137.101.118/*"
+      ],
+      "js": [
+        "content-app.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "better-names-for-7fa4-refactor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node scripts/build/manifest.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.296",
+    "@types/node": "^24.6.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.7"
+  }
+}

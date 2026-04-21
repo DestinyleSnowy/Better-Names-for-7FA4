@@ -1,0 +1,55 @@
+#bn-refactor-root {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    z-index: 2147483647;
+    font-family: "Segoe UI", "PingFang SC", sans-serif;
+}
+
+.bn-refactor-card {
+    width: 320px;
+    padding: 16px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 16px;
+    background:
+        linear-gradient(135deg, rgba(248, 250, 252, 0.98), rgba(226, 232, 240, 0.95));
+    box-shadow: 0 12px 40px rgba(15, 23, 42, 0.14);
+    color: #0f172a;
+}
+
+.bn-refactor-eyebrow {
+    margin-bottom: 8px;
+    color: #b45309;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.bn-refactor-title {
+    margin: 0 0 8px;
+    font-size: 20px;
+    line-height: 1.2;
+}
+
+.bn-refactor-copy {
+    margin: 0;
+    color: #334155;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.bn-refactor-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.bn-refactor-pill {
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.08);
+    font-size: 12px;
+    font-weight: 600;
+}

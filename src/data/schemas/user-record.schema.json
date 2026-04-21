@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UserRecord",
+  "type": "object",
+  "description": "Placeholder schema for refactored user data.",
+  "required": [
+    "id",
+    "displayName"
+  ],
+  "properties": {
+    "id": {
+      "type": [
+        "integer",
+        "string"
+      ]
+    },
+    "displayName": {
+      "type": "string"
+    },
+    "color": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Better Names for 7FA4 Refactor</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<main class="popup">
+    <p class="eyebrow">Better Names for 7FA4</p>
+    <h1>Refactor Scaffold</h1>
+    <p class="copy">
+        当前加载的是从零开始的新扩展骨架。旧目录仅保留作参考，不参与运行。
+    </p>
+    <section class="status">
+        <div class="status-row">
+            <span>运行模式</span>
+            <strong>Root Extension</strong>
+        </div>
+        <div class="status-row">
+            <span>架构状态</span>
+            <strong>Scaffold Only</strong>
+        </div>
+        <div class="status-row">
+            <span>兼容目标</span>
+            <strong>Manifest V3</strong>
+        </div>
+    </section>
+    <button id="refreshStatus" type="button">刷新状态</button>
+    <pre id="statusOutput" class="output">Waiting for background status...</pre>
+</main>
+<script src="popup.js"></script>
+</body>
+</html>

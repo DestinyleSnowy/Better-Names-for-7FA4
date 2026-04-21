@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "Better Names for 7FA4 Refactor",
+  "version": "0.1.0",
+  "description": "A ground-up refactor scaffold for the 7FA4 browser extension.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "http://*.7fa4.cn/*",
+    "http://10.210.57.10/*",
+    "http://211.137.101.118/*"
+  ],
+  "background": {
+    "service_worker": "extension/background/background.js"
+  },
+  "action": {
+    "default_title": "Better Names for 7FA4 Refactor",
+    "default_popup": "extension/popup/popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*.7fa4.cn/*",
+        "http://10.210.57.10/*",
+        "http://211.137.101.118/*"
+      ],
+      "js": [
+        "extension/content/content-script.js"
+      ],
+      "css": [
+        "extension/content/content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "extension/content/panel.html"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
+}
