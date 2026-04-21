@@ -1,3 +1,4 @@
+import { mountFloatingPanel } from '@features/panel/floating-panel';
 import type { FeatureDefinition } from '@shared/types/feature';
 
 export function createPanelFeature(): FeatureDefinition {
@@ -7,7 +8,12 @@ export function createPanelFeature(): FeatureDefinition {
         routes: ['problem-list', 'profile', 'tag-detail'],
         async setup(context) {
             const host = context.dom.ensureRoot('bn-refactor-panel-host');
-            host.textContent = 'panel feature mounted';
+            if (host.dataset.bnPanelMounted === '1') {
+                return;
+            }
+
+            host.dataset.bnPanelMounted = '1';
+            await mountFloatingPanel(host, context.storage);
         }
     };
 }
