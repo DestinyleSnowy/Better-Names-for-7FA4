@@ -74,7 +74,7 @@
     const debugLog = (...args) => {
         if (!DEBUG) return;
         try {
-            console.log('[BN][debug]', ...args);
+            console.debug('[BN][debug]', ...args);
         } catch (_) { /* ignore */
         }
     };
@@ -1877,7 +1877,7 @@
         }
     });
 
-    chkUseColor.onchange = () => {
+    chkUseColor.onchange = async () => {
         const isChecked = chkUseColor.checked;
         if (isChecked) {
             container.classList.add('bn-expanded');
@@ -1891,6 +1891,12 @@
             }, 200);
         }
         checkChanged();
+        users = await loadUsersData(isChecked);
+        const a = document.querySelectorAll(USER_LINK_SELECTOR);
+        a.forEach((el) => {
+            el.removeAttribute("data-bn-user-done");
+        });
+        a.forEach(processUserLink);
     };
 
     if (useCustomColors) {
@@ -2969,13 +2975,13 @@
         return out;
     }
 
-    async function loadUsersData() {
+    async function loadUsersData(get) {
         const urls = [];
         if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function') {
             try {
                 urls.push(chrome.runtime.getURL('data/users.json'));
             } catch (err) {
-                // console.warn('Failed to resolve users.json via chrome.runtime.getURL', err);
+                console.warn('Failed to resolve users.json via chrome.runtime.getURL', err);
             }
         }
         urls.push('data/users.json');
@@ -2983,14 +2989,24 @@
             try {
                 const resp = await fetch(url, {cache: 'no-store'});
                 if (resp && resp.ok) {
-                    return await resp.json();
+                    const json = await resp.json();
+                    let users;
+                    if ("users" in json)
+                        users = json.users;
+                    else users = json;
+                    if (!get) {
+                        for (let user in users) {
+                            users[user].colorKey = "clear";
+                        }
+                    }
+                    return users;
                 }
-                // console.warn(`Failed to load users.json from ${url}: ${resp ? resp.status : 'no response'}`);
+                console.warn(`Failed to load users.json from ${url}: ${resp ? resp.status : 'no response'}`);
             } catch (err) {
-                // console.warn(`Failed to load users.json from ${url}`, err);
+                console.warn(`Failed to load users.json from ${url}`, err);
             }
         }
-        // console.warn('Users data could not be loaded; using empty map.');
+        console.warn('Users data could not be loaded; using empty map.');
         return {};
     }
 
@@ -3098,8 +3114,8 @@
         }
     }
 
-    const [users, specialRules] = await Promise.all([
-        loadUsersData(),
+    let [users, specialRules] = await Promise.all([
+        loadUsersData(GM_getValue("useCustomColors")),
         loadSpecialRules(),
     ]);
     applySpecialRules(users, specialRules);
@@ -3654,8 +3670,12 @@
             if (showUserNickname && originalNickname) {
                 combinedName += `（${originalNickname}）`;
             }
-            const c = palette[info.colorKey];
-            if (c) a.style.color = c;
+            if (info.colorKey === "clear")
+                a.style.color = '';
+            else {
+                const c = palette[info.colorKey];
+                if (c) a.style.color = c;
+            }
         }
 
         const limitedName = truncateByUnits(combinedName || '', maxUserUnits);
@@ -5279,7 +5299,7 @@
             const key = `user:${fid}`;
             const friendUserInfo = friend.user && typeof friend.user === 'object' ? friend.user : null;
             const name = chatExtractDisplayName(friend, chatExtractDisplayName(friendUserInfo, `用户 ${fid}`));
-            if ( !(
+            if (!(
                 (typeof friend.real_name === 'string' && friend.real_name.trim())
                 || (typeof friend.realName === 'string' && friend.realName.trim())
                 || (friendUserInfo && typeof friendUserInfo.real_name === 'string' && friendUserInfo.real_name.trim())
@@ -5481,7 +5501,6 @@
             });
             chatRenderMessages({preserveScroll: true});
             chatSetStatus(`已加载更早消息 ${olderMessages.length} 条`, 'success');
-            console.log("scroll bottom", oldScrollBottom);
             chatMessageListEl.scrollTop = chatMessageListEl.scrollHeight - oldScrollBottom;
         } catch (error) {
             chatSetStatus(`加载失败：${error && error.message ? error.message : '未知错误'}`, 'error');
@@ -5510,10 +5529,9 @@
                 {silent: false, preserveScroll: false}
             ).then(chatMessagesScrollToBottom);
         }
-        const name =key.startsWith("group") ? "group-id"
-                : "target-id";
+        const name = key.startsWith("group") ? "group-id"
+            : "target-id";
         const id = key.split(":")[1];
-        console.log("set", name, "to", id);
         const input_value = document.getElementById("bn-chat-group-op-" + name);
         input_value.value = id;
     }
@@ -6356,11 +6374,13 @@
             URL.revokeObjectURL(url);
         }
     });
+
     function escapeHtml(text) {
         const el = document.createElement("div");
         el.textContent = text;
         return el.innerHTML;
     }
+
     function readFileAsDataUrl(file) {
         return new Promise((resolve, reject) => {
             const fileReader = new FileReader();
@@ -6369,6 +6389,7 @@
             fileReader.readAsDataURL(file);
         });
     }
+
     async function buildUploadHtml(file, base64) {
         const safeName = escapeHtml(file.name);
         if (typeof base64 !== 'string') return '';
@@ -6377,17 +6398,18 @@
         }
         if (base64.startsWith("data:text/") || base64.startsWith("data:application/json")) {
             const res = await fetch(base64);
-            const content  = await res.text();
+            const content = await res.text();
             let lang;
             if (base64.startsWith("data:application/json")) lang = "json";
             else {
                 const s = safeName.split(".");
-                lang = getLang(s[s.length-1]);
+                lang = getLang(s[s.length - 1]);
             }
             return `<pre data-download="${safeName}" class="language-${lang}"><code>${content}</code></pre>`;
         }
         return `<a class="bn-file" href="${base64}" download="${safeName}">${safeName}（${file.size} B）</a>`;
     }
+
     function captureChatSelection() {
         const el = chatInputEl;
         return {
@@ -6396,6 +6418,7 @@
             scrollTop: el.scrollTop
         };
     }
+
     function insertHtmlAtChatSelection(insertHtml, range = captureChatSelection()) {
         const el = chatInputEl;
         const scrollTop = range.scrollTop ?? el.scrollTop;
@@ -6413,7 +6436,9 @@
             scrollTop
         };
     }
+
     let chatUploadQueue = Promise.resolve();
+
     async function uploadFiles(files, initialRange = captureChatSelection()) {
         let range = initialRange;
         for (const file of files) {
@@ -6421,7 +6446,7 @@
                 const base64 = await readFileAsDataUrl(file);
                 let insertHtml = await buildUploadHtml(file, base64);
                 if (!insertHtml) continue;
-                if (chatInputEl.value.length + insertHtml.length){
+                if (chatInputEl.value.length + insertHtml.length) {
                     console.warn("[BN] 警告：文件过大");
                 }
                 range = insertHtmlAtChatSelection(insertHtml, range);
@@ -6430,6 +6455,7 @@
             }
         }
     }
+
     function queueUploadFiles(files) {
         const normalizedFiles = Array.from(files || []);
         if (!normalizedFiles.length) return Promise.resolve();
@@ -6513,7 +6539,7 @@
         el.classList.remove("hljs");
     Prism.highlightAll();
     const el = document.querySelector(`a[onclick="toggleFormattedCode()"]`);
-    if (el){
+    if (el) {
         const fa = document.getElementById("status_table");
         fa.appendChild(el);
         el.addEventListener("click", () => {
