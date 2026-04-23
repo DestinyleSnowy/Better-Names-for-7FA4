@@ -165,8 +165,8 @@
     }
 
     const RENDER_MATH_DELIMITERS = [
-        {left: '$$', right: '$$', display: true},
         {left: '$', right: '$', display: false},
+        {left: '$$', right: '$$', display: true},
         {left: '\\(', right: '\\)', display: false},
         {left: '\\[', right: '\\]', display: true}
     ];
@@ -193,7 +193,11 @@
 
     function RenderMarkdown(el, md) {
         el.innerHTML = marked.parse(md);
-        renderMathInElement(el, RENDER_MATH_DELIMITERS);
+        renderMathInElement(el, {
+            delimeters: RENDER_MATH_DELIMITERS,
+            throwOnError: false
+        });
+        console.log(el.innerHTML);
         for (let elem of el.querySelectorAll("pre"))
             addPrism(elem);
     }
@@ -206,8 +210,6 @@
     }
 
     function addPrism(pre) {
-        // console.log(pre.innerHTML);
-        // console.log("Adding Prism to", pre);
         pre.setAttribute("data-prismjs-copy", "复制");
         pre.setAttribute("data-prismjs-copy-error", "复制失败");
         pre.setAttribute("data-prismjs-copy-success", "复制成功");
@@ -216,7 +218,6 @@
     }
 
     function downloadCode(codeElement, langClass, fileName) {
-        console.log(fileName);
         const codeContent = codeElement;
         const {fileType, fileExt} = getSuffix(langClass);
         if (! fileName) fileName = "code." + fileExt;
@@ -318,7 +319,8 @@
         let cleanHTML = DOMPurify.sanitize(
             dirtyHTML, {
                 FORBID_TAGS: ["style", "link", "iframe", "script", 'frame'],
-                FORBID_ATTR: ["onclick", "id"]
+                FORBID_ATTR: ["id"],
+                ALLOWED_URI_REGEXP: /^.*/
             }
         );
         cleanHTML = cleanHTML.replaceAll(
@@ -330,7 +332,7 @@
             ""
         )
         cleanHTML = cleanHTML.replaceAll(
-            /![(.*)](.*)/g,
+            /!\[(.*)](.*)/g,
             `<img alt="$1" data-src="$2">`
         )
         el.innerHTML = cleanHTML;
@@ -351,10 +353,7 @@
         })
         removeFixed(el);
         renderMathInElement(el, {
-            delimiters: [
-                {left: '$$', right: '$$', display: true},
-                {left: '$', right: '$', display: false}
-            ],
+            delimeters: RENDER_MATH_DELIMITERS,
             throwOnError: false
         });
         for (let elem of el.querySelectorAll("pre"))

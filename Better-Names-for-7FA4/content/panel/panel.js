@@ -830,6 +830,7 @@
     const chatGroupOpRunBtnEl = container.querySelector('#bn-chat-group-op-run-btn');
     const chatGroupOpStatusEl = container.querySelector('#bn-chat-group-op-status');
     const chatInputPreviewEl = container.querySelector('#bn-chat-preview');
+    const chatShowMembsersEl = container.querySelector('#bn-chat-show-members');
 
     const chatState = {
         initialized: false,
@@ -4967,7 +4968,7 @@
 
             const subtitle = document.createElement('div');
             subtitle.className = 'bn-chat-conversation-sub';
-            subtitle.textContent = item.subtitle || (item.type === 'group' ? '群组会话' : '好友会话');
+            subtitle.innerHTML = item.subtitle || (item.type === 'group' ? '群组会话' : '好友会话');
 
             entry.appendChild(top);
             entry.appendChild(subtitle);
@@ -5323,11 +5324,17 @@
             if (!Number.isFinite(gid) || gid <= 0) return;
             const key = `group:${gid}`;
             const title = chatExtractDisplayName(group, `群组 ${gid}`);
-            const members = Array.isArray(group.members) ? group.members : [];
+            const members = Array.isArray(group.users) ? group.users : [];
+            const membersName = [];
+            const administratorsName = [];
+            let ownerName;
+
             members.forEach((member) => {
                 const uid = chatToInteger(member && (member.id ?? member.user_id ?? member.uid));
                 if (!Number.isFinite(uid) || uid <= 0) return;
                 const memberName = chatExtractDisplayName(member, `用户 ${uid}`);
+                if (member.type === "Owner") ownerName = memberName;
+                else (member.type === "Member" ? membersName : administratorsName).push(memberName);
                 if (!chatState.userNameById.has(uid) || !chatState.userNameById.get(uid)) {
                     chatState.userNameById.set(uid, memberName);
                 }
@@ -5340,7 +5347,7 @@
                 id: gid,
                 type: 'group',
                 name: title,
-                subtitle: `群成员 ${members.length || 0} 人 · ID ${gid}`,
+                subtitle: `<div class="bn-group-title" data-title="群主：${ownerName}<br>管理员：${administratorsName.join("，")}<br>成员：${membersName.join("，")}">群成员 ${members.length || 0} 人 · ID ${gid}</div>`,
             });
         });
 
@@ -5680,6 +5687,7 @@
             const remain = chatToInteger(payload.remain_token_count);
             chatState.tokenUsed = Number.isFinite(used) ? used : null;
             chatState.tokenRemain = Number.isFinite(remain) ? remain : null;
+            chatState.maxTokenCount = Number.isFinite(used) && Number.isFinite(remain) ? used+remain : null;
             chatUpdateTokenDisplay();
             const usedText = Number.isFinite(chatState.tokenUsed) ? chatState.tokenUsed : '--';
             const remainText = Number.isFinite(chatState.tokenRemain) ? chatState.tokenRemain : '--';
@@ -6366,12 +6374,26 @@
         if (e.target.classList.contains('bn-file')) {
             const fileName = e.target.dataset.name;
             const url = e.target.dataset.src;
+            if (!url) return;
             const a = document.createElement('a');
             a.href = url;
             a.download = fileName;
             a.target = "_blank";
             a.click();
             URL.revokeObjectURL(url);
+        }
+    });
+    document.addEventListener("mouseover", (e) => {
+        if (e.target.classList.contains("bn-group-title")) {
+            const timer = setTimeout(() => {
+                chatShowMembsersEl.innerHTML = e.target.dataset.title;
+                chatShowMembsersEl.style.display = "block";
+
+            }, 500);
+            e.target.addEventListener("mouseout", () => {
+                chatShowMembsersEl.style.display = "none";
+                clearTimeout(timer);
+            });
         }
     });
 
