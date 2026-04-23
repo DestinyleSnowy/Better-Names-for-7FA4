@@ -2975,6 +2975,20 @@
         }
         return out;
     }
+    
+    async function getRealnames(){
+        let response = {};
+        const chatInfo = await fetch("/chat/info");
+        const json = await chatInfo.json();
+        for (let user of json.friends){
+            if (user.real_name)
+                response[user.id] = user.real_name;
+        }
+        for (let user of await fetchBetterNamesUsers()){
+            response[user.id] = user.real_name;
+        }
+        return response;
+    }
 
     async function loadUsersData(get) {
         const urls = [];
@@ -3120,6 +3134,7 @@
         loadSpecialRules(),
     ]);
     applySpecialRules(users, specialRules);
+    const realnames = await getRealnames();
 
     function firstVisibleCharOfTitle() {
         const h1 = document.querySelector('body > div:nth-child(2) > div > div.ui.center.aligned.grid > div > h1');
@@ -3648,6 +3663,8 @@
         if (!markOnce(a, 'UserDone')) return;
         if (!isBareUserProfileHref(rawHref, uid)) return;
         const info = users[uid];
+        // if (realnames[uid])
+        //     a.innerHTML = `${realnames[uid]}（${a.innerHTML}）`;
         if (info && GRADE_LABELS[info.colorKey]) a.setAttribute('title', GRADE_LABELS[info.colorKey]);
 
         let baseText = '';
@@ -5300,11 +5317,7 @@
             const key = `user:${fid}`;
             const friendUserInfo = friend.user && typeof friend.user === 'object' ? friend.user : null;
             const name = chatExtractDisplayName(friend, chatExtractDisplayName(friendUserInfo, `用户 ${fid}`));
-            if (!(
-                (typeof friend.real_name === 'string' && friend.real_name.trim())
-                || (typeof friend.realName === 'string' && friend.realName.trim())
-                || (friendUserInfo && typeof friendUserInfo.real_name === 'string' && friendUserInfo.real_name.trim())
-            )) return;
+            if (!(typeof friend.real_name === 'string' && friend.real_name.trim())) return;
             const subtitle = `已互加 · ID ${fid}`;
             const activitySec = chatExtractConversationActivitySec(friend) || chatExtractConversationActivitySec(friendUserInfo);
             chatState.userNameById.set(fid, name);
@@ -5332,7 +5345,7 @@
             members.forEach((member) => {
                 const uid = chatToInteger(member && (member.id ?? member.user_id ?? member.uid));
                 if (!Number.isFinite(uid) || uid <= 0) return;
-                const memberName = chatExtractDisplayName(member, `用户 ${uid}`);
+                const memberName = realnames[uid] ?? `用户 ${uid}`;
                 if (member.type === "Owner") ownerName = memberName;
                 else (member.type === "Member" ? membersName : administratorsName).push(memberName);
                 if (!chatState.userNameById.has(uid) || !chatState.userNameById.get(uid)) {
