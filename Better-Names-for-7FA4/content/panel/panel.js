@@ -38,7 +38,8 @@
         hideOrig: true,
         enableContestDownloadButtons: true,
         enableContestReviewButtons: true,
-        showUserNickname: true,
+        showUserRealname: "none",
+        showUser: "none",
         enableUserMenu: true,
         enablePlanAdder: true,
         enableTemplateBulkAdd: true,
@@ -152,7 +153,8 @@
     const hideOrig = readConfigValue('hideOrig');
     const enableContestDownloadButtons = readConfigValue('enableContestDownloadButtons');
     const enableContestReviewButtons = readConfigValue('enableContestReviewButtons');
-    const showUserNickname = readConfigValue('showUserNickname');
+    const showUserRealname = readConfigValue('showUserRealname');
+    const showUser = readConfigValue('showUser');
     const enableMenu = readConfigValue('enableUserMenu');
     const enablePlanAdder = true;
     try {
@@ -250,7 +252,8 @@
         hideOrig,
         enableContestDownloadButtons,
         enableContestReviewButtons,
-        showUserNickname,
+        showUserRealname,
+        showUser,
         enableMenu,
         enablePlanAdder,
         enableTemplateBulkAdd,
@@ -1390,8 +1393,9 @@
     const chkHo = document.getElementById('bn-hide-orig');
     const chkContestDownload = document.getElementById('bn-enable-contest-download');
     const chkContestReview = document.getElementById('bn-enable-contest-review');
-    const chkShowNickname = document.getElementById('bn-show-user-nickname');
-
+    const chkShowRealname = document.getElementById('bn-show-user-realname');
+    const selectShowRealnameAnd = document.getElementById("bn-show-user-realname-and");
+    const selectShowUserShow = document.getElementById("bn-show-user-show");
     const chkMenu = document.getElementById('bn-enable-user-menu');
     let chkTemplateBulkAdd = document.getElementById('bn-enable-template-bulk-add');
     const chkAutoRenew = document.getElementById('bn-enable-renew');
@@ -1437,7 +1441,9 @@
     chkHo.checked = hideOrig;
     chkContestDownload.checked = enableContestDownloadButtons;
     chkContestReview.checked = enableContestReviewButtons;
-    chkShowNickname.checked = showUserNickname;
+    chkShowRealname.checked = showUserRealname !== undefined;
+    selectShowRealnameAnd.value = showUserRealname ?? "none";
+    selectShowUserShow.value = showUser;
     chkMenu.checked = enableMenu;
     if (chkTemplateBulkAdd) chkTemplateBulkAdd.checked = enableTemplateBulkAdd;
     chkAutoRenew.checked = enableAutoRenew;
@@ -1520,7 +1526,8 @@
         hideOrig,
         enableContestDownloadButtons,
         enableContestReviewButtons,
-        showUserNickname,
+        showUserRealname,
+        showUser,
         enableMenu,
         enablePlanAdder,
         enableTemplateBulkAdd,
@@ -1801,6 +1808,14 @@
         };
     }
 
+    function updateUserShow(){
+        const a = document.querySelectorAll(USER_LINK_SELECTOR);
+        a.forEach((el) => {
+            el.removeAttribute("data-bn-user-done");
+        });
+        a.forEach(processUserLink);
+    }
+
     const wakeController = createPanelWakeController();
     wakeController.syncPinnedState();
     updateContainerState();
@@ -1893,11 +1908,7 @@
         }
         checkChanged();
         users = await loadUsersData(isChecked);
-        const a = document.querySelectorAll(USER_LINK_SELECTOR);
-        a.forEach((el) => {
-            el.removeAttribute("data-bn-user-done");
-        });
-        a.forEach(processUserLink);
+        updateUserShow();
     };
 
     if (useCustomColors) {
@@ -2410,7 +2421,8 @@
             (document.getElementById('bn-hide-orig').checked !== originalConfig.hideOrig) ||
             (document.getElementById('bn-enable-contest-download').checked !== originalConfig.enableContestDownloadButtons) ||
             (document.getElementById('bn-enable-contest-review').checked !== originalConfig.enableContestReviewButtons) ||
-            (document.getElementById('bn-show-user-nickname').checked !== originalConfig.showUserNickname) ||
+            (document.getElementById('bn-show-user-realname').checked ? selectShowRealnameAnd.value : null !== originalConfig.showUserRealname) ||
+            (selectShowUserShow !== originalConfig.showUser) ||
             (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) ||
             ((templateBulkAddChk ? templateBulkAddChk.checked : originalConfig.enableTemplateBulkAdd) !== originalConfig.enableTemplateBulkAdd) ||
             (document.getElementById('bn-enable-renew').checked !== originalConfig.enableAutoRenew) ||
@@ -2496,7 +2508,11 @@
     chkHo.onchange = checkChanged;
     chkContestDownload.onchange = checkChanged;
     chkContestReview.onchange = checkChanged;
-    chkShowNickname.onchange = checkChanged;
+    chkShowRealname.onchange = selectShowRealnameAnd.onchange = selectShowUserShow.onchange = () => {
+        checkChanged();
+        shownames = getShowNames();
+        updateUserShow();
+    }
     chkMenu.onchange = checkChanged;
     chkVj.onchange = checkChanged;
     chkHideDoneSkip.onchange = () => {
@@ -2574,7 +2590,8 @@
         GM_setValue('hideOrig', chkHo.checked);
         GM_setValue('enableContestDownloadButtons', chkContestDownload.checked);
         GM_setValue('enableContestReviewButtons', chkContestReview.checked);
-        GM_setValue('showUserNickname', chkShowNickname.checked);
+        GM_setValue('showUserRealname', chkShowRealname.checked ? selectShowRealnameAnd.value : undefined);
+        GM_setValue('showUser', selectShowUserShow.value);
         GM_setValue('hideDoneSkip', chkHideDoneSkip.checked);
         GM_setValue('enableQuickSkip', chkQuickSkip.checked);
         GM_setValue('enableTitleOptimization', chkTitleOpt.checked);
@@ -2673,7 +2690,8 @@
         chkHo.checked = originalConfig.hideOrig;
         chkContestDownload.checked = originalConfig.enableContestDownloadButtons;
         chkContestReview.checked = originalConfig.enableContestReviewButtons;
-        chkShowNickname.checked = originalConfig.showUserNickname;
+        chkShowRealname.checked = originalConfig.showUserRealname !== undefined;
+        selectShowRealnameAnd.value = originalConfig.showUserRealname ?? "none";
         chkMenu.checked = originalConfig.enableMenu;
         chkVj.checked = originalConfig.enableVjLink;
         chkHideDoneSkip.checked = originalConfig.hideDoneSkip;
@@ -2976,18 +2994,36 @@
         return out;
     }
     
-    async function getRealnames(){
-        let response = {};
+    async function getShowNames(){
         const chatInfo = await fetch("/chat/info");
-        const json = await chatInfo.json();
-        for (let user of json.friends){
-            if (user.real_name)
-                response[user.id] = user.real_name;
+        const response = (await chatInfo.json()).friends;
+        response.concat(response, await fetchBetterNamesUsers());
+        let ret = {};
+        for (let user of response){
+            let add;
+            if (showUserRealname !== undefined && user.real_name){
+                add = user.real_name;
+                if (user[showUserRealname])
+                    add += `（${user[showUserRealname]}）`;
+            } else {
+                if (user[showUser]) {
+                    add = user[showUser];
+                } else if (showUser === "username"){
+                    const htmlres = await fetch(`/user/${user.id}`);
+                    const html = await htmlres.text();
+                    add = html.match(/<title>(.*) - 用户.*<\/title>/)[1];
+                } else if (showUser === "nickname"){const htmlres = await fetch(`/user/${user.id}`);
+                    const html = await htmlres.text();
+                    add = html.match(/<h4.*>\s*昵称\s*<\/h4>\s*<div.*>\s*(.*)\s*<\/div>/);
+                    if (add)
+                        add = add[1];
+                    else
+                        add = html.match(/<h4.*>\s*昵称 \/ 姓名\s*<\/h4><div.*>\s*(.*) \/ .* \/ .*\s*<\/div>/)[1];
+                }else add = null;
+            }
+            ret[user.id] = add;
         }
-        for (let user of await fetchBetterNamesUsers()){
-            response[user.id] = user.real_name;
-        }
-        return response;
+        return ret;
     }
 
     async function loadUsersData(get) {
@@ -3134,7 +3170,12 @@
         loadSpecialRules(),
     ]);
     applySpecialRules(users, specialRules);
-    const realnames = await getRealnames();
+    let shownames = await getShowNames();
+    console.log(shownames);
+
+    function getShowName(uid, arg){
+        return shownames[uid] ?? arg;
+    }
 
     function firstVisibleCharOfTitle() {
         const h1 = document.querySelector('body > div:nth-child(2) > div > div.ui.center.aligned.grid > div > h1');
@@ -3663,8 +3704,6 @@
         if (!markOnce(a, 'UserDone')) return;
         if (!isBareUserProfileHref(rawHref, uid)) return;
         const info = users[uid];
-        // if (realnames[uid])
-        //     a.innerHTML = `${realnames[uid]}（${a.innerHTML}）`;
         if (info && GRADE_LABELS[info.colorKey]) a.setAttribute('title', GRADE_LABELS[info.colorKey]);
 
         let baseText = '';
@@ -3674,7 +3713,6 @@
         baseText = baseText.trim();
         const defaultSource = baseText || (a.textContent || '').trim();
         if (isLikelyUrlLabel(defaultSource, rawHref)) return;
-        const originalNickname = (showUserNickname && info) ? extractOriginalNickname(baseText) : '';
 
         const img = a.querySelector('img');
         if (img && hideAvatar) img.remove();
@@ -3685,8 +3723,14 @@
         let combinedName = defaultSource;
         if (info) {
             combinedName = typeof info.name === 'string' ? info.name : (defaultSource || '');
-            if (showUserNickname && originalNickname) {
-                combinedName += `（${originalNickname}）`;
+            if (getShowName(uid, null)){
+                console.log(a.innerHTML);
+                a.childNodes.forEach(n => {
+                    if (n.nodeType === Node.TEXT_NODE) n.remove();
+                });
+                console.log(a.innerHTML);
+                a.innerHTML += getShowName(uid);
+                console.log(a.innerHTML);
             }
             if (info.colorKey === "clear")
                 a.style.color = '';
@@ -3696,13 +3740,6 @@
             }
         }
 
-        const limitedName = truncateByUnits(combinedName || '', maxUserUnits);
-        const finalText = (img ? '\u00A0' : '') + limitedName;
-
-        Array.from(a.childNodes).forEach(n => {
-            if (n.nodeType === Node.TEXT_NODE) n.remove();
-        });
-        a.appendChild(document.createTextNode(finalText));
         renderUserTags(a, info?.tags);
     }
 
@@ -5345,7 +5382,7 @@
             members.forEach((member) => {
                 const uid = chatToInteger(member && (member.id ?? member.user_id ?? member.uid));
                 if (!Number.isFinite(uid) || uid <= 0) return;
-                const memberName = realnames[uid] ?? `用户 ${uid}`;
+                const memberName = getShowName(uid, `用户 ${uid}`);
                 if (member.type === "Owner") ownerName = memberName;
                 else (member.type === "Member" ? membersName : administratorsName).push(memberName);
                 if (!chatState.userNameById.has(uid) || !chatState.userNameById.get(uid)) {

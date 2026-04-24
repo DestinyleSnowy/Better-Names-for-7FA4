@@ -260,7 +260,16 @@
                         <div class="bn-option-group">
                             <div class="bn-option-group-title">显示选项</div>
                             <label><input type="checkbox" id="bn-hide-avatar"/> 隐藏用户头像</label>
-                            <label><input type="checkbox" id="bn-show-user-nickname"/> 显示用户昵称</label>
+                            <label><input type="checkbox" id="bn-show-user-realname"/> 尝试显示用户真名 + <select id="bn-show-user-realname-and">
+                                <option value="username">用户名</option>
+                                <option value="nickname">昵称（没有昵称不显示）</option>
+                                <option value="none" selected>无</option>
+                            </select></label>
+                            <label>显示用户的<select id="bn-show-user-show">
+                                <option value="username">用户名</option>
+                                <option value="nickname">昵称（没有昵称显示原来的）</option>
+                                <option value="none" selected>原本要显示的内容</option>
+                            </select></label>
                         </div>
                         <div class="bn-option-group">
                             <div class="bn-option-group-title">优化选项</div>
