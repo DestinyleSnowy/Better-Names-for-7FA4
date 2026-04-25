@@ -2,13 +2,7 @@
 (async function () {
     'use strict';
     if (typeof window.__GM_ready === 'function') await window.__GM_ready();
-    const backgroundStyles = [
-        "center/cover no-repeat",
-        "center/contain no-repeat",
-        "center/100% 100% no-repeat",
-        "repeat",
-        "center no-repeat",
-    ];
+    const backgroundStyles = ["center/cover no-repeat", "center/contain no-repeat", "center/100% 100% no-repeat", "repeat", "center no-repeat",];
     const DEFAULT_BT_INTERVAL = 2000;
     const HI_TOILET_INTERVAL_MIN = 10;
     const HI_TOILET_INTERVAL_MAX = 2000;
@@ -104,9 +98,7 @@
             const avatarModule = await import(candidate);
             if (avatarModule && typeof avatarModule.createAvatarBlocker === 'function') {
                 const blocker = avatarModule.createAvatarBlocker({
-                    isBlockingEnabled: () => !!hideAvatar,
-                    placeholderSrc: AVATAR_PLACEHOLDER_SRC,
-                    debugLog,
+                    isBlockingEnabled: () => !!hideAvatar, placeholderSrc: AVATAR_PLACEHOLDER_SRC, debugLog,
                 });
                 ensureAvatarBlockerInstalled = blocker.ensureAvatarBlockerInstalled;
                 runAvatarSanitizer = blocker.runAvatarSanitizer;
@@ -238,11 +230,7 @@
     };
     const themeConfig = {mode: storedThemeModeRaw, color: storedThemeColorRaw};
     const truncationConfig = {
-        rawTitleUnits: storedTitleUnits,
-        rawUserUnits: storedUserUnits,
-        maxTitleUnits,
-        maxUserUnits,
-        widthMode,
+        rawTitleUnits: storedTitleUnits, rawUserUnits: storedUserUnits, maxTitleUnits, maxUserUnits, widthMode,
     };
     const hiToiletConfig = {enabled: btEnabled, interval: storedBtInterval};
     const featureFlags = {
@@ -265,14 +253,11 @@
         enableTitleOptimization,
     };
     const rankingConfig = {
-        enableRankingFilterSetting,
-        enableColumnSwitchSetting,
-        enableMergeAssistantSetting,
+        enableRankingFilterSetting, enableColumnSwitchSetting, enableMergeAssistantSetting,
     };
     const quickSkipState = {raw: rawQuickSkip, migrated: quickSkipMigrated, enabled: enableQuickSkip};
     const layoutConfig = {
-        pinned: !!readConfigValue('panelPinned'),
-        corner: readConfigValue(CORNER_KEY),
+        pinned: !!readConfigValue('panelPinned'), corner: readConfigValue(CORNER_KEY),
     };
     const paletteConfig = {
         storedPalette: safeGetJSON('userPalette', CONFIG_DEFAULTS.userPalette),
@@ -488,9 +473,7 @@
     const normalizedBgFileName = typeof storedBgImageDataName === 'string' ? storedBgImageDataName : '';
     const normalizedBgOpacity = String(clampOpacity(storedBgOpacity));
     const normalizedBgBlur = clampBlur(storedBgBlur);
-    const initialBackgroundSource = (normalizedBgSourceType === 'local' && normalizedBgData)
-        ? normalizedBgData
-        : normalizedBgUrl;
+    const initialBackgroundSource = (normalizedBgSourceType === 'local' && normalizedBgData) ? normalizedBgData : normalizedBgUrl;
     applyBackgroundOverlay(storedBgEnabled, storedBgfillway, initialBackgroundSource, normalizedBgOpacity, normalizedBgBlur);
 
     function readAutoRenewMemory() {
@@ -524,10 +507,7 @@
 
     function markAutoRenewRedirect(tagId) {
         writeAutoRenewMemory({
-            tagId: String(tagId),
-            host: location.host,
-            port: location.port || '',
-            timestamp: Date.now(),
+            tagId: String(tagId), host: location.host, port: location.port || '', timestamp: Date.now(),
         });
     }
 
@@ -609,8 +589,7 @@
             applyRenewWithin(document);
             const target = document.body;
             if (!target) {
-                if (typeof requestAnimationFrame === 'function') requestAnimationFrame(start);
-                else setTimeout(start, 50);
+                if (typeof requestAnimationFrame === 'function') requestAnimationFrame(start); else setTimeout(start, 50);
                 return;
             }
             observer.observe(target, {childList: true, subtree: true, attributes: true, attributeFilter: ['href']});
@@ -698,14 +677,10 @@
     const palette = Object.assign({}, palettes.light, useCustomColors ? storedPalette : {});
     let currentThemeMode = themeMode;
 
-    const runtimeApi = (typeof browser !== 'undefined' && browser.runtime && typeof browser.runtime.getURL === 'function')
-        ? browser.runtime
-        : ((typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function') ? chrome.runtime : null);
+    const runtimeApi = (typeof browser !== 'undefined' && browser.runtime && typeof browser.runtime.getURL === 'function') ? browser.runtime : ((typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function') ? chrome.runtime : null);
 
     async function fetchPanelTemplate() {
-        const templateUrl = runtimeApi && typeof runtimeApi.getURL === 'function'
-            ? runtimeApi.getURL('content/panel/panel.html')
-            : null;
+        const templateUrl = runtimeApi && typeof runtimeApi.getURL === 'function' ? runtimeApi.getURL('content/panel/panel.html') : null;
         if (!templateUrl) {
             console.warn('[BN] runtime API 不可用，回退至内置面板模板');
             return FALLBACK_PANEL_TEMPLATE;
@@ -1061,9 +1036,7 @@
             const emit = (angle, speed, overrides = {}) => {
                 const hue = overrides.hue ?? (baseHue + rand(-68, 68) + 360) % 360;
                 spawnParticle(x, y, angle, speed, {
-                    gravity: baseGravity,
-                    hue,
-                    ...overrides,
+                    gravity: baseGravity, hue, ...overrides,
                 });
             };
 
@@ -1274,8 +1247,7 @@
         resize();
 
         return {
-            launch,
-            destroy,
+            launch, destroy,
         };
     }
 
@@ -1565,11 +1537,7 @@
 
     function createPanelWakeController() {
         const reasons = Object.freeze({
-            PIN: 'pin',
-            TRIGGER: 'hover:trigger',
-            PANEL: 'hover:panel',
-            BRIDGE: 'hover:bridge',
-            FOCUS: 'focus',
+            PIN: 'pin', TRIGGER: 'hover:trigger', PANEL: 'hover:panel', BRIDGE: 'hover:bridge', FOCUS: 'focus',
         });
         const PANEL_HIDE_DELAY = 300;
         const HOVER_SUPPRESS_MS = 600;
@@ -1745,8 +1713,7 @@
 
         const syncPinnedState = () => {
             pinBtn.classList.toggle('bn-pinned', pinned);
-            if (pinned) requestWake(reasons.PIN);
-            else releaseWake(reasons.PIN);
+            if (pinned) requestWake(reasons.PIN); else releaseWake(reasons.PIN);
         };
 
         const toggleFromTrigger = () => {
@@ -1791,24 +1758,16 @@
             wakeReasons.delete(reasons.TRIGGER);
             wakeReasons.delete(reasons.PANEL);
             wakeReasons.delete(reasons.FOCUS);
-            if (pinned) requestWake(reasons.PIN);
-            else panel.classList.remove('bn-show');
+            if (pinned) requestWake(reasons.PIN); else panel.classList.remove('bn-show');
             updateContainerState();
         };
 
         return {
-            reasons,
-            attachHoverWake,
-            syncPinnedState,
-            toggleFromTrigger,
-            onFocusIn,
-            onFocusOut,
-            onDragStart,
-            onDragEnd,
+            reasons, attachHoverWake, syncPinnedState, toggleFromTrigger, onFocusIn, onFocusOut, onDragStart, onDragEnd,
         };
     }
 
-    function updateUserShow(){
+    function updateUserShow() {
         const a = document.querySelectorAll(USER_LINK_SELECTOR);
         a.forEach((el) => {
             el.removeAttribute("data-bn-user-done");
@@ -2234,8 +2193,7 @@
             let lo = 0;
             while (lo < hi) {
                 const mid = (lo + hi) >> 1;
-                if (lengths[mid] < targetLen) lo = mid + 1;
-                else hi = mid;
+                if (lengths[mid] < targetLen) lo = mid + 1; else hi = mid;
             }
             const idx = Math.max(1, lo);
             const segStart = lengths[idx - 1];
@@ -2386,12 +2344,8 @@
         const paletteChanged = COLOR_KEYS.some(k => {
             return colorPickers[k] && colorPickers[k].value.toLowerCase() !== (originalConfig.palette[k] || '').toLowerCase();
         });
-        const currentThemeColor = themeColorInput
-            ? normalizeHexColor(themeColorInput.value, originalConfig.themeColor)
-            : originalConfig.themeColor;
-        const themeColorChanged = themeColorInput
-            ? currentThemeColor.toLowerCase() !== (originalConfig.themeColor || '').toLowerCase()
-            : false;
+        const currentThemeColor = themeColorInput ? normalizeHexColor(themeColorInput.value, originalConfig.themeColor) : originalConfig.themeColor;
+        const themeColorChanged = themeColorInput ? currentThemeColor.toLowerCase() !== (originalConfig.themeColor || '').toLowerCase() : false;
         const currentBgEnabled = bgEnabledInput ? bgEnabledInput.checked : originalConfig.bgEnabled;
         const currentBgfillway = bgfillwayInput ? bgfillwayInput.value : originalConfig.bgfillway;
         const currentBgOpacity = bgOpacityInput ? bgOpacityInput.value : originalConfig.bgOpacity;
@@ -2399,9 +2353,7 @@
         const currentBgUrl = bgUrlInput ? bgUrlInput.value.trim() : '';
         let bgSourceChanged = false;
         if (currentBgSourceType === 'local') {
-            if (originalConfig.bgSourceType !== 'local' ||
-                currentBgImageData !== originalConfig.bgImageData ||
-                (currentBgImageDataName || '') !== (originalConfig.bgImageDataName || '')) {
+            if (originalConfig.bgSourceType !== 'local' || currentBgImageData !== originalConfig.bgImageData || (currentBgImageDataName || '') !== (originalConfig.bgImageDataName || '')) {
                 bgSourceChanged = true;
             }
         } else if (originalConfig.bgSourceType !== 'remote' || currentBgUrl !== originalConfig.bgImageUrl) {
@@ -2410,40 +2362,7 @@
         const currentBtEnabled = getHiToiletEnabledState();
         const templateBulkAddChk = document.getElementById('bn-enable-template-bulk-add');
 
-        const changed =
-            (document.getElementById('bn-enable-title-truncate').checked !== originalConfig.titleTruncate) ||
-            (document.getElementById('bn-enable-user-truncate').checked !== originalConfig.userTruncate) ||
-            (document.getElementById('bn-enable-title-truncate').checked && ti !== originalConfig.maxTitleUnits) ||
-            (document.getElementById('bn-enable-user-truncate').checked && ui !== originalConfig.maxUserUnits) ||
-            (document.getElementById('bn-hide-avatar').checked !== originalConfig.hideAvatar) ||
-            (document.getElementById('bn-enable-copy').checked !== originalConfig.enableCopy) ||
-            (document.getElementById('bn-enable-desc-copy').checked !== originalConfig.enableDescCopy) ||
-            (document.getElementById('bn-hide-orig').checked !== originalConfig.hideOrig) ||
-            (document.getElementById('bn-enable-contest-download').checked !== originalConfig.enableContestDownloadButtons) ||
-            (document.getElementById('bn-enable-contest-review').checked !== originalConfig.enableContestReviewButtons) ||
-            (document.getElementById('bn-show-user-realname').checked ? selectShowRealnameAnd.value : null !== originalConfig.showUserRealname) ||
-            (selectShowUserShow !== originalConfig.showUser) ||
-            (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) ||
-            ((templateBulkAddChk ? templateBulkAddChk.checked : originalConfig.enableTemplateBulkAdd) !== originalConfig.enableTemplateBulkAdd) ||
-            (document.getElementById('bn-enable-renew').checked !== originalConfig.enableAutoRenew) ||
-            (document.getElementById('bn-enable-ranking-filter').checked !== originalConfig.enableRankingFilter) ||
-            (document.getElementById('bn-enable-column-switch').checked !== originalConfig.columnSwitchEnabled) ||
-            (document.getElementById('bn-enable-merge-assistant').checked !== originalConfig.mergeAssistantEnabled) ||
-            (document.getElementById('bn-enable-vj').checked !== originalConfig.enableVjLink) ||
-            (document.getElementById('bn-hide-done-skip').checked !== originalConfig.hideDoneSkip) ||
-            (document.getElementById('bn-enable-quick-skip').checked !== originalConfig.enableQuickSkip) ||
-            (document.getElementById('bn-enable-title-optimization').checked !== originalConfig.enableTitleOptimization) ||
-            (document.getElementById('bn-use-custom-color').checked !== originalConfig.useCustomColors) ||
-            ((document.getElementById('bn-width-mode')?.value ?? originalConfig.widthMode) !== originalConfig.widthMode) ||
-            (currentBgEnabled !== originalConfig.bgEnabled) ||
-            bgSourceChanged || (currentBgfillway !== originalConfig.bgfillway) ||
-            (currentBgOpacity !== originalConfig.bgOpacity) ||
-            (clampBlur(currentBgBlur) !== clampBlur(originalConfig.bgBlur)) ||
-            (currentBtEnabled !== originalConfig.btEnabled) ||
-            (hiToiletIntervalInput && clampHiToiletInterval(hiToiletIntervalInput.value) !== originalConfig.btInterval) ||
-            (getSelectedThemeMode() !== originalConfig.themeMode) ||
-            themeColorChanged ||
-            paletteChanged;
+        const changed = (document.getElementById('bn-enable-title-truncate').checked !== originalConfig.titleTruncate) || (document.getElementById('bn-enable-user-truncate').checked !== originalConfig.userTruncate) || (document.getElementById('bn-enable-title-truncate').checked && ti !== originalConfig.maxTitleUnits) || (document.getElementById('bn-enable-user-truncate').checked && ui !== originalConfig.maxUserUnits) || (document.getElementById('bn-hide-avatar').checked !== originalConfig.hideAvatar) || (document.getElementById('bn-enable-copy').checked !== originalConfig.enableCopy) || (document.getElementById('bn-enable-desc-copy').checked !== originalConfig.enableDescCopy) || (document.getElementById('bn-hide-orig').checked !== originalConfig.hideOrig) || (document.getElementById('bn-enable-contest-download').checked !== originalConfig.enableContestDownloadButtons) || (document.getElementById('bn-enable-contest-review').checked !== originalConfig.enableContestReviewButtons) || (document.getElementById('bn-show-user-realname').checked ? selectShowRealnameAnd.value : null !== originalConfig.showUserRealname) || (selectShowUserShow !== originalConfig.showUser) || (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) || ((templateBulkAddChk ? templateBulkAddChk.checked : originalConfig.enableTemplateBulkAdd) !== originalConfig.enableTemplateBulkAdd) || (document.getElementById('bn-enable-renew').checked !== originalConfig.enableAutoRenew) || (document.getElementById('bn-enable-ranking-filter').checked !== originalConfig.enableRankingFilter) || (document.getElementById('bn-enable-column-switch').checked !== originalConfig.columnSwitchEnabled) || (document.getElementById('bn-enable-merge-assistant').checked !== originalConfig.mergeAssistantEnabled) || (document.getElementById('bn-enable-vj').checked !== originalConfig.enableVjLink) || (document.getElementById('bn-hide-done-skip').checked !== originalConfig.hideDoneSkip) || (document.getElementById('bn-enable-quick-skip').checked !== originalConfig.enableQuickSkip) || (document.getElementById('bn-enable-title-optimization').checked !== originalConfig.enableTitleOptimization) || (document.getElementById('bn-use-custom-color').checked !== originalConfig.useCustomColors) || ((document.getElementById('bn-width-mode')?.value ?? originalConfig.widthMode) !== originalConfig.widthMode) || (currentBgEnabled !== originalConfig.bgEnabled) || bgSourceChanged || (currentBgfillway !== originalConfig.bgfillway) || (currentBgOpacity !== originalConfig.bgOpacity) || (clampBlur(currentBgBlur) !== clampBlur(originalConfig.bgBlur)) || (currentBtEnabled !== originalConfig.btEnabled) || (hiToiletIntervalInput && clampHiToiletInterval(hiToiletIntervalInput.value) !== originalConfig.btInterval) || (getSelectedThemeMode() !== originalConfig.themeMode) || themeColorChanged || paletteChanged;
 
         saveActions.classList.toggle('bn-visible', changed);
     }
@@ -2610,9 +2529,7 @@
         });
         GM_setValue('userPalette', JSON.stringify(obj));
         GM_setValue('useCustomColors', chkUseColor.checked);
-        const themeColorValue = themeColorInput
-            ? normalizeHexColor(themeColorInput.value, originalConfig.themeColor)
-            : originalConfig.themeColor;
+        const themeColorValue = themeColorInput ? normalizeHexColor(themeColorInput.value, originalConfig.themeColor) : originalConfig.themeColor;
         GM_setValue('themeColor', themeColorValue);
         container.style.setProperty('--bn-theme-color', themeColorValue);
         if (themeColorInput) themeColorInput.value = themeColorValue;
@@ -2640,9 +2557,7 @@
             bgImageDataToSave = currentBgImageData;
             bgImageDataNameToSave = currentBgImageDataName || '';
         }
-        const overlaySource = bgImageSourceType === 'local' && bgImageDataToSave
-            ? bgImageDataToSave
-            : bgImageUrlToSave;
+        const overlaySource = bgImageSourceType === 'local' && bgImageDataToSave ? bgImageDataToSave : bgImageUrlToSave;
 
         GM_setValue('bg_enabled', bgEnabled);
         GM_setValue('bg_fillway', bgfillway);
@@ -2744,9 +2659,7 @@
         if (bgBlurInput) bgBlurInput.value = originalConfig.bgBlur;
         if (bgBlurValueSpan) bgBlurValueSpan.textContent = formatBlurText(originalConfig.bgBlur);
         updateBgSourceUI();
-        const restoreSource = (originalConfig.bgSourceType === 'local' && originalConfig.bgImageData)
-            ? originalConfig.bgImageData
-            : originalConfig.bgImageUrl;
+        const restoreSource = (originalConfig.bgSourceType === 'local' && originalConfig.bgImageData) ? originalConfig.bgImageData : originalConfig.bgImageUrl;
         applyBackgroundOverlay(originalConfig.bgEnabled, originalConfig.bgfillway, restoreSource, originalConfig.bgOpacity, originalConfig.bgBlur);
         checkChanged();
     }
@@ -2875,8 +2788,7 @@
     } else if (hiToiletIntervalValue) {
         hiToiletIntervalValue.textContent = String(originalConfig.btInterval);
     }
-    if (hiToiletInput) hiToiletInput.addEventListener('change', checkChanged);
-    else document.getElementById('bn-bt-enabled')?.addEventListener('change', checkChanged);
+    if (hiToiletInput) hiToiletInput.addEventListener('change', checkChanged); else document.getElementById('bn-bt-enabled')?.addEventListener('change', checkChanged);
 
     function getHiToiletPollDelay() {
         return clampHiToiletInterval(originalConfig.btInterval);
@@ -2993,36 +2905,49 @@
         }
         return out;
     }
-    
-    async function getShowNames(){
+
+    async function __getShowName(user) {
+        let add;
+        if (showUserRealname !== undefined && user.real_name) {
+            add = user.real_name;
+            if (user[showUserRealname]) add += `（${user[showUserRealname]}）`;
+        } else {
+            if (user[showUser]) {
+                add = user[showUser];
+            } else if (showUser === "username") {
+                const htmlres = await fetch(`/user/${user.id}`);
+                const html = await htmlres.text();
+                add = html.match(/<title>(.*) - 用户.*<\/title>/)[1];
+            } else if (showUser === "nickname") {
+                const htmlres = await fetch(`/user/${user.id}`);
+                const html = await htmlres.text();
+                console.log(html);
+                add = html.match(/<h4.*>\s*昵称\s*<\/h4>\s*<div.*>\s*(.*)\s*<\/div>/);
+                if (add) add = add[1]; else add = html.match(/<h4.*>\s*昵称 \/ 姓名\s*<\/h4><div.*>\s*(.*) \/ .* \/ .*\s*<\/div>/)[1];
+            } else add = null;
+        }
+        return add;
+    }
+
+    async function getShowNames() {
         const chatInfo = await fetch("/chat/info");
         const response = (await chatInfo.json()).friends;
         response.concat(response, await fetchBetterNamesUsers());
         let ret = {};
-        for (let user of response){
-            let add;
-            if (showUserRealname !== undefined && user.real_name){
-                add = user.real_name;
-                if (user[showUserRealname])
-                    add += `（${user[showUserRealname]}）`;
-            } else {
-                if (user[showUser]) {
-                    add = user[showUser];
-                } else if (showUser === "username"){
-                    const htmlres = await fetch(`/user/${user.id}`);
-                    const html = await htmlres.text();
-                    add = html.match(/<title>(.*) - 用户.*<\/title>/)[1];
-                } else if (showUser === "nickname"){const htmlres = await fetch(`/user/${user.id}`);
-                    const html = await htmlres.text();
-                    add = html.match(/<h4.*>\s*昵称\s*<\/h4>\s*<div.*>\s*(.*)\s*<\/div>/);
-                    if (add)
-                        add = add[1];
-                    else
-                        add = html.match(/<h4.*>\s*昵称 \/ 姓名\s*<\/h4><div.*>\s*(.*) \/ .* \/ .*\s*<\/div>/)[1];
-                }else add = null;
-            }
-            ret[user.id] = add;
+        let promises = [];
+        const SIZE = 1;
+        for (let i = 1; i <= SIZE; i++) promises.push(new Promise((resolve, reject) => {resolve()}));
+        for (let user of response) {
+            promises[user.id % SIZE] =
+                promises[user.id % SIZE].then(async () => {
+                    console.log("Get", user.id);
+                    const add = await __getShowName(user);
+                    ret[user.id] = add;
+                    console.log(user.id, add);
+                });
         }
+        for (let promise of promises)
+            await promise;
         return ret;
     }
 
@@ -3042,9 +2967,7 @@
                 if (resp && resp.ok) {
                     const json = await resp.json();
                     let users;
-                    if ("users" in json)
-                        users = json.users;
-                    else users = json;
+                    if ("users" in json) users = json.users; else users = json;
                     if (!get) {
                         for (let user in users) {
                             users[user].colorKey = "clear";
@@ -3067,10 +2990,8 @@
         }
         const users = (raw.users && typeof raw.users === 'object' && !Array.isArray(raw.users)) ? raw.users : {};
         const tags = (raw.tags && typeof raw.tags === 'object') ? raw.tags : {};
-        const definitions = (tags.definitions && typeof tags.definitions === 'object' && !Array.isArray(tags.definitions))
-            ? tags.definitions : {};
-        const assignments = (tags.assignments && typeof tags.assignments === 'object' && !Array.isArray(tags.assignments))
-            ? tags.assignments : {};
+        const definitions = (tags.definitions && typeof tags.definitions === 'object' && !Array.isArray(tags.definitions)) ? tags.definitions : {};
+        const assignments = (tags.assignments && typeof tags.assignments === 'object' && !Array.isArray(tags.assignments)) ? tags.assignments : {};
         return {users, tags: {definitions, assignments}};
     }
 
@@ -3165,15 +3086,12 @@
         }
     }
 
-    let [users, specialRules] = await Promise.all([
-        loadUsersData(GM_getValue("useCustomColors")),
-        loadSpecialRules(),
-    ]);
+    let [users, specialRules] = await Promise.all([loadUsersData(GM_getValue("useCustomColors")), loadSpecialRules(),]);
     applySpecialRules(users, specialRules);
     let shownames = await getShowNames();
     console.log(shownames);
 
-    function getShowName(uid, arg){
+    function getShowName(uid, arg) {
         return shownames[uid] ?? arg;
     }
 
@@ -3199,12 +3117,9 @@
     function findProblemActionLink() {
         const links = document.querySelectorAll("a");
         let response = [];
-        const findHref =
-            stripEnding(location.href) +
-            "/markdown/html";
+        const findHref = stripEnding(location.href) + "/markdown/html";
         links.forEach(link => {
-            if (stripEnding(link.href) === findHref)
-                response.push(link);
+            if (stripEnding(link.href) === findHref) response.push(link);
         })
         return response.length ? response[0] : null;
     }
@@ -3398,11 +3313,9 @@
         }
 
         const button = document.querySelector('a.small.ui.green.button[data-tooltip]');
-        if (!button)
-            return;
+        if (!button) return;
         const result = extractOJAndProblem(button);
-        if (!result)
-            return;
+        if (!result) return;
         const lower = result.problemNumber.toLowerCase()
         let vjUrl = '';
         for (const k of Object.keys(parser)) {
@@ -3434,10 +3347,7 @@
         vj.href = vjUrl;
         vj.target = '_blank';
         vj.rel = 'noopener';
-        if (result.oj !== 'vj')
-            vj.setAttribute('data-tooltip', `vj-${result.oj}-${lower}`);
-        else
-            vj.setAttribute('data-tooltip', `${result.oj}-${lower}`);
+        if (result.oj !== 'vj') vj.setAttribute('data-tooltip', `vj-${result.oj}-${lower}`); else vj.setAttribute('data-tooltip', `${result.oj}-${lower}`);
         vj.textContent = 'Vjudge';
         vj.style.backgroundColor = '#f2711c';
         vj.style.color = '#ffffff';
@@ -3692,12 +3602,7 @@
         // Skip review actions; they are not user-name labels.
         if (/\/review\/user_tag/i.test(rawHref)) return;
 
-        if (
-            a.matches('#user-dropdown > a') ||
-            a.matches('#user-dropdown > div > a:nth-child(1)') ||
-            a.matches('body > div.ui.fixed.borderless.menu > div > div > a') ||
-            a.matches('#form > div > div:nth-child(13) > a')
-        ) return;
+        if (a.matches('#user-dropdown > a') || a.matches('#user-dropdown > div > a:nth-child(1)') || a.matches('body > div.ui.fixed.borderless.menu > div > div > a') || a.matches('#form > div > div:nth-child(13) > a')) return;
 
         const uid = resolveUidFromHref(rawHref, a);
         if (!uid) return;
@@ -3723,7 +3628,7 @@
         let combinedName = defaultSource;
         if (info) {
             combinedName = typeof info.name === 'string' ? info.name : (defaultSource || '');
-            if (getShowName(uid, null)){
+            if (getShowName(uid, null)) {
                 console.log(a.innerHTML);
                 a.childNodes.forEach(n => {
                     if (n.nodeType === Node.TEXT_NODE) n.remove();
@@ -3732,9 +3637,7 @@
                 a.innerHTML += getShowName(uid);
                 console.log(a.innerHTML);
             }
-            if (info.colorKey === "clear")
-                a.style.color = '';
-            else {
+            if (info.colorKey === "clear") a.style.color = ''; else {
                 const c = palette[info.colorKey];
                 if (c) a.style.color = c;
             }
@@ -3873,11 +3776,7 @@
             if (!icon) return false;
             const cs = getComputedStyle(icon || {});
             const col = (cs && (cs.color || cs.fill || '') || '').toLowerCase();
-            if (
-                !icon.classList.contains('gold') &&
-                !icon.classList.contains('yellow') &&
-                !/gold|yellow|#ffd700|#ffb100|#ffc107|rgb\(\s*255\s*,\s*215\s*,\s*0\s*\)|rgb\(\s*255\s*,\s*193\s*,\s*7\s*\)/i.test(col)
-            ) return false;
+            if (!icon.classList.contains('gold') && !icon.classList.contains('yellow') && !/gold|yellow|#ffd700|#ffb100|#ffc107|rgb\(\s*255\s*,\s*215\s*,\s*0\s*\)|rgb\(\s*255\s*,\s*193\s*,\s*7\s*\)/i.test(col)) return false;
             const skipCell = icon.closest('td[data-bn-quick-skip-cell="1"]');
             return !skipCell;
         });
@@ -3978,9 +3877,7 @@
             const targetUrl = btn.href;
             try {
                 const response = await fetch(targetUrl, {
-                    method: 'GET',
-                    credentials: 'include',
-                    redirect: 'follow',
+                    method: 'GET', credentials: 'include', redirect: 'follow',
                 });
                 if (!response || !response.ok) throw new Error('Skip request failed');
             } catch (err) {
@@ -4134,8 +4031,7 @@
         const root = scopeRoot || document;
         const rows = root.querySelectorAll('table.ui.very.basic.center.aligned.table tbody tr');
         rows.forEach(tr => {
-            if (enabled && __bn_shouldHideRow(tr)) tr.classList.add('bn-hide-done-skip');
-            else tr.classList.remove('bn-hide-done-skip');
+            if (enabled && __bn_shouldHideRow(tr)) tr.classList.add('bn-hide-done-skip'); else tr.classList.remove('bn-hide-done-skip');
         });
         try {
             updateHideBadge(enabled);
@@ -4308,12 +4204,7 @@
         if (!Number.isFinite(date.getTime())) return '--';
         try {
             return date.toLocaleString('zh-CN', {
-                hour12: false,
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
+                hour12: false, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
             });
         } catch (_) {
             return date.toISOString();
@@ -4378,10 +4269,7 @@
         const top = chatClampNumber(Number(rect && rect.top), CHAT_WINDOW_EDGE_MARGIN, maxTop);
 
         return {
-            left,
-            top,
-            width,
-            height,
+            left, top, width, height,
         };
     }
 
@@ -4677,9 +4565,7 @@
                     method: upperMethod,
                     url,
                     timeout: timeoutMs,
-                    headers: upperMethod === 'POST'
-                        ? {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'}
-                        : undefined,
+                    headers: upperMethod === 'POST' ? {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'} : undefined,
                     data: upperMethod === 'POST' ? body : undefined,
                     onload: (resp) => {
                         if (!resp || resp.status < 200 || resp.status >= 300) {
@@ -4707,9 +4593,7 @@
                 cache: 'no-store',
                 credentials: 'include',
                 signal: controller ? controller.signal : undefined,
-                headers: upperMethod === 'POST'
-                    ? {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'}
-                    : undefined,
+                headers: upperMethod === 'POST' ? {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'} : undefined,
                 body: upperMethod === 'POST' ? body : undefined,
             });
             const timeoutPromise = new Promise((_, reject) => {
@@ -4787,8 +4671,7 @@
         chatUpdateInputCounter();
         RenderMarkdown(chatInputPreviewEl, chatInputEl.value)
         Prism.highlightAll();
-        if (!chatInputPreviewEl.innerHTML.trim())
-            chatInputPreviewEl.innerHTML = "<span style=\"color: #1e2a40; opacity: 0.5; user-select: none; padding: 10px 10px;\">预览</span>";
+        if (!chatInputPreviewEl.innerHTML.trim()) chatInputPreviewEl.innerHTML = "<span style=\"color: #1e2a40; opacity: 0.5; user-select: none; padding: 10px 10px;\">预览</span>";
     }
 
     function chatSetControlsDisabled(disabled) {
@@ -4912,30 +4795,21 @@
         const senderName = Number.isFinite(latest.senderId) ? chatResolveUserName(latest.senderId) : (conversation.name || '新消息');
         const body = String(latest.content || '[空消息]').slice(0, 80);
         const suffix = newMessages.length > 1 ? `（${newMessages.length} 条）` : '';
-        const message = conversation.type === 'group'
-            ? `${senderName}: ${body}${suffix}`
-            : `${body}${suffix}`;
+        const message = conversation.type === 'group' ? `${senderName}: ${body}${suffix}` : `${body}${suffix}`;
         GM_notification({
-            title: `聊天室新消息 · ${conversation.name || conversation.id}`,
-            text: message,
-            timeout: 5000,
+            title: `聊天室新消息 · ${conversation.name || conversation.id}`, text: message, timeout: 5000,
         });
     }
 
     function chatRememberConversationMessages(conversation, incomingMessages, {
-        trackUnread = false,
-        notify = false,
-        rerenderList = false,
-        updateOldest = true,
+        trackUnread = false, notify = false, rerenderList = false, updateOldest = true,
     } = {}) {
         if (!conversation) return {merged: [], newIncoming: [], hadBaseline: false};
         const key = conversation.key;
         const existing = chatState.messagesByKey.get(key) || [];
         const hadBaseline = chatState.trackedConversationKeys.has(key);
         const existingIds = hadBaseline ? new Set(existing.map(item => item && item.id)) : null;
-        const previousLatestSec = hadBaseline && existing.length
-            ? Math.max(...existing.map(item => chatNormalizeTimestampToSec(item && item.sec)))
-            : NaN;
+        const previousLatestSec = hadBaseline && existing.length ? Math.max(...existing.map(item => chatNormalizeTimestampToSec(item && item.sec))) : NaN;
         const merged = chatMergeMessages(existing, incomingMessages);
         chatState.messagesByKey.set(key, merged);
         if (merged.length) {
@@ -4972,8 +4846,7 @@
             chatState.unreadCountByKey.delete(key);
         }
 
-        if (rerenderList) chatUpdateUnreadUi({rerenderList: true});
-        else {
+        if (rerenderList) chatUpdateUnreadUi({rerenderList: true}); else {
             chatResortConversationState();
             chatUpdateTriggerUnreadUi();
         }
@@ -5057,12 +4930,8 @@
             return;
         }
         if (chatCurrentTitleEl) chatCurrentTitleEl.textContent = current.name || `会话 ${current.id}`;
-        const baseMeta = current.type === 'group'
-            ? `群组 ID: ${current.id}`
-            : `用户 ID: ${current.id}`;
-        const recoverText = Number.isFinite(chatState.recoverTime)
-            ? `，Token 恢复：${chatState.recoverTime}s`
-            : '';
+        const baseMeta = current.type === 'group' ? `群组 ID: ${current.id}` : `用户 ID: ${current.id}`;
+        const recoverText = Number.isFinite(chatState.recoverTime) ? `，Token 恢复：${chatState.recoverTime}s` : '';
         if (chatCurrentMetaEl) chatCurrentMetaEl.textContent = `${baseMeta}${recoverText}`;
     }
 
@@ -5077,14 +4946,7 @@
         const isSelf = Number.isFinite(chatState.selfId) && Number.isFinite(senderId) && senderId === chatState.selfId;
         const actualDirection = direction || (isSelf ? 'out' : 'in');
         return {
-            id: syntheticId,
-            senderId,
-            targetId,
-            content,
-            sec,
-            direction: actualDirection,
-            isSelf,
-            raw,
+            id: syntheticId, senderId, targetId, content, sec, direction: actualDirection, isSelf, raw,
         };
     }
 
@@ -5248,30 +5110,14 @@
         if (!friendInfo || typeof friendInfo !== 'object') return NaN;
         const nestedUser = friendInfo.user && typeof friendInfo.user === 'object' ? friendInfo.user : null;
         const selfId = Number.isFinite(chatState.selfId) && chatState.selfId > 0 ? chatState.selfId : NaN;
-        const relationSource = chatToInteger(
-            friendInfo.source_id ?? friendInfo.sourceId ?? friendInfo.from_id ?? friendInfo.fromId ?? friendInfo.sender_id ?? friendInfo.senderId
-        );
-        const relationTarget = chatToInteger(
-            friendInfo.target_id ?? friendInfo.targetId ?? friendInfo.to_id ?? friendInfo.toId
-        );
+        const relationSource = chatToInteger(friendInfo.source_id ?? friendInfo.sourceId ?? friendInfo.from_id ?? friendInfo.fromId ?? friendInfo.sender_id ?? friendInfo.senderId);
+        const relationTarget = chatToInteger(friendInfo.target_id ?? friendInfo.targetId ?? friendInfo.to_id ?? friendInfo.toId);
         if (Number.isFinite(selfId) && Number.isFinite(relationSource) && Number.isFinite(relationTarget)) {
             if (relationSource === selfId && relationTarget > 0) return relationTarget;
             if (relationTarget === selfId && relationSource > 0) return relationSource;
         }
 
-        const candidates = [
-            relationTarget,
-            relationSource,
-            friendInfo.friend_id,
-            friendInfo.friendId,
-            friendInfo.other_id,
-            friendInfo.otherId,
-            friendInfo.user_id,
-            friendInfo.userId,
-            friendInfo.uid,
-            nestedUser ? (nestedUser.id ?? nestedUser.user_id ?? nestedUser.uid) : NaN,
-            friendInfo.id,
-        ];
+        const candidates = [relationTarget, relationSource, friendInfo.friend_id, friendInfo.friendId, friendInfo.other_id, friendInfo.otherId, friendInfo.user_id, friendInfo.userId, friendInfo.uid, nestedUser ? (nestedUser.id ?? nestedUser.user_id ?? nestedUser.uid) : NaN, friendInfo.id,];
         for (const value of candidates) {
             const parsed = chatToInteger(value);
             if (!Number.isFinite(parsed) || parsed <= 0) continue;
@@ -5293,29 +5139,7 @@
 
     function chatExtractConversationActivitySec(obj) {
         if (!obj || typeof obj !== 'object') return NaN;
-        const candidates = [
-            obj.last_message_time,
-            obj.lastMessageTime,
-            obj.last_message_at,
-            obj.lastMessageAt,
-            obj.last_chat_time,
-            obj.lastChatTime,
-            obj.last_chat_at,
-            obj.lastChatAt,
-            obj.latest_message_time,
-            obj.latestMessageTime,
-            obj.latest_message_at,
-            obj.latestMessageAt,
-            obj.updated_at,
-            obj.updatedAt,
-            obj.timestamp,
-            obj.send_time,
-            obj.time,
-            obj.created_at,
-            obj.createdAt,
-            obj.last_message && (obj.last_message.timestamp ?? obj.last_message.send_time ?? obj.last_message.created_at),
-            obj.latest_message && (obj.latest_message.timestamp ?? obj.latest_message.send_time ?? obj.latest_message.created_at),
-        ];
+        const candidates = [obj.last_message_time, obj.lastMessageTime, obj.last_message_at, obj.lastMessageAt, obj.last_chat_time, obj.lastChatTime, obj.last_chat_at, obj.lastChatAt, obj.latest_message_time, obj.latestMessageTime, obj.latest_message_at, obj.latestMessageAt, obj.updated_at, obj.updatedAt, obj.timestamp, obj.send_time, obj.time, obj.created_at, obj.createdAt, obj.last_message && (obj.last_message.timestamp ?? obj.last_message.send_time ?? obj.last_message.created_at), obj.latest_message && (obj.latest_message.timestamp ?? obj.latest_message.send_time ?? obj.latest_message.created_at),];
         for (const value of candidates) {
             const sec = chatNormalizeTimestampToSec(value);
             if (Number.isFinite(sec) && sec > 0) return sec;
@@ -5360,11 +5184,7 @@
             chatState.userNameById.set(fid, name);
             if (Number.isFinite(activitySec) && activitySec > 0) chatState.lastActivitySecByKey.set(key, activitySec);
             conversations.push({
-                key,
-                id: fid,
-                type: 'user',
-                name,
-                subtitle,
+                key, id: fid, type: 'user', name, subtitle,
             });
         });
 
@@ -5383,8 +5203,7 @@
                 const uid = chatToInteger(member && (member.id ?? member.user_id ?? member.uid));
                 if (!Number.isFinite(uid) || uid <= 0) return;
                 const memberName = getShowName(uid, `用户 ${uid}`);
-                if (member.type === "Owner") ownerName = memberName;
-                else (member.type === "Member" ? membersName : administratorsName).push(memberName);
+                if (member.type === "Owner") ownerName = memberName; else (member.type === "Member" ? membersName : administratorsName).push(memberName);
                 if (!chatState.userNameById.has(uid) || !chatState.userNameById.get(uid)) {
                     chatState.userNameById.set(uid, memberName);
                 }
@@ -5455,8 +5274,7 @@
 
         if (conversation.type === 'group') {
             const payload = await chatApiRequest('GET', '/chat/chat', {
-                params: {...commonParams, type: 'group'},
-                timeoutMs: 12000,
+                params: {...commonParams, type: 'group'}, timeoutMs: 12000,
             });
             const groupMessages = chatGetChatsFromPayload(payload)
                 .map(message => chatNormalizeMessage(message))
@@ -5464,16 +5282,11 @@
             return chatSortMessages(groupMessages);
         }
 
-        const [recvPayload, sentPayload] = await Promise.all([
-            chatApiRequest('GET', '/chat/chat', {
-                params: {...commonParams, type: 'user'},
-                timeoutMs: 12000,
-            }),
-            chatApiRequest('GET', '/chat/chat', {
-                params: {...commonParams, type: 'send'},
-                timeoutMs: 12000,
-            }),
-        ]);
+        const [recvPayload, sentPayload] = await Promise.all([chatApiRequest('GET', '/chat/chat', {
+            params: {...commonParams, type: 'user'}, timeoutMs: 12000,
+        }), chatApiRequest('GET', '/chat/chat', {
+            params: {...commonParams, type: 'send'}, timeoutMs: 12000,
+        }),]);
 
         const incomingMessages = chatGetChatsFromPayload(recvPayload)
             .map(msg => chatNormalizeMessage(msg, 'in'))
@@ -5491,11 +5304,8 @@
         }
         const payload = await chatApiRequest('GET', '/chat/chat', {
             params: {
-                target_id: conversation.id,
-                take: CHAT_MONITOR_PROBE_TAKE,
-                type: 'user',
-            },
-            timeoutMs: 12000,
+                target_id: conversation.id, take: CHAT_MONITOR_PROBE_TAKE, type: 'user',
+            }, timeoutMs: 12000,
         });
         return chatSortMessages(chatGetChatsFromPayload(payload)
             .map(msg => chatNormalizeMessage(msg, 'in'))
@@ -5518,9 +5328,7 @@
             const latestMessages = await chatFetchConversationMessages(conversation);
             if (seq !== chatState.requestSeq) return;
             const {merged} = chatRememberConversationMessages(conversation, latestMessages, {
-                trackUnread: true,
-                notify: silent,
-                rerenderList: true,
+                trackUnread: true, notify: silent, rerenderList: true,
             });
             chatRenderMessages({preserveScroll, forceScrollBottom: !silent});
             if (!silent) chatSetStatus(`消息已更新（${merged.length} 条）`, 'success');
@@ -5553,8 +5361,7 @@
                 return;
             }
             chatRememberConversationMessages(conversation, olderMessages, {
-                trackUnread: false,
-                rerenderList: false,
+                trackUnread: false, rerenderList: false,
             });
             chatRenderMessages({preserveScroll: true});
             chatSetStatus(`已加载更早消息 ${olderMessages.length} 条`, 'success');
@@ -5582,12 +5389,9 @@
         chatUpdateInput();
         chatStartAutoRefreshTimer();
         if (changed || forceRefresh) {
-            chatRefreshMessages(
-                {silent: false, preserveScroll: false}
-            ).then(chatMessagesScrollToBottom);
+            chatRefreshMessages({silent: false, preserveScroll: false}).then(chatMessagesScrollToBottom);
         }
-        const name = key.startsWith("group") ? "group-id"
-            : "target-id";
+        const name = key.startsWith("group") ? "group-id" : "target-id";
         const id = key.split(":")[1];
         const input_value = document.getElementById("bn-chat-group-op-" + name);
         input_value.value = id;
@@ -5618,9 +5422,7 @@
     async function chatHydrateConversationActivity({force = false} = {}) {
         if (!chatState.conversations.length) return;
         const seq = ++chatState.activityHydrationSeq;
-        const targets = (force ? chatState.conversations : chatState.conversations.filter((item) => (
-            chatGetConversationLastActivitySec(item && item.key) <= 0
-        )));
+        const targets = (force ? chatState.conversations : chatState.conversations.filter((item) => (chatGetConversationLastActivitySec(item && item.key) <= 0)));
         if (!targets.length) return;
 
         for (let index = 0; index < targets.length; index += CHAT_ACTIVITY_HYDRATE_BATCH_SIZE) {
@@ -5631,10 +5433,7 @@
                     const recentMessages = await chatFetchConversationMessages(conversation, null, CHAT_ACTIVITY_PROBE_TAKE);
                     if (seq !== chatState.activityHydrationSeq || !recentMessages.length) return;
                     chatRememberConversationMessages(conversation, recentMessages, {
-                        trackUnread: false,
-                        notify: false,
-                        rerenderList: false,
-                        updateOldest: false,
+                        trackUnread: false, notify: false, rerenderList: false, updateOldest: false,
                     });
                 } catch (_) {
                     // ignore single-conversation hydration failures
@@ -5650,17 +5449,12 @@
         if (!conversation || !chatState.conversationByKey.has(conversation.key)) return;
         const probeMessages = await chatFetchConversationProbeMessages(conversation);
         const {hadBaseline, newIncoming} = chatRememberConversationMessages(conversation, probeMessages, {
-            trackUnread: true,
-            notify: true,
-            rerenderList: false,
-            updateOldest: false,
+            trackUnread: true, notify: true, rerenderList: false, updateOldest: false,
         });
         if (!hadBaseline || !newIncoming.length) return;
         const latestMessages = await chatFetchConversationMessages(conversation);
         chatRememberConversationMessages(conversation, latestMessages, {
-            trackUnread: true,
-            notify: false,
-            rerenderList: true,
+            trackUnread: true, notify: false, rerenderList: true,
         });
     }
 
@@ -5730,14 +5524,13 @@
         chatSetStatus('正在查询 Token...');
         try {
             const payload = await chatApiRequest('POST', '/chat/chat', {
-                data: {type: 'none'},
-                timeoutMs: 12000,
+                data: {type: 'none'}, timeoutMs: 12000,
             });
             const used = chatToInteger(payload.used_token_count);
             const remain = chatToInteger(payload.remain_token_count);
             chatState.tokenUsed = Number.isFinite(used) ? used : null;
             chatState.tokenRemain = Number.isFinite(remain) ? remain : null;
-            chatState.maxTokenCount = Number.isFinite(used) && Number.isFinite(remain) ? used+remain : null;
+            chatState.maxTokenCount = Number.isFinite(used) && Number.isFinite(remain) ? used + remain : null;
             chatUpdateTokenDisplay();
             const usedText = Number.isFinite(chatState.tokenUsed) ? chatState.tokenUsed : '--';
             const remainText = Number.isFinite(chatState.tokenRemain) ? chatState.tokenRemain : '--';
@@ -5772,11 +5565,8 @@
         try {
             const payload = await chatApiRequest('POST', '/chat/chat', {
                 data: {
-                    type: conversation.type,
-                    target_id: conversation.id,
-                    content,
-                },
-                timeoutMs: 12000,
+                    type: conversation.type, target_id: conversation.id, content,
+                }, timeoutMs: 12000,
             });
 
             const used = chatToInteger(payload.used_token_count);
@@ -6065,9 +5855,7 @@
     function setJoinPlanStatus(kind, text) {
         if (!joinPlanStatusTextEl) return;
         joinPlanStatusTextEl.classList.remove(...JOIN_PLAN_STATUS_CLASSES);
-        const nextClass = kind === 'success'
-            ? 'bn-plan-status-success'
-            : (kind === 'danger' ? 'bn-plan-status-danger' : 'bn-plan-status-loading');
+        const nextClass = kind === 'success' ? 'bn-plan-status-success' : (kind === 'danger' ? 'bn-plan-status-danger' : 'bn-plan-status-loading');
         joinPlanStatusTextEl.classList.add(nextClass);
         joinPlanStatusTextEl.textContent = text;
     }
@@ -6083,9 +5871,7 @@
 
     function setJoinPlanDetailContent(text) {
         if (!joinPlanModalBodyEl) return;
-        joinPlanModalBodyEl.textContent = (typeof text === 'string' && text.trim())
-            ? text.trim()
-            : JOIN_PLAN_DETAIL_TEXT;
+        joinPlanModalBodyEl.textContent = (typeof text === 'string' && text.trim()) ? text.trim() : JOIN_PLAN_DETAIL_TEXT;
     }
 
     function closeJoinPlanDetailModal(returnFocus = true) {
@@ -6189,10 +5975,7 @@
 
         const dropdown = document.querySelector('#user-dropdown');
         if (dropdown && dropdown.dataset) {
-            const raw = dropdown.dataset.user_id
-                || dropdown.dataset.userId
-                || dropdown.getAttribute('data-user_id')
-                || dropdown.getAttribute('data-user-id');
+            const raw = dropdown.dataset.user_id || dropdown.dataset.userId || dropdown.getAttribute('data-user_id') || dropdown.getAttribute('data-user-id');
             if (raw && /^\d+$/.test(String(raw))) {
                 const value = Number(raw);
                 if (Number.isFinite(value) && value > 0) return value;
@@ -6241,12 +6024,9 @@
         }
 
         try {
-            const usersList = await Promise.race([
-                fetchBetterNamesUsers(),
-                new Promise((_, reject) => {
-                    window.setTimeout(() => reject(new Error('Join status check timeout')), 9000);
-                })
-            ]);
+            const usersList = await Promise.race([fetchBetterNamesUsers(), new Promise((_, reject) => {
+                window.setTimeout(() => reject(new Error('Join status check timeout')), 9000);
+            })]);
             if (isUserInBetterNames(usersList, uid)) {
                 setJoinPlanStatus('success', '你已加入 Better Names 计划');
                 setJoinPlanDetailVisibility(false, false);
@@ -6472,8 +6252,7 @@
             const res = await fetch(base64);
             const content = await res.text();
             let lang;
-            if (base64.startsWith("data:application/json")) lang = "json";
-            else {
+            if (base64.startsWith("data:application/json")) lang = "json"; else {
                 const s = safeName.split(".");
                 lang = getLang(s[s.length - 1]);
             }
@@ -6503,9 +6282,7 @@
         el.setSelectionRange(newCursorPos, newCursorPos);
         chatUpdateInput();
         return {
-            start: newCursorPos,
-            end: newCursorPos,
-            scrollTop
+            start: newCursorPos, end: newCursorPos, scrollTop
         };
     }
 
@@ -6594,8 +6371,7 @@
         // 滚动条距离顶部的距离
         const scrollTop = chatMessageListEl.scrollTop;
         // 阈值：当 scrollTop < 200px 时触发加载
-        if (scrollTop < 200)
-            chatLoadOlderMessages();
+        if (scrollTop < 200) chatLoadOlderMessages();
     }
 
     let checkLoadDebounceTimer = null;
@@ -6605,10 +6381,8 @@
         }
         checkLoadDebounceTimer = setTimeout(checkLoad, 100);
     });
-    for (let el of document.querySelectorAll("pre"))
-        addPrism(el);
-    for (let el of document.querySelectorAll(".hljs"))
-        el.classList.remove("hljs");
+    for (let el of document.querySelectorAll("pre")) addPrism(el);
+    for (let el of document.querySelectorAll(".hljs")) el.classList.remove("hljs");
     Prism.highlightAll();
     const el = document.querySelector(`a[onclick="toggleFormattedCode()"]`);
     if (el) {

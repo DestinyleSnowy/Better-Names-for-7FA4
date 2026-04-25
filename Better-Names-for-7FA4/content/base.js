@@ -197,7 +197,6 @@
             delimeters: RENDER_MATH_DELIMITERS,
             throwOnError: false
         });
-        console.log(el.innerHTML);
         for (let elem of el.querySelectorAll("pre"))
             addPrism(elem);
     }
