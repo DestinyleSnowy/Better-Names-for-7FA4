@@ -808,7 +808,6 @@
     const chatGroupOpRunBtnEl = container.querySelector('#bn-chat-group-op-run-btn');
     const chatGroupOpStatusEl = container.querySelector('#bn-chat-group-op-status');
     const chatInputPreviewEl = container.querySelector('#bn-chat-preview');
-    const chatShowMembsersEl = container.querySelector('#bn-chat-show-members');
 
     const chatState = {
         initialized: false,
@@ -1413,7 +1412,7 @@
     chkHo.checked = hideOrig;
     chkContestDownload.checked = enableContestDownloadButtons;
     chkContestReview.checked = enableContestReviewButtons;
-    chkShowRealname.checked = showUserRealname !== undefined;
+    chkShowRealname.checked = !!showUserRealname;
     selectShowRealnameAnd.value = showUserRealname ?? "none";
     selectShowUserShow.value = showUser;
     chkMenu.checked = enableMenu;
@@ -2509,7 +2508,7 @@
         GM_setValue('hideOrig', chkHo.checked);
         GM_setValue('enableContestDownloadButtons', chkContestDownload.checked);
         GM_setValue('enableContestReviewButtons', chkContestReview.checked);
-        GM_setValue('showUserRealname', chkShowRealname.checked ? selectShowRealnameAnd.value : undefined);
+        GM_setValue('showUserRealname', chkShowRealname.checked ? selectShowRealnameAnd.value : null);
         GM_setValue('showUser', selectShowUserShow.value);
         GM_setValue('hideDoneSkip', chkHideDoneSkip.checked);
         GM_setValue('enableQuickSkip', chkQuickSkip.checked);
@@ -2605,7 +2604,7 @@
         chkHo.checked = originalConfig.hideOrig;
         chkContestDownload.checked = originalConfig.enableContestDownloadButtons;
         chkContestReview.checked = originalConfig.enableContestReviewButtons;
-        chkShowRealname.checked = originalConfig.showUserRealname !== undefined;
+        chkShowRealname.checked = !!originalConfig.showUserRealname;
         selectShowRealnameAnd.value = originalConfig.showUserRealname ?? "none";
         chkMenu.checked = originalConfig.enableMenu;
         chkVj.checked = originalConfig.enableVjLink;
@@ -2907,24 +2906,28 @@
     }
 
     async function __getShowName(user) {
-        let add;
+        let add = null;
         if (showUserRealname !== undefined && user.real_name) {
             add = user.real_name;
             if (user[showUserRealname]) add += `（${user[showUserRealname]}）`;
         } else {
             if (user[showUser]) {
                 add = user[showUser];
-            } else if (showUser === "username") {
-                const htmlres = await fetch(`/user/${user.id}`);
-                const html = await htmlres.text();
-                add = html.match(/<title>(.*) - 用户.*<\/title>/)[1];
-            } else if (showUser === "nickname") {
-                const htmlres = await fetch(`/user/${user.id}`);
-                const html = await htmlres.text();
-                console.log(html);
-                add = html.match(/<h4.*>\s*昵称\s*<\/h4>\s*<div.*>\s*(.*)\s*<\/div>/);
-                if (add) add = add[1]; else add = html.match(/<h4.*>\s*昵称 \/ 姓名\s*<\/h4><div.*>\s*(.*) \/ .* \/ .*\s*<\/div>/)[1];
-            } else add = null;
+            }
+            // else if (showUser === "username") {
+            //     const htmlres = await fetch(`/user/${user.id}`);
+            //     const html = await htmlres.text();
+            //     add = html.match(/<title>(.*) - 用户.*<\/title>/)[1];
+            // } else if (showUser === "nickname") {
+            //     const htmlres = await fetch(`/user/${user.id}`);
+            //     console.log(htmlres);
+            //     const html = await htmlres.text();
+            //     console.log(html);
+            //     add = html.match(/<h4.*>\s*昵称\s*<\/h4>\s*<div.*>\s*(.*?)\s*<\/div>/)
+            //         ?? html.match(/<h4.*>\s*昵称 \/ 姓名\s*<\/h4><div.*>\s*(.*?) \/ .* \/ .*\s*<\/div>/);
+            //     if (add) add = add[1];
+            //     else throw new Error("");
+            // }
         }
         return add;
     }
@@ -2932,22 +2935,30 @@
     async function getShowNames() {
         const chatInfo = await fetch("/chat/info");
         const response = (await chatInfo.json()).friends;
-        response.concat(response, await fetchBetterNamesUsers());
         let ret = {};
-        let promises = [];
-        const SIZE = 1;
-        for (let i = 1; i <= SIZE; i++) promises.push(new Promise((resolve, reject) => {resolve()}));
-        for (let user of response) {
-            promises[user.id % SIZE] =
-                promises[user.id % SIZE].then(async () => {
-                    console.log("Get", user.id);
-                    const add = await __getShowName(user);
-                    ret[user.id] = add;
-                    console.log(user.id, add);
-                });
+        for (let user of response.concat(await fetchBetterNamesUsers())) {
+            const add = await __getShowName(user);
+            ret[user.id] = add;
         }
-        for (let promise of promises)
-            await promise;
+        // const promises = [];
+        // const SIZE = 300;
+        // for (let i = 1; i <= SIZE; i++)
+        //     promises.push(async () => {
+        //         for (let j = i; j <= 4000; j += SIZE) {
+        //             if (ret[i]) continue;
+        //             console.log("Get", i);
+        //             try {
+        //                 const add = await __getShowName({
+        //                     id: i,
+        //                 });
+        //                 ret[i] = add;
+        //                 console.log(i, add);
+        //             } catch (e) {
+        //                 break;
+        //             }
+        //         }
+        //     });
+        // await Promise.all(promises);
         return ret;
     }
 
@@ -3089,7 +3100,6 @@
     let [users, specialRules] = await Promise.all([loadUsersData(GM_getValue("useCustomColors")), loadSpecialRules(),]);
     applySpecialRules(users, specialRules);
     let shownames = await getShowNames();
-    console.log(shownames);
 
     function getShowName(uid, arg) {
         return shownames[uid] ?? arg;
@@ -3627,15 +3637,11 @@
 
         let combinedName = defaultSource;
         if (info) {
-            combinedName = typeof info.name === 'string' ? info.name : (defaultSource || '');
             if (getShowName(uid, null)) {
-                console.log(a.innerHTML);
                 a.childNodes.forEach(n => {
                     if (n.nodeType === Node.TEXT_NODE) n.remove();
                 });
-                console.log(a.innerHTML);
                 a.innerHTML += getShowName(uid);
-                console.log(a.innerHTML);
             }
             if (info.colorKey === "clear") a.style.color = ''; else {
                 const c = palette[info.colorKey];
@@ -5203,7 +5209,8 @@
                 const uid = chatToInteger(member && (member.id ?? member.user_id ?? member.uid));
                 if (!Number.isFinite(uid) || uid <= 0) return;
                 const memberName = getShowName(uid, `用户 ${uid}`);
-                if (member.type === "Owner") ownerName = memberName; else (member.type === "Member" ? membersName : administratorsName).push(memberName);
+                const showMemberHtml = `<a href="/user/${uid}">${escapeHtml(memberName)}</a>`;
+                if (member.type === "Owner") ownerName = showMemberHtml; else (member.type === "Member" ? membersName : administratorsName).push(showMemberHtml);
                 if (!chatState.userNameById.has(uid) || !chatState.userNameById.get(uid)) {
                     chatState.userNameById.set(uid, memberName);
                 }
@@ -5216,7 +5223,7 @@
                 id: gid,
                 type: 'group',
                 name: title,
-                subtitle: `<div class="bn-group-title" data-title="群主：${ownerName}<br>管理员：${administratorsName.join("，")}<br>成员：${membersName.join("，")}">群成员 ${members.length || 0} 人 · ID ${gid}</div>`,
+                subtitle: `群成员 ${members.length || 0} 人 · ID ${gid}<br>群主：${ownerName}<br>管理员：${administratorsName.join("，")}<br>成员：${membersName.join("，")}`,
             });
         });
 
@@ -6211,19 +6218,6 @@
             a.target = "_blank";
             a.click();
             URL.revokeObjectURL(url);
-        }
-    });
-    document.addEventListener("mouseover", (e) => {
-        if (e.target.classList.contains("bn-group-title")) {
-            const timer = setTimeout(() => {
-                chatShowMembsersEl.innerHTML = e.target.dataset.title;
-                chatShowMembsersEl.style.display = "block";
-
-            }, 500);
-            e.target.addEventListener("mouseout", () => {
-                chatShowMembsersEl.style.display = "none";
-                clearTimeout(timer);
-            });
         }
     });
 
