@@ -614,6 +614,206 @@
     }
 }
 
+#bn-welcome-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483647;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: rgba(15, 23, 42, 0.42);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .22s ease;
+    backdrop-filter: blur(8px);
+}
+
+#bn-welcome-modal.bn-show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.bn-welcome-dialog {
+    width: min(720px, calc(100vw - 32px));
+    max-height: min(760px, calc(100vh - 40px));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.72);
+    border-radius: 16px;
+    background:
+            radial-gradient(circle at 16% 0%, rgba(30, 136, 229, 0.14), transparent 30%),
+            radial-gradient(circle at 96% 8%, rgba(249, 115, 22, 0.16), transparent 26%),
+            linear-gradient(180deg, #ffffff, #f8fafc);
+    color: #172033;
+    box-shadow: 0 28px 80px rgba(15, 23, 42, 0.26);
+    transform: translateY(12px) scale(0.98);
+    transition: transform .22s ease;
+}
+
+#bn-welcome-modal.bn-show .bn-welcome-dialog {
+    transform: translateY(0) scale(1);
+}
+
+.bn-welcome-header {
+    padding: 28px 32px 18px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.bn-welcome-kicker {
+    color: #1e88e5;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0;
+}
+
+.bn-welcome-header h2 {
+    margin: 8px 0 10px;
+    color: #111827;
+    font-size: 26px;
+    line-height: 1.28;
+    font-weight: 800;
+    letter-spacing: 0;
+}
+
+.bn-welcome-code-name {
+    color: #64748b;
+    font-size: 14px;
+    font-weight: 650;
+}
+
+.bn-welcome-changelog {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: min(430px, calc(100vh - 260px));
+    overflow: auto;
+    padding: 18px 32px 6px;
+}
+
+.bn-welcome-changelog ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.bn-welcome-changelog li {
+    margin: 0 0 10px;
+    color: #273449;
+    font-size: 14px;
+    line-height: 1.62;
+}
+
+.bn-welcome-changelog li::marker {
+    color: #1e88e5;
+}
+
+.bn-welcome-changelog li ul {
+    margin-top: 6px;
+    padding-left: 18px;
+}
+
+.bn-welcome-changelog li li {
+    margin-bottom: 5px;
+    color: #526173;
+    font-size: 13px;
+}
+
+.bn-welcome-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding: 16px 32px 24px;
+    border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.bn-welcome-close {
+    min-width: 96px;
+    height: 38px;
+    border: 0;
+    border-radius: 8px;
+    background: #1e88e5;
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 10px 22px rgba(30, 136, 229, 0.24);
+    transition: background .18s ease, transform .18s ease, box-shadow .18s ease;
+}
+
+.bn-welcome-close:hover {
+    background: #166fc0;
+    transform: translateY(-1px);
+    box-shadow: 0 12px 26px rgba(30, 136, 229, 0.28);
+}
+
+.bn-welcome-close:focus-visible {
+    outline: 3px solid rgba(30, 136, 229, 0.28);
+    outline-offset: 2px;
+}
+
+#bn-container.bn-theme-dark ~ #bn-welcome-modal {
+    background: rgba(2, 6, 23, 0.58);
+}
+
+#bn-container.bn-theme-dark ~ #bn-welcome-modal .bn-welcome-dialog {
+    border-color: rgba(148, 163, 184, 0.22);
+    background:
+            radial-gradient(circle at 16% 0%, rgba(56, 141, 227, 0.18), transparent 32%),
+            radial-gradient(circle at 96% 8%, rgba(249, 115, 22, 0.14), transparent 28%),
+            linear-gradient(180deg, #101827, #0f172a);
+    color: #e5edf7;
+    box-shadow: 0 30px 84px rgba(0, 0, 0, 0.58);
+}
+
+#bn-container.bn-theme-dark ~ #bn-welcome-modal .bn-welcome-header,
+#bn-container.bn-theme-dark ~ #bn-welcome-modal .bn-welcome-actions {
+    border-color: rgba(148, 163, 184, 0.18);
+}
+
+#bn-container.bn-theme-dark ~ #bn-welcome-modal .bn-welcome-header h2 {
+    color: #f8fafc;
+}
+
+#bn-container.bn-theme-dark ~ #bn-welcome-modal .bn-welcome-code-name,
+#bn-container.bn-theme-dark ~ #bn-welcome-modal .bn-welcome-changelog li li {
+    color: #aab8cc;
+}
+
+#bn-container.bn-theme-dark ~ #bn-welcome-modal .bn-welcome-changelog li {
+    color: #d9e2ef;
+}
+
+@media (max-width: 560px) {
+    #bn-welcome-modal {
+        padding: 14px;
+    }
+
+    .bn-welcome-dialog {
+        width: calc(100vw - 20px);
+        max-height: calc(100vh - 20px);
+        border-radius: 14px;
+    }
+
+    .bn-welcome-header {
+        padding: 22px 20px 14px;
+    }
+
+    .bn-welcome-header h2 {
+        font-size: 22px;
+    }
+
+    .bn-welcome-changelog {
+        max-height: calc(100vh - 250px);
+        padding: 16px 20px 4px;
+    }
+
+    .bn-welcome-actions {
+        padding: 14px 20px 20px;
+    }
+
+    .bn-welcome-close {
+        width: 100%;
+    }
+}
+
 .bn-panel-title {
     font-size: 16px;
     font-weight: 600;

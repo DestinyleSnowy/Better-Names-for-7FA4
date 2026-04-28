@@ -169,6 +169,33 @@
     const UPDATE_MANUAL_SYNC_MESSAGE = '登录 Gitlab 同步最新版本';
     const manifestVersion = normalizeVersionString(readManifestVersion());
     const manifestVersionInfo = parseComparableVersion(manifestVersion);
+    const WELCOME_SEEN_VERSION_KEY = 'bn.welcome.seenVersion';
+    const WELCOME_CHANGELOG_CODE_NAME = '好久不见';
+    const WELCOME_CHANGELOG_ITEMS = [
+        {
+            text: '添加并修复聊天室功能。',
+            children: [
+                '优化聊天消息排序，消息按时间从旧到新显示，最新消息位于底部。',
+                '优化会话列表排序，优先按最近消息时间排列。',
+                '修复私聊中无法加载自己发送消息的问题。',
+                '改进更早消息加载逻辑，滚动到顶部附近时自动加载。',
+                '移除“加载更早消息”按钮，调整会话标题、ID 与状态信息为同一行显示。',
+                '增大消息输入预览区域，并支持开关预览。',
+                '添加聊天消息本地缓存，减少刷新后重复拉取历史消息。',
+                '修复聊天室新消息提示在部分会话缺少消息基线时失效的问题。',
+                '优化聊天室自动刷新间隔与后台探测逻辑，降低接口请求频率。',
+                '加强聊天消息与预览内容的 Markdown/HTML 清理，减少不安全内容注入风险。',
+            ],
+        },
+        {text: '恢复用户显示选项为“显示用户昵称”，移除尝试显示用户真名与用户名的相关选项。'},
+        {text: '新增“默认隐藏已提交作业”显示选项，问题页已提交作业默认收缩并支持手动展开。'},
+        {text: '新增个人计划日期导航，进入长计划页时默认跳转到今日计划，并修复长计划页面被固定高度截断的问题。'},
+        {text: '修复配置面板在未修改设置时仍显示“保存配置”和“取消更改”的问题。'},
+        {text: '修复默认关闭自定义颜色时用户颜色不渲染的问题。'},
+        {text: '调整默认年级用户颜色显示效果。'},
+        {text: '更换彩蛋。'},
+        {text: '新增首次加载版本欢迎弹窗，展示 2026.07 更新内容。'},
+    ];
     const isSupportedHostname = (host) => {
         if (typeof host !== 'string' || !host) return false;
         if (SUPPORTED_HOSTS.has(host)) return true;
@@ -313,6 +340,12 @@
     function formatBlurText(value) {
         const num = clampBlur(value);
         return num.toFixed(1).replace(/\.0+$/, '');
+    }
+
+    function normalizeBgFillway(value) {
+        const fallback = String(CONFIG_DEFAULTS.bg_fillway);
+        const normalized = String(value ?? fallback);
+        return Object.prototype.hasOwnProperty.call(backgroundStyles, normalized) ? normalized : fallback;
     }
 
     function clampHiToiletInterval(value) {
@@ -464,7 +497,7 @@
     }
 
     const normalizedBgData = typeof storedBgImageData === 'string' ? storedBgImageData.trim() : '';
-    const normalizedBgfillway = storedBgfillway;
+    const normalizedBgfillway = normalizeBgFillway(storedBgfillway);
     const normalizedBgUrl = typeof storedBgImageUrl === 'string' ? storedBgImageUrl.trim() : '';
     debugLog('Background remote url normalized:', normalizedBgUrl);
     debugLog('Background fillway normalized:', normalizedBgfillway);
@@ -477,7 +510,7 @@
     const normalizedBgOpacity = String(clampOpacity(storedBgOpacity));
     const normalizedBgBlur = clampBlur(storedBgBlur);
     const initialBackgroundSource = (normalizedBgSourceType === 'local' && normalizedBgData) ? normalizedBgData : normalizedBgUrl;
-    applyBackgroundOverlay(storedBgEnabled, storedBgfillway, initialBackgroundSource, normalizedBgOpacity, normalizedBgBlur);
+    applyBackgroundOverlay(storedBgEnabled, normalizedBgfillway, initialBackgroundSource, normalizedBgOpacity, normalizedBgBlur);
 
     function readAutoRenewMemory() {
         try {
@@ -902,6 +935,7 @@
     }
     syncThemeModeUI(currentThemeMode);
     applyThemeMode(currentThemeMode);
+    showFirstLoadWelcome();
     let pinned = !!configCenter.layout.pinned;
     const SNAP_MARGIN = 20;
     const DRAG_THRESHOLD = 6;
@@ -1294,6 +1328,88 @@
         return fireworksEngine;
     }
 
+    function renderWelcomeChangelogItems(items) {
+        return items.map(item => {
+            const text = typeof item === 'string' ? item : item.text;
+            const children = item && Array.isArray(item.children) ? item.children : [];
+            const childHtml = children.length
+                ? `<ul>${children.map(child => `<li>${escapeHtml(child)}</li>`).join('')}</ul>`
+                : '';
+            return `<li><span>${escapeHtml(text || '')}</span>${childHtml}</li>`;
+        }).join('');
+    }
+
+    function shouldShowFirstLoadWelcome() {
+        if (!manifestVersion) return false;
+        try {
+            return String(GM_getValue(WELCOME_SEEN_VERSION_KEY, '') || '') !== manifestVersion;
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function markFirstLoadWelcomeSeen() {
+        if (!manifestVersion) return;
+        try {
+            GM_setValue(WELCOME_SEEN_VERSION_KEY, manifestVersion);
+        } catch (_) { /* ignore */
+        }
+    }
+
+    function showFirstLoadWelcome() {
+        if (!document.body || !shouldShowFirstLoadWelcome()) return;
+        const existing = document.getElementById('bn-welcome-modal');
+        if (existing) return;
+        const modal = document.createElement('div');
+        modal.id = 'bn-welcome-modal';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', 'bn-welcome-title');
+        modal.innerHTML = `
+            <div class="bn-welcome-dialog">
+                <div class="bn-welcome-header">
+                    <div class="bn-welcome-kicker">Better Names for 7FA4</div>
+                    <h2 id="bn-welcome-title">隆重推出 Better Names for 7FA4 ${escapeHtml(manifestVersion)}</h2>
+                    <div class="bn-welcome-code-name">版本代号：${escapeHtml(WELCOME_CHANGELOG_CODE_NAME)}</div>
+                </div>
+                <div class="bn-welcome-changelog" aria-label="${escapeHtml(manifestVersion)} 更新内容">
+                    <ul>${renderWelcomeChangelogItems(WELCOME_CHANGELOG_ITEMS)}</ul>
+                </div>
+                <div class="bn-welcome-actions">
+                    <button type="button" class="bn-welcome-close" data-bn-welcome-close="1">知道了</button>
+                </div>
+            </div>
+        `;
+        const closeWelcome = () => {
+            markFirstLoadWelcomeSeen();
+            modal.classList.remove('bn-show');
+            setTimeout(() => modal.remove(), 220);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape') closeWelcome();
+        };
+        modal.addEventListener('click', event => {
+            if (event.target === modal) closeWelcome();
+        });
+        modal.querySelectorAll('[data-bn-welcome-close="1"]').forEach(button => {
+            button.addEventListener('click', closeWelcome);
+        });
+        document.addEventListener('keydown', handleKeyDown);
+        document.body.appendChild(modal);
+        requestAnimationFrame(() => modal.classList.add('bn-show'));
+        setTimeout(() => {
+            const closeButton = modal.querySelector('[data-bn-welcome-close="1"]');
+            if (closeButton && typeof closeButton.focus === 'function') {
+                try {
+                    closeButton.focus({preventScroll: true});
+                } catch (_) {
+                    closeButton.focus();
+                }
+            }
+        }, 0);
+    }
+
     function showBirthdayWish() {
         if (!document.body) return;
         let wish = document.getElementById('bn-birthday-wish');
@@ -1510,6 +1626,7 @@
     if (chkUserPlanDateNavigator) chkUserPlanDateNavigator.checked = enableUserPlanDateNavigator;
     chkTitleOpt.checked = enableTitleOptimization;
     if (bgOpacityValueSpan) bgOpacityValueSpan.textContent = formatOpacityText(normalizedBgOpacity);
+    if (bgOpacityInput) bgOpacityInput.value = normalizedBgOpacity;
     if (bgBlurInput && bgBlurValueSpan) {
         bgBlurInput.value = normalizedBgBlur;
         bgBlurValueSpan.textContent = formatBlurText(normalizedBgBlur);
@@ -2434,8 +2551,8 @@
         const currentThemeColor = themeColorInput ? normalizeHexColor(themeColorInput.value, originalConfig.themeColor) : originalConfig.themeColor;
         const themeColorChanged = themeColorInput ? currentThemeColor.toLowerCase() !== (originalConfig.themeColor || '').toLowerCase() : false;
         const currentBgEnabled = bgEnabledInput ? bgEnabledInput.checked : originalConfig.bgEnabled;
-        const currentBgfillway = bgfillwayInput ? bgfillwayInput.value : originalConfig.bgfillway;
-        const currentBgOpacity = bgOpacityInput ? bgOpacityInput.value : originalConfig.bgOpacity;
+        const currentBgfillway = bgfillwayInput ? normalizeBgFillway(bgfillwayInput.value) : originalConfig.bgfillway;
+        const currentBgOpacity = bgOpacityInput ? String(clampOpacity(bgOpacityInput.value)) : originalConfig.bgOpacity;
         const currentBgBlur = bgBlurInput ? bgBlurInput.value : originalConfig.bgBlur;
         const currentBgUrl = bgUrlInput ? bgUrlInput.value.trim() : '';
         let bgSourceChanged = false;
@@ -2626,7 +2743,7 @@
         originalConfig.themeMode = nextThemeMode;
         applyThemeMode(nextThemeMode);
         const bgEnabled = bgEnabledInput ? bgEnabledInput.checked : false;
-        const bgfillway = bgfillwayInput.value;
+        const bgfillway = normalizeBgFillway(bgfillwayInput.value);
         const rawBgUrl = bgUrlInput ? bgUrlInput.value.trim() : '';
         const bgOpacityRaw = bgOpacityInput ? bgOpacityInput.value : normalizedBgOpacity;
         const bgBlurRaw = bgBlurInput ? bgBlurInput.value : normalizedBgBlur;
@@ -2735,7 +2852,7 @@
         syncThemeModeUI(originalConfig.themeMode);
         applyThemeMode(originalConfig.themeMode);
         if (bgEnabledInput) bgEnabledInput.checked = originalConfig.bgEnabled;
-        if (bgfillwayInput) bgfillwayInput.value = originalConfig.bgfillway;
+        if (bgfillwayInput) bgfillwayInput.value = normalizeBgFillway(originalConfig.bgfillway);
         if (bgUrlInput) bgUrlInput.value = originalConfig.bgImageUrl;
         currentBgSourceType = originalConfig.bgSourceType;
         currentBgImageData = originalConfig.bgImageData;
