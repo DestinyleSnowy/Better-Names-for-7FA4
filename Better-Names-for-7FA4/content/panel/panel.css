@@ -2317,16 +2317,36 @@
     background: var(--bn-surface);
 }
 
+.bn-chat-current-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+}
+
+.bn-chat-current-identity {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    min-width: 0;
+}
+
 .bn-chat-current-title {
+    min-width: 0;
     font-size: 13px;
     font-weight: 700;
     color: var(--bn-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .bn-chat-current-meta {
-    margin-top: 2px;
+    flex: 0 0 auto;
     font-size: 11px;
     color: var(--bn-text-muted);
+    white-space: nowrap;
 }
 
 .bn-chat-message-list {
@@ -2395,16 +2415,42 @@
     word-break: break-word;
 }
 
-.bn-chat-message-actions {
-    display: flex;
-    justify-content: center;
-}
-
 .bn-chat-composer {
     border: 1px solid var(--bn-border-subtle);
     border-radius: 10px;
     background: var(--bn-surface);
     padding: 8px;
+}
+
+.bn-chat-composer-tools {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    margin-bottom: 6px;
+}
+
+.bn-chat-preview-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--bn-text-sub);
+    user-select: none;
+}
+
+.bn-chat-editor-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    gap: 8px;
+    align-items: stretch;
+}
+
+.bn-chat-editor-row.bn-preview-hidden {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.bn-chat-editor-row.bn-preview-hidden #bn-chat-preview {
+    display: none;
 }
 .bn-chat-composer-tabs {
     display: flex;
@@ -2442,14 +2488,14 @@
     display: block;
 }
 .bn-chat-input {
-    width: 60%;
+    width: 100%;
     border: 1px solid var(--bn-border-subtle);
     border-radius: 10px;
-    display: inline-block;
+    display: block;
     padding: 8px 10px;
     resize: vertical;
-    min-height: 72px;
-    max-height: 160px;
+    min-height: 96px;
+    max-height: 220px;
     font-size: 13px;
     line-height: 1.4;
     background: var(--bn-bg);
@@ -2465,16 +2511,17 @@
 }
 
 #bn-chat-preview {
-    min-width: 20%;
-    max-width: 36%;
-    display: inline-block;
+    min-width: 0;
+    max-width: none;
+    display: block;
     border: 1px solid var(--bn-border-subtle);
     border-radius: 10px;
     overflow: auto;
-    padding: 8px -50px;
+    padding: 8px 10px;
     resize: vertical;
-    height: 72px;
-    max-height: 160px;
+    min-height: 96px;
+    height: 96px;
+    max-height: 220px;
     font-size: 13px;
     line-height: 1.4;
     background: var(--bn-bg);
@@ -2506,27 +2553,22 @@
 }
 
 .bn-chat-status {
+    flex: 0 1 auto;
+    max-width: min(360px, 45%);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-size: 12px;
     color: var(--bn-text-muted);
-    border: 1px solid var(--bn-border-subtle);
-    border-radius: 10px;
-    padding: 6px 10px;
-    background: rgba(255, 255, 255, 0.5);
-    min-height: 30px;
-    display: inline-block;
-    align-items: center;
+    text-align: right;
 }
 
 .bn-chat-status.is-error {
     color: #c23a3a;
-    border-color: rgba(194, 58, 58, 0.35);
-    background: rgba(255, 234, 234, 0.85);
 }
 
 .bn-chat-status.is-success {
     color: #0f8f4b;
-    border-color: rgba(15, 143, 75, 0.35);
-    background: rgba(227, 252, 240, 0.88);
 }
 
 .bn-chat-group-ops-grid {
@@ -2645,7 +2687,6 @@
 #bn-container.bn-theme-dark .bn-chat-main-header,
 #bn-container.bn-theme-dark .bn-chat-message-list,
 #bn-container.bn-theme-dark .bn-chat-composer,
-#bn-container.bn-theme-dark .bn-chat-status,
 #bn-container.bn-theme-dark .bn-chat-group-ops-panel,
 #bn-container.bn-theme-dark .bn-chat-group-ops-hint {
     background: rgba(14, 22, 38, 0.8);
@@ -2703,7 +2744,27 @@
         justify-content: space-between;
     }
 
+    .bn-chat-current-row {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .bn-chat-current-identity {
+        flex-wrap: wrap;
+        gap: 4px 8px;
+    }
+
+    .bn-chat-status {
+        max-width: 100%;
+        text-align: left;
+    }
+
     .bn-chat-group-ops-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .bn-chat-editor-row {
         grid-template-columns: minmax(0, 1fr);
     }
 }

@@ -99,7 +99,7 @@
             <strong>@KarmaticEnding</strong>, <strong>@fltLi</strong>, <strong>@clx0226</strong>, <strong>@CloudDreamLaker</strong>,
             <strong>@OmegaTau</strong>, <strong>@for_fo_f</strong>, <strong>@mulab</strong>, <strong>@Leo-hele</strong>
             and <span class="bn-ai-models"
-                      title="GPT-5.4 (fast, xhigh), GPT-5.3-Codex (xhigh), GPT-5.2-Codex-5.2 (high), GPT-5.1-Codex-Max (medium), GPT-5.1-Codex-5.1-Mini (high), GPT-5-Codex (medium), GPT-5 Pro, GPT-5 Thinking, GPT-o3, GPT-o4-mini-high, Microsoft Copilot and Manus 1.5 Lite">AI</span>.
+                      title="GPT-5.5 (high), GPT-5.4 (fast, xhigh), GPT-5.3-Codex (xhigh), GPT-5.2-Codex-5.2 (high), GPT-5.1-Codex-Max (medium), GPT-5.1-Codex-5.1-Mini (high), GPT-5-Codex (medium), GPT-5 Pro, GPT-5 Thinking, GPT-o3, GPT-o4-mini-high, Microsoft Copilot and Manus 1.5 Lite">AI</span>.
         </div>
     </div>
     <div class="bn-panel-content">
@@ -395,7 +395,7 @@
             <button class="bn-btn" id="bn-cancel-changes">取消更改</button>
         </div>
         <div class="bn-version">
-            <div class="bn-version-text" id="bn-version-text" data-slogan="我们要好好过每一天"></div>
+            <div class="bn-version-text" id="bn-version-text" data-slogan="好久不见"></div>
             <div class="bn-update-notice" id="bn-update-notice" aria-live="polite">
                 <div class="bn-update-dot" aria-hidden="true"></div>
                 <div class="bn-update-copy">
@@ -429,18 +429,15 @@
                     <button type="button" class="bn-btn" id="bn-chat-refresh-btn">刷新消息</button>
                     <button type="button" class="bn-btn" id="bn-chat-token-btn">查询 Token</button>
                 </div>
-                <div id="bn-chat-status" class="bn-chat-status" role="status" aria-live="polite">聊天室初始化中...</div>
-                <button type="button" class="bn-btn" id="bn-chat-load-older-btn" disabled>加载更早消息</button>
                 <div class="bn-chat-toolbar-right">
                     <label class="bn-chat-auto-refresh-toggle" for="bn-chat-auto-refresh">
                         <input type="checkbox" id="bn-chat-auto-refresh" checked/>
                         <span>自动刷新</span>
                     </label>
                     <select id="bn-chat-interval" class="bn-chat-interval-select" aria-label="自动刷新间隔">
-                        <option value="2000">2 秒</option>
-                        <option value="3000" selected>3 秒</option>
+                        <option value="3000">3 秒</option>
                         <option value="5000">5 秒</option>
-                        <option value="8000">8 秒</option>
+                        <option value="8000" selected>8 秒</option>
                     </select>
                     <span id="bn-chat-token-display" class="bn-chat-token-display">Token：-- / --</span>
                 </div>
@@ -470,19 +467,26 @@
                 </aside>
                 <section class="bn-chat-main">
                     <div class="bn-chat-main-header">
-                        <div id="bn-chat-current-title" class="bn-chat-current-title">请选择会话</div>
-                        <div id="bn-chat-current-meta" class="bn-chat-current-meta">加载后可开始聊天</div>
+                        <div class="bn-chat-current-row">
+                            <div class="bn-chat-current-identity">
+                                <div id="bn-chat-current-title" class="bn-chat-current-title">请选择会话</div>
+                                <div id="bn-chat-current-meta" class="bn-chat-current-meta">加载后可开始聊天</div>
+                            </div>
+                            <div id="bn-chat-status" class="bn-chat-status" role="status" aria-live="polite">聊天室初始化中...</div>
+                        </div>
                     </div>
                     <div id="bn-chat-message-list" class="bn-chat-message-list" aria-live="polite"></div>
-                    <div class="bn-chat-message-actions">
-
-                    </div>
                     <div class="bn-chat-composer">
-                        <div style="display: inline-block; width: 100%">
+                        <div class="bn-chat-composer-tools">
+                            <label class="bn-chat-preview-toggle" for="bn-chat-preview-enabled">
+                                <input type="checkbox" id="bn-chat-preview-enabled" checked/>
+                                <span>预览</span>
+                            </label>
+                        </div>
+                        <div class="bn-chat-editor-row">
                             <textarea id="bn-chat-input"
                                       class="bn-chat-input" rows="3"
-                                      placeholder="输入消息，Ctrl+Enter 发送"
-                                      contenteditable="true"></textarea>
+                                      placeholder="输入消息，Enter 发送，Shift+Enter 换行"></textarea>
                             <div id="bn-chat-preview">
                                 <span style="color: #1e2a40; opacity: 0.5; user-select: none; padding: 5px 5px;">预览</span>
                             </div>

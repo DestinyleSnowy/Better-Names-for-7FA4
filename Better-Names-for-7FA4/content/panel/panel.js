@@ -795,7 +795,6 @@
     const chatCurrentTitleEl = container.querySelector('#bn-chat-current-title');
     const chatCurrentMetaEl = container.querySelector('#bn-chat-current-meta');
     const chatMessageListEl = container.querySelector('#bn-chat-message-list');
-    const chatLoadOlderBtnEl = container.querySelector('#bn-chat-load-older-btn');
     const chatInputEl = container.querySelector('#bn-chat-input');
     const chatInputCounterEl = container.querySelector('#bn-chat-input-counter');
     const chatSendBtnEl = container.querySelector('#bn-chat-send-btn');
@@ -808,6 +807,8 @@
     const chatGroupOpRunBtnEl = container.querySelector('#bn-chat-group-op-run-btn');
     const chatGroupOpStatusEl = container.querySelector('#bn-chat-group-op-status');
     const chatInputPreviewEl = container.querySelector('#bn-chat-preview');
+    const chatInputPreviewToggleEl = container.querySelector('#bn-chat-preview-enabled');
+    const chatEditorRowEl = container.querySelector('.bn-chat-editor-row');
 
     const chatState = {
         initialized: false,
@@ -838,8 +839,12 @@
         oldestSecByKey: new Map(),
         lastActivitySecByKey: new Map(),
         unreadCountByKey: new Map(),
+        noOlderConversationKeys: new Set(),
         trackedConversationKeys: new Set(),
         lastNotifiedMessageIdByKey: new Map(),
+        cacheRestored: false,
+        cacheRestoredMessages: false,
+        cacheSaveTimer: null,
         tokenUsed: null,
         tokenRemain: null,
         requestSeq: 0,
@@ -848,10 +853,16 @@
     const CHAT_WINDOW_EDGE_MARGIN = 8;
     const CHAT_WINDOW_MIN_WIDTH = 560;
     const CHAT_WINDOW_MIN_HEIGHT = 420;
-    const CHAT_MONITOR_BATCH_SIZE = 3;
-    const CHAT_MONITOR_PROBE_TAKE = 5;
-    const CHAT_ACTIVITY_HYDRATE_BATCH_SIZE = 4;
+    const CHAT_MONITOR_BATCH_SIZE = 1;
+    const CHAT_MONITOR_PROBE_TAKE = 3;
+    const CHAT_ACTIVITY_HYDRATE_BATCH_SIZE = 2;
     const CHAT_ACTIVITY_PROBE_TAKE = 3;
+    const CHAT_UPLOAD_MAX_BYTES = 512 * 1024;
+    const CHAT_CACHE_KEY = 'bn.chat.messageCache.v1';
+    const CHAT_CACHE_VERSION = 1;
+    const CHAT_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+    const CHAT_CACHE_MAX_CONVERSATIONS = 60;
+    const CHAT_CACHE_MAX_MESSAGES_PER_CONVERSATION = 500;
     let chatWindowInteractionState = null;
     let chatWindowRestoreRect = null;
 
@@ -4185,14 +4196,14 @@
     }
 
     function chatNormalizeTimestampToSec(value) {
-        if (value == null || value === '') return Math.floor(Date.now() / 1000);
+        if (value == null || value === '') return NaN;
         if (typeof value === 'number' && Number.isFinite(value)) {
             if (value > 1e10) return Math.floor(value / 1000);
             return Math.floor(value);
         }
         if (typeof value === 'string') {
             const trimmed = value.trim();
-            if (!trimmed) return Math.floor(Date.now() / 1000);
+            if (!trimmed) return NaN;
             const num = Number(trimmed);
             if (Number.isFinite(num)) {
                 if (num > 1e10) return Math.floor(num / 1000);
@@ -4201,7 +4212,7 @@
             const parsed = Date.parse(trimmed);
             if (Number.isFinite(parsed)) return Math.floor(parsed / 1000);
         }
-        return Math.floor(Date.now() / 1000);
+        return NaN;
     }
 
     function chatFormatTimestamp(sec) {
@@ -4673,9 +4684,22 @@
         }
     }
 
+    function chatIsPreviewVisible() {
+        return !chatInputPreviewToggleEl || chatInputPreviewToggleEl.checked;
+    }
+
+    function chatSetPreviewVisible(visible) {
+        const nextVisible = !!visible;
+        if (chatInputPreviewToggleEl) chatInputPreviewToggleEl.checked = nextVisible;
+        if (chatEditorRowEl) chatEditorRowEl.classList.toggle('bn-preview-hidden', !nextVisible);
+        if (chatInputPreviewEl) chatInputPreviewEl.hidden = !nextVisible;
+        if (nextVisible) chatUpdateInput();
+    }
+
     function chatUpdateInput() {
         chatUpdateInputCounter();
-        RenderMarkdown(chatInputPreviewEl, chatInputEl.value)
+        if (!chatInputPreviewEl || !chatIsPreviewVisible()) return;
+        WriteCleanHTML(chatInputPreviewEl, chatInputEl.value || '');
         Prism.highlightAll();
         if (!chatInputPreviewEl.innerHTML.trim()) chatInputPreviewEl.innerHTML = "<span style=\"color: #1e2a40; opacity: 0.5; user-select: none; padding: 10px 10px;\">预览</span>";
     }
@@ -4684,7 +4708,6 @@
         if (chatRefreshBtnEl) chatRefreshBtnEl.disabled = !!disabled;
         if (chatTokenBtnEl) chatTokenBtnEl.disabled = !!disabled;
         if (chatSendBtnEl) chatSendBtnEl.disabled = !!disabled;
-        if (chatLoadOlderBtnEl) chatLoadOlderBtnEl.disabled = !!disabled;
     }
 
     function chatGetFilteredConversations() {
@@ -4721,9 +4744,14 @@
 
     function chatSortConversations(items) {
         return [...(Array.isArray(items) ? items : [])].sort((a, b) => {
+            const aActivity = chatGetConversationLastActivitySec(a && a.key);
+            const bActivity = chatGetConversationLastActivitySec(b && b.key);
+            if (aActivity !== bActivity) return bActivity - aActivity;
             const aName = String(a && a.name || '');
             const bName = String(b && b.name || '');
-            return aName.localeCompare(bName, 'zh-CN');
+            const byName = aName.localeCompare(bName, 'zh-CN');
+            if (byName !== 0) return byName;
+            return String(a && a.key || '').localeCompare(String(b && b.key || ''));
         });
     }
 
@@ -4784,6 +4812,9 @@
         cleanupMap(chatState.lastActivitySecByKey);
         cleanupMap(chatState.unreadCountByKey);
         cleanupMap(chatState.lastNotifiedMessageIdByKey);
+        Array.from(chatState.noOlderConversationKeys.values()).forEach((key) => {
+            if (!keep.has(key)) chatState.noOlderConversationKeys.delete(key);
+        });
         Array.from(chatState.trackedConversationKeys.values()).forEach((key) => {
             if (!keep.has(key)) chatState.trackedConversationKeys.delete(key);
         });
@@ -4815,16 +4846,16 @@
         const existing = chatState.messagesByKey.get(key) || [];
         const hadBaseline = chatState.trackedConversationKeys.has(key);
         const existingIds = hadBaseline ? new Set(existing.map(item => item && item.id)) : null;
-        const previousLatestSec = hadBaseline && existing.length ? Math.max(...existing.map(item => chatNormalizeTimestampToSec(item && item.sec))) : NaN;
+        const existingTimes = existing.map(item => chatNormalizeTimestampToSec(item && item.sec)).filter(Number.isFinite);
+        const previousLatestSec = hadBaseline && existingTimes.length ? Math.max(...existingTimes) : NaN;
         const merged = chatMergeMessages(existing, incomingMessages);
         chatState.messagesByKey.set(key, merged);
-        if (merged.length) {
-            const latestSec = Math.max(...merged.map(item => chatNormalizeTimestampToSec(item.sec)));
-            if (Number.isFinite(latestSec)) chatState.lastActivitySecByKey.set(key, latestSec);
+        const mergedTimes = merged.map(item => chatNormalizeTimestampToSec(item && item.sec)).filter(Number.isFinite);
+        if (mergedTimes.length) {
+            chatState.lastActivitySecByKey.set(key, Math.max(...mergedTimes));
         }
-        if (updateOldest && merged.length) {
-            const oldest = Math.min(...merged.map(item => chatNormalizeTimestampToSec(item.sec)));
-            if (Number.isFinite(oldest)) chatState.oldestSecByKey.set(key, oldest);
+        if (updateOldest && mergedTimes.length) {
+            chatState.oldestSecByKey.set(key, Math.min(...mergedTimes));
         }
         chatState.trackedConversationKeys.add(key);
 
@@ -4856,6 +4887,7 @@
             chatResortConversationState();
             chatUpdateTriggerUnreadUi();
         }
+        chatScheduleMessageCacheSave();
         return {merged, newIncoming, hadBaseline};
     }
 
@@ -4948,9 +4980,11 @@
         const content = String(raw.content ?? raw.message ?? raw.text ?? '').trim();
         const sec = chatNormalizeTimestampToSec(raw.timestamp ?? raw.send_time ?? raw.time ?? raw.created_at ?? raw.createdAt);
         const baseId = raw.id ?? raw.chat_id ?? raw.message_id ?? raw.mid ?? '';
-        const syntheticId = `${baseId}|${senderId}|${targetId}|${sec}|${content}`;
-        const isSelf = Number.isFinite(chatState.selfId) && Number.isFinite(senderId) && senderId === chatState.selfId;
-        const actualDirection = direction || (isSelf ? 'out' : 'in');
+        const fallbackId = raw.uuid ?? raw.guid ?? raw.key ?? '';
+        const rawSelf = Number.isFinite(chatState.selfId) && Number.isFinite(senderId) && senderId === chatState.selfId;
+        const actualDirection = direction || (rawSelf ? 'out' : 'in');
+        const isSelf = actualDirection === 'out' || rawSelf;
+        const syntheticId = `${actualDirection}|${baseId || fallbackId}|${senderId}|${targetId}|${Number.isFinite(sec) ? sec : 'no-time'}|${content}`;
         return {
             id: syntheticId, senderId, targetId, content, sec, direction: actualDirection, isSelf, raw,
         };
@@ -4996,7 +5030,8 @@
             }
             if (directionHint === 'out') {
                 if (Number.isFinite(target) && target === convId) return true;
-                // if (Number.isFinite(sender) && sender === selfId && ids.includes(convId)) return true;
+                if (Number.isFinite(sender) && sender === convId) return true;
+                if (ids.includes(convId)) return true;
             }
             return false;
         }
@@ -5008,7 +5043,10 @@
         return [...messages].sort((a, b) => {
             const ta = chatToInteger(a && a.sec);
             const tb = chatToInteger(b && b.sec);
-            if (ta !== tb) return ta - tb;
+            const aHasTime = Number.isFinite(ta);
+            const bHasTime = Number.isFinite(tb);
+            if (aHasTime && bHasTime && ta !== tb) return ta - tb;
+            if (aHasTime !== bHasTime) return aHasTime ? -1 : 1;
             return String(a && a.id || '').localeCompare(String(b && b.id || ''));
         });
     }
@@ -5024,12 +5062,160 @@
         return merged;
     }
 
+    function chatSerializeMessage(message) {
+        if (!message || typeof message !== 'object') return null;
+        const id = String(message.id || '').trim();
+        const content = String(message.content || '');
+        if (!id && !content) return null;
+        const senderId = chatToInteger(message.senderId);
+        const targetId = chatToInteger(message.targetId);
+        const sec = chatNormalizeTimestampToSec(message.sec);
+        return {
+            id: id || `${message.direction || ''}|${message.senderId || ''}|${message.targetId || ''}|${message.sec || ''}|${content}`,
+            senderId: Number.isFinite(senderId) ? senderId : null,
+            targetId: Number.isFinite(targetId) ? targetId : null,
+            content,
+            sec: Number.isFinite(sec) ? sec : null,
+            direction: message.direction === 'out' ? 'out' : (message.direction === 'in' ? 'in' : ''),
+            isSelf: !!message.isSelf,
+        };
+    }
+
+    function chatDeserializeMessage(raw) {
+        if (!raw || typeof raw !== 'object') return null;
+        const content = String(raw.content || '');
+        const id = String(raw.id || '').trim();
+        if (!id && !content) return null;
+        const direction = raw.direction === 'out' ? 'out' : (raw.direction === 'in' ? 'in' : '');
+        const senderId = raw.senderId == null || raw.senderId === '' ? NaN : chatToInteger(raw.senderId);
+        const targetId = raw.targetId == null || raw.targetId === '' ? NaN : chatToInteger(raw.targetId);
+        return {
+            id: id || `${direction}|${raw.senderId || ''}|${raw.targetId || ''}|${raw.sec || ''}|${content}`,
+            senderId,
+            targetId,
+            content,
+            sec: chatNormalizeTimestampToSec(raw.sec),
+            direction,
+            isSelf: !!raw.isSelf || direction === 'out',
+            raw: {},
+        };
+    }
+
+    function chatReadMessageCache() {
+        try {
+            const raw = GM_getValue(CHAT_CACHE_KEY, '');
+            if (!raw) return null;
+            return typeof raw === 'string' ? JSON.parse(raw) : raw;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function chatWriteMessageCache(payload) {
+        try {
+            GM_setValue(CHAT_CACHE_KEY, JSON.stringify(payload));
+        } catch (_) {
+            // cache is an optimization only
+        }
+    }
+
+    function chatBuildMessageCacheSnapshot() {
+        const selfId = Number.isFinite(chatState.selfId) ? chatState.selfId : null;
+        if (!Number.isFinite(selfId)) return null;
+        const sortedKeys = chatState.conversations
+            .map(item => item && item.key)
+            .filter(key => key && chatState.messagesByKey.has(key))
+            .sort((a, b) => chatGetConversationLastActivitySec(b) - chatGetConversationLastActivitySec(a))
+            .slice(0, CHAT_CACHE_MAX_CONVERSATIONS);
+        const conversations = [];
+        sortedKeys.forEach((key) => {
+            const messages = (chatState.messagesByKey.get(key) || [])
+                .slice(-CHAT_CACHE_MAX_MESSAGES_PER_CONVERSATION)
+                .map(chatSerializeMessage)
+                .filter(Boolean);
+            if (!messages.length) return;
+            conversations.push({
+                key,
+                messages,
+                oldestSec: chatState.oldestSecByKey.get(key),
+                lastActivitySec: chatState.lastActivitySecByKey.get(key),
+                noOlder: chatState.noOlderConversationKeys.has(key),
+            });
+        });
+        return {
+            version: CHAT_CACHE_VERSION,
+            savedAt: Date.now(),
+            selfId,
+            activeKey: chatState.activeKey || '',
+            conversations,
+        };
+    }
+
+    function chatPersistMessageCacheNow() {
+        if (chatState.cacheSaveTimer) {
+            window.clearTimeout(chatState.cacheSaveTimer);
+            chatState.cacheSaveTimer = null;
+        }
+        const snapshot = chatBuildMessageCacheSnapshot();
+        if (snapshot) chatWriteMessageCache(snapshot);
+    }
+
+    function chatScheduleMessageCacheSave() {
+        if (chatState.cacheSaveTimer) return;
+        chatState.cacheSaveTimer = window.setTimeout(chatPersistMessageCacheNow, 500);
+    }
+
+    function chatRestoreMessageCache() {
+        if (chatState.cacheRestored) return false;
+        chatState.cacheRestored = true;
+        const cache = chatReadMessageCache();
+        if (!cache || cache.version !== CHAT_CACHE_VERSION) return false;
+        if (!Number.isFinite(cache.savedAt) || Date.now() - cache.savedAt > CHAT_CACHE_MAX_AGE_MS) return false;
+        const cacheSelfId = chatToInteger(cache.selfId);
+        if (Number.isFinite(cacheSelfId) && Number.isFinite(chatState.selfId) && cacheSelfId !== chatState.selfId) return false;
+        if (!Array.isArray(cache.conversations)) return false;
+
+        let restoredCount = 0;
+        cache.conversations.forEach((entry) => {
+            if (!entry || typeof entry !== 'object') return;
+            const key = String(entry.key || '');
+            if (!key || !chatState.conversationByKey.has(key)) return;
+            const messages = Array.isArray(entry.messages) ? entry.messages.map(chatDeserializeMessage).filter(Boolean) : [];
+            if (!messages.length) return;
+            const sorted = chatSortMessages(messages).slice(-CHAT_CACHE_MAX_MESSAGES_PER_CONVERSATION);
+            chatState.messagesByKey.set(key, sorted);
+            chatState.trackedConversationKeys.add(key);
+            const times = sorted.map(item => chatNormalizeTimestampToSec(item && item.sec)).filter(Number.isFinite);
+            const cachedOldest = chatNormalizeTimestampToSec(entry.oldestSec);
+            const cachedActivity = chatNormalizeTimestampToSec(entry.lastActivitySec);
+            if (Number.isFinite(cachedOldest)) chatState.oldestSecByKey.set(key, cachedOldest);
+            else if (times.length) chatState.oldestSecByKey.set(key, Math.min(...times));
+            if (Number.isFinite(cachedActivity)) chatState.lastActivitySecByKey.set(key, cachedActivity);
+            else if (times.length) chatState.lastActivitySecByKey.set(key, Math.max(...times));
+            if (entry.noOlder) chatState.noOlderConversationKeys.add(key);
+            restoredCount += sorted.length;
+        });
+
+        const cachedActiveKey = String(cache.activeKey || '');
+        if (cachedActiveKey && chatState.conversationByKey.has(cachedActiveKey)) {
+            chatState.activeKey = cachedActiveKey;
+        }
+        if (restoredCount > 0) {
+            chatState.cacheRestoredMessages = true;
+            chatResortConversationState();
+            return true;
+        }
+        return false;
+    }
+
     function chatRenderMessages({preserveScroll = false, forceScrollBottom = false} = {}) {
         if (!chatMessageListEl) return;
         const conv = chatGetConversationByKey(chatState.activeKey);
         const currentMessages = conv ? (chatState.messagesByKey.get(conv.key) || []) : [];
         const oldScrollHeight = chatMessageListEl.scrollHeight;
         const oldScrollTop = chatMessageListEl.scrollTop;
+        const oldScrollBottom = oldScrollHeight - oldScrollTop - chatMessageListEl.clientHeight;
+        const wasNearBottom = oldScrollBottom <= 48;
         const renderMessages = currentMessages;
 
         chatMessageListEl.innerHTML = '';
@@ -5038,7 +5224,6 @@
             placeholder.className = 'bn-chat-message-placeholder';
             placeholder.textContent = '请选择一个会话开始聊天';
             chatMessageListEl.appendChild(placeholder);
-            if (chatLoadOlderBtnEl) chatLoadOlderBtnEl.disabled = true;
             return;
         }
 
@@ -5047,7 +5232,6 @@
             placeholder.className = 'bn-chat-message-placeholder';
             placeholder.textContent = '暂无消息，发送一条试试吧';
             chatMessageListEl.appendChild(placeholder);
-            if (chatLoadOlderBtnEl) chatLoadOlderBtnEl.disabled = chatState.loadingOlder || chatState.loadingMessages;
             return;
         }
 
@@ -5087,18 +5271,17 @@
         });
 
         Prism.highlightAll();
-        if (chatLoadOlderBtnEl) chatLoadOlderBtnEl.disabled = chatState.loadingOlder || chatState.loadingMessages;
 
         if (forceScrollBottom || (!preserveScroll)) {
-            chatMessageListEl.scrollTop = 0;
+            chatMessagesScrollToBottom();
             return;
         }
         const nextScrollHeight = chatMessageListEl.scrollHeight;
+        const delta = nextScrollHeight - oldScrollHeight;
         if (preserveScroll) {
-            chatMessageListEl.scrollTop = oldScrollTop;
+            chatMessageListEl.scrollTop = wasNearBottom ? chatMessageListEl.scrollHeight : Math.max(0, oldScrollTop + delta);
             return;
         }
-        const delta = nextScrollHeight - oldScrollHeight;
         chatMessageListEl.scrollTop = delta > 0 ? Math.max(0, oldScrollTop + delta) : oldScrollTop;
     }
 
@@ -5233,6 +5416,7 @@
         chatCleanupConversationCaches(validKeys);
         chatState.conversations = sortedConversations;
         chatState.conversationByKey = new Map(sortedConversations.map(item => [item.key, item]));
+        chatRestoreMessageCache();
         chatState.lastInfoLoadedAt = Date.now();
         chatUpdateTokenDisplay();
         chatUpdateInput();
@@ -5246,7 +5430,7 @@
         try {
             const payload = await chatApiRequest('GET', '/chat/info', {timeoutMs: 12000});
             chatRebuildStateFromInfo(payload);
-            const previousKey = preserveSelection ? chatState.activeKey : '';
+            const previousKey = (preserveSelection || chatState.cacheRestoredMessages) ? chatState.activeKey : '';
             const hasPrevious = previousKey && chatState.conversationByKey.has(previousKey);
             chatRenderConversationList();
 
@@ -5260,7 +5444,7 @@
             chatUpdateCurrentConversationHeader();
             chatRenderConversationList();
             chatRenderMessages();
-            void chatHydrateConversationActivity({force: !silent});
+            void chatHydrateConversationActivity({force: false});
             chatStartMonitorTimer();
             if (!silent) {
                 chatSetStatus(`列表已更新：${chatState.conversations.length} 个会话`, 'success');
@@ -5350,6 +5534,10 @@
     async function chatLoadOlderMessages() {
         const conversation = chatGetConversationByKey(chatState.activeKey);
         if (!conversation || chatState.loadingOlder) return;
+        if (chatState.noOlderConversationKeys.has(conversation.key)) {
+            chatSetStatus('没有更早消息了');
+            return;
+        }
         const oldestSec = chatState.oldestSecByKey.get(conversation.key);
         if (!Number.isFinite(oldestSec)) {
             chatSetStatus('没有更早消息了');
@@ -5358,18 +5546,27 @@
         const endTimeSec = Math.max(0, Math.floor(oldestSec) - 1);
 
         chatState.loadingOlder = true;
-        if (chatLoadOlderBtnEl) chatLoadOlderBtnEl.disabled = true;
         chatSetStatus('正在加载更早消息...');
         try {
             const oldScrollBottom = chatMessageListEl.scrollHeight - chatMessageListEl.scrollTop;
             const olderMessages = await chatFetchConversationMessages(conversation, endTimeSec);
             if (!olderMessages.length) {
+                chatState.noOlderConversationKeys.add(conversation.key);
+                chatScheduleMessageCacheSave();
                 chatSetStatus('没有更早消息了');
                 return;
             }
+            const previousOldestSec = oldestSec;
             chatRememberConversationMessages(conversation, olderMessages, {
                 trackUnread: false, rerenderList: false,
             });
+            const nextOldestSec = chatState.oldestSecByKey.get(conversation.key);
+            if (!Number.isFinite(nextOldestSec) || nextOldestSec >= previousOldestSec) {
+                chatState.noOlderConversationKeys.add(conversation.key);
+                chatScheduleMessageCacheSave();
+                chatSetStatus('没有更早消息了');
+                return;
+            }
             chatRenderMessages({preserveScroll: true});
             chatSetStatus(`已加载更早消息 ${olderMessages.length} 条`, 'success');
             chatMessageListEl.scrollTop = chatMessageListEl.scrollHeight - oldScrollBottom;
@@ -5377,7 +5574,6 @@
             chatSetStatus(`加载失败：${error && error.message ? error.message : '未知错误'}`, 'error');
         } finally {
             chatState.loadingOlder = false;
-            if (chatLoadOlderBtnEl) chatLoadOlderBtnEl.disabled = false;
         }
     }
 
@@ -5401,15 +5597,15 @@
         const name = key.startsWith("group") ? "group-id" : "target-id";
         const id = key.split(":")[1];
         const input_value = document.getElementById("bn-chat-group-op-" + name);
-        input_value.value = id;
+        if (input_value) input_value.value = id;
     }
 
     function chatGetAutoRefreshIntervalMs() {
-        const fallback = 3000;
+        const fallback = 8000;
         if (!chatIntervalSelectEl) return fallback;
         const parsed = chatToInteger(chatIntervalSelectEl.value);
         if (!Number.isFinite(parsed)) return fallback;
-        return Math.min(20000, Math.max(1000, parsed));
+        return Math.min(30000, Math.max(3000, parsed));
     }
 
     function chatStopAutoRefreshTimer() {
@@ -5584,6 +5780,9 @@
 
             chatInputEl.value = '';
             chatUpdateInput();
+            chatState.lastActivitySecByKey.set(conversation.key, Math.floor(Date.now() / 1000));
+            chatResortConversationState();
+            chatRenderConversationList();
             chatSetStatus('发送成功', 'success');
             await chatRefreshMessages({silent: true, preserveScroll: false});
         } catch (error) {
@@ -5644,11 +5843,21 @@
             if (rule.needMute) {
                 const time = chatToInteger(chatGroupOpMuteEl ? chatGroupOpMuteEl.value : NaN);
                 if (!Number.isFinite(time) || time < 0) throw new Error('time 必须是非负整数');
-                payload.mute = time + Math.floor(Date.now() / 1000)
+                payload.mute = time + Math.floor(Date.now() / 1000);
             }
         } catch (error) {
             chatSetGroupOperationStatus(error.message || '参数错误', 'error');
             return;
+        }
+
+        const destructiveOperations = new Set(['leave', 'set_title', 'del_member', 'add_administrator', 'del_administrator', 'mute_member', 'mute_group', 'give_owner']);
+        if (destructiveOperations.has(operation)) {
+            const targetText = payload.group_id ? `群 ${payload.group_id}` : (payload.target_id ? `目标 ${payload.target_id}` : '当前目标');
+            const ok = window.confirm(`确认执行 ${operation}？\n${targetText}\n该操作会立即生效。`);
+            if (!ok) {
+                chatSetGroupOperationStatus('已取消操作');
+                return;
+            }
         }
 
         if (chatGroupOpRunBtnEl) chatGroupOpRunBtnEl.disabled = true;
@@ -5720,6 +5929,7 @@
                 chatStartMonitorTimer();
             });
         }
+        window.addEventListener('beforeunload', chatPersistMessageCacheNow);
         if (chatIntervalSelectEl) {
             chatIntervalSelectEl.addEventListener('change', () => {
                 chatStartAutoRefreshTimer();
@@ -5727,20 +5937,22 @@
             });
         }
 
-        if (chatLoadOlderBtnEl) {
-            chatLoadOlderBtnEl.addEventListener('click', () => {
-                chatLoadOlderMessages();
-            });
-        }
-
         if (chatInputEl) {
             chatInputEl.addEventListener('input', chatUpdateInput);
             chatInputEl.addEventListener('keydown', (event) => {
                 if (!event) return;
-                if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                if (event.key !== 'Enter') return;
+                if (event.shiftKey) return;
+                if (event.ctrlKey || event.metaKey || !event.isComposing) {
                     event.preventDefault();
                     chatSendMessage();
                 }
+            });
+        }
+
+        if (chatInputPreviewToggleEl) {
+            chatInputPreviewToggleEl.addEventListener('change', () => {
+                chatSetPreviewVisible(chatInputPreviewToggleEl.checked);
             });
         }
 
@@ -5776,6 +5988,7 @@
             });
         });
         chatUpdateGroupOperationFields();
+        chatSetPreviewVisible(chatIsPreviewVisible());
         chatUpdateInput();
         chatUpdateTokenDisplay();
         chatUpdateTriggerUnreadUi();
@@ -6239,7 +6452,7 @@
     async function buildUploadHtml(file, base64) {
         const safeName = escapeHtml(file.name);
         if (typeof base64 !== 'string') return '';
-        if (base64.startsWith('data:image/')) {
+        if (/^data:image\/(?:png|gif|jpe?g|webp|bmp);/i.test(base64)) {
             return `<div data-tooltip="${safeName}"><img src="${base64}" alt="${safeName}"></div>`;
         }
         if (base64.startsWith("data:text/") || base64.startsWith("data:application/json")) {
@@ -6286,11 +6499,18 @@
         let range = initialRange;
         for (const file of files) {
             try {
+                if (file && file.size > CHAT_UPLOAD_MAX_BYTES) {
+                    const maxSizeKb = Math.round(CHAT_UPLOAD_MAX_BYTES / 1024);
+                    chatSetStatus(`文件 ${file.name || ''} 超过 ${maxSizeKb} KB，已跳过`, 'error');
+                    continue;
+                }
                 const base64 = await readFileAsDataUrl(file);
                 let insertHtml = await buildUploadHtml(file, base64);
                 if (!insertHtml) continue;
-                if (chatInputEl.value.length + insertHtml.length) {
-                    console.warn("[BN] 警告：文件过大");
+                const limit = chatGetMessageLengthLimit();
+                if (Number.isFinite(limit) && chatInputEl.value.length + insertHtml.length > limit) {
+                    chatSetStatus(`文件 ${file.name || ''} 插入后会超过消息长度限制，已跳过`, 'error');
+                    continue;
                 }
                 range = insertHtmlAtChatSelection(insertHtml, range);
             } catch (error) {
@@ -6359,22 +6579,35 @@
         // 如果没有文件，让浏览器正常粘贴文本
     });
 
+    const CHAT_LOAD_OLDER_EDGE_PX = 200;
+
+    function chatIsMessageListNearTop() {
+        if (!chatMessageListEl) return false;
+        return chatMessageListEl.scrollTop <= CHAT_LOAD_OLDER_EDGE_PX;
+    }
+
     function checkLoad() {
-        // 如果正在加载，不再触发
         if (chatState.loadingOlder || chatState.loadingMessages) return;
-        // 滚动条距离顶部的距离
-        const scrollTop = chatMessageListEl.scrollTop;
-        // 阈值：当 scrollTop < 200px 时触发加载
-        if (scrollTop < 200) chatLoadOlderMessages();
+        if (chatIsMessageListNearTop()) chatLoadOlderMessages();
     }
 
     let checkLoadDebounceTimer = null;
+    let checkLoadWheelThrottleTimer = null;
     chatMessageListEl.addEventListener('scroll', () => {
         if (checkLoadDebounceTimer) {
             clearTimeout(checkLoadDebounceTimer);
         }
         checkLoadDebounceTimer = setTimeout(checkLoad, 100);
     });
+    chatMessageListEl.addEventListener('wheel', (event) => {
+        if (!event || event.deltaY >= 0) return;
+        if (!chatIsMessageListNearTop()) return;
+        if (checkLoadWheelThrottleTimer) return;
+        checkLoadWheelThrottleTimer = setTimeout(() => {
+            checkLoadWheelThrottleTimer = null;
+        }, 300);
+        checkLoad();
+    }, {passive: true});
     for (let el of document.querySelectorAll("pre")) addPrism(el);
     for (let el of document.querySelectorAll(".hljs")) el.classList.remove("hljs");
     Prism.highlightAll();

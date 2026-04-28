@@ -191,8 +191,19 @@
         }
     }
 
+    const SAFE_MARKDOWN_URI_PATTERN = /^(?:(?:https?|mailto|tel):|#|\/(?!\/)|\.\.?\/|[a-z0-9+.\-]+(?:[^a-z0-9+.\-:]|$)|[^a-z]|data:image\/(?:png|gif|jpe?g|webp|bmp);|data:text\/plain|data:application\/json|data:application\/octet-stream)/i;
+
+    function sanitizeMarkdownHTML(dirtyHTML) {
+        return DOMPurify.sanitize(dirtyHTML, {
+            FORBID_TAGS: ["style", "link", "iframe", "script", "frame"],
+            FORBID_ATTR: ["id", "onerror", "onload", "onclick", "onmouseover"],
+            ALLOWED_URI_REGEXP: SAFE_MARKDOWN_URI_PATTERN
+        });
+    }
+
     function RenderMarkdown(el, md) {
-        el.innerHTML = marked.parse(md);
+        if (!el) return;
+        el.innerHTML = sanitizeMarkdownHTML(marked.parse(md || ''));
         renderMathInElement(el, {
             delimeters: RENDER_MATH_DELIMITERS,
             throwOnError: false
@@ -315,13 +326,7 @@
     function WriteCleanHTML(el, dirtyHTML) {
         if (!el) return;
         dirtyHTML = marked.parse(dirtyHTML);
-        let cleanHTML = DOMPurify.sanitize(
-            dirtyHTML, {
-                FORBID_TAGS: ["style", "link", "iframe", "script", 'frame'],
-                FORBID_ATTR: ["id"],
-                ALLOWED_URI_REGEXP: /^.*/
-            }
-        );
+        let cleanHTML = sanitizeMarkdownHTML(dirtyHTML);
         cleanHTML = cleanHTML.replaceAll(
             /(<img.*)src=(.*>)/g,
             "$1data-src=$2"
