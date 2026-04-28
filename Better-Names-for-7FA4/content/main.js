@@ -2577,6 +2577,517 @@ window.getCurrentUserId = getCurrentUserId;
         .catch(err => console.warn('[BN] Unable to resolve user name for title', err));
 })();
 
+/* === BN PATCH: user plan date navigator and long-page layout === */
+(function () {
+    const pathMatch = location.pathname.match(/^\/user_plans\/(\d+)(?:\/|$)/);
+    if (!pathMatch) return;
+
+    const SETTING_KEY = 'enableUserPlanDateNavigator';
+    const STYLE_ID = 'bn-user-plan-date-nav-style';
+    const NAV_ID = 'bn-user-plan-date-nav';
+    const ELEMENT_NODE = (typeof Node === 'function' && Node.ELEMENT_NODE) || 1;
+    let navStarted = false;
+    let navEl = null;
+    let dayEntries = [];
+    let autoScrollStarted = false;
+    let autoScrollCancelled = false;
+    let autoScrollAttemptCount = 0;
+    let todayAlignmentTimer = null;
+    let todayAlignmentDeadline = 0;
+    let todayAlignmentStableTicks = 0;
+    let lastDocumentHeight = 0;
+    let selectedDateIso = '';
+    let refreshTimer = null;
+    let scrollTimer = null;
+
+    document.documentElement.classList.add('bn-user-plan-page');
+
+    function ensureStyle() {
+        if (document.getElementById(STYLE_ID)) return;
+        const css = `
+html.bn-user-plan-page {
+  position: static !important;
+  width: auto !important;
+  min-height: 100% !important;
+  height: auto !important;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+}
+html.bn-user-plan-page body {
+  position: relative !important;
+  min-height: calc(100vh - 49px) !important;
+  height: auto !important;
+  overflow-y: visible !important;
+}
+html.bn-user-plan-page .ui.main.container,
+html.bn-user-plan-page .padding,
+html.bn-user-plan-page td.selectable,
+html.bn-user-plan-page td.plan-item,
+html.bn-user-plan-page td.tr-expand {
+  overflow: visible !important;
+}
+html.bn-user-plan-page td.plan-item,
+html.bn-user-plan-page td.selectable {
+  vertical-align: top !important;
+}
+html.bn-user-plan-page .td-fold {
+  max-height: none !important;
+  overflow: visible !important;
+}
+html.bn-user-plan-page td.plan-item pre,
+html.bn-user-plan-page td.selectable pre {
+  max-height: none !important;
+  overflow: visible !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+html.bn-user-plan-page .katex-display {
+  overflow-x: auto;
+  overflow-y: visible;
+}
+#${NAV_ID} {
+  position: fixed;
+  top: 76px;
+  left: max(10px, calc(50vw - 650px));
+  z-index: 99;
+  width: 86px;
+  max-height: calc(100vh - 104px);
+  padding: 8px;
+  border: 1px solid rgba(34, 36, 38, .15);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .94);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .10);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  font-size: 12px;
+  line-height: 1.25;
+}
+#${NAV_ID}::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+#${NAV_ID}::-webkit-scrollbar-thumb {
+  background: rgba(34, 36, 38, .22);
+  border-radius: 999px;
+}
+#${NAV_ID} .bn-user-plan-date-nav-title {
+  margin: 0 0 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(34, 36, 38, .10);
+  color: rgba(0, 0, 0, .60);
+  font-weight: 700;
+  text-align: center;
+}
+#${NAV_ID} .bn-user-plan-date-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+#${NAV_ID} .bn-user-plan-date-nav-btn {
+  width: 100%;
+  min-height: 28px;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #276fbb;
+  cursor: pointer;
+  font: inherit;
+  text-align: center;
+  transition: background .16s ease, color .16s ease;
+}
+#${NAV_ID} .bn-user-plan-date-nav-btn:hover,
+#${NAV_ID} .bn-user-plan-date-nav-btn:focus-visible {
+  background: rgba(33, 133, 208, .12);
+  color: #1b4f8a;
+  outline: none;
+}
+#${NAV_ID} .bn-user-plan-date-nav-btn.is-active {
+  background: #2185d0;
+  color: #fff;
+  font-weight: 700;
+}
+#${NAV_ID} .bn-user-plan-date-nav-btn.is-today:not(.is-active) {
+  background: rgba(33, 186, 69, .13);
+  color: #167c2d;
+  font-weight: 700;
+}
+@media (max-width: 1320px) {
+  #${NAV_ID} {
+    top: 58px;
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-height: 56px;
+    display: flex;
+    align-items: center;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  #${NAV_ID} .bn-user-plan-date-nav-title {
+    flex: 0 0 auto;
+    margin: 0 8px 0 0;
+    padding: 0 8px 0 0;
+    border-right: 1px solid rgba(34, 36, 38, .10);
+    border-bottom: 0;
+  }
+  #${NAV_ID} .bn-user-plan-date-nav-list {
+    flex-direction: row;
+  }
+  #${NAV_ID} .bn-user-plan-date-nav-btn {
+    width: auto;
+    min-width: 58px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #${NAV_ID} .bn-user-plan-date-nav-btn {
+    transition: none;
+  }
+}
+`;
+        const styleEl = document.createElement('style');
+        styleEl.id = STYLE_ID;
+        styleEl.textContent = css;
+        (document.head || document.documentElement || document.body).appendChild(styleEl);
+    }
+
+    function normalizeSetting(value) {
+        if (value === undefined || value === null) return true;
+        if (typeof value === 'boolean') return value;
+        if (typeof value === 'number') return value !== 0;
+        if (typeof value === 'string') {
+            const trimmed = value.trim();
+            if (!trimmed) return false;
+            if (/^(false|0)$/i.test(trimmed)) return false;
+            if (/^(true|1)$/i.test(trimmed)) return true;
+            return true;
+        }
+        return true;
+    }
+
+    async function isNavigatorEnabled() {
+        try {
+            if (typeof window.__GM_ready === 'function') await window.__GM_ready();
+        } catch (_) { /* ignore */
+        }
+        try {
+            return normalizeSetting(GM_getValue(SETTING_KEY, true));
+        } catch (_) {
+            return true;
+        }
+    }
+
+    function getLocalIsoDate(date = new Date()) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    function getIsoFromUnixSeconds(value) {
+        const seconds = Number(value);
+        if (!Number.isFinite(seconds) || seconds <= 0) return '';
+        return new Date((seconds + 8 * 3600) * 1000).toISOString().slice(0, 10);
+    }
+
+    function getFixedHeaderOffset() {
+        const fixedMenu = document.querySelector('.ui.fixed.menu');
+        if (!fixedMenu) return 62;
+        const rect = fixedMenu.getBoundingClientRect();
+        return Math.max(56, Math.ceil(rect.height || 49) + 12);
+    }
+
+    function extractIsoDate(row) {
+        if (!row) return '';
+        const firstCell = row.cells && row.cells[0] ? row.cells[0] : row.querySelector('td');
+        const text = firstCell ? firstCell.textContent || '' : row.textContent || '';
+        const match = text.match(/\b\d{4}-\d{2}-\d{2}\b/);
+        if (match) return match[0];
+        return getIsoFromUnixSeconds(row.getAttribute('data-date'));
+    }
+
+    function getScrollElement() {
+        const candidates = [document.scrollingElement, document.documentElement, document.body]
+            .filter((el, index, arr) => el && arr.indexOf(el) === index);
+        return candidates.find(el => (el.scrollHeight || 0) > (el.clientHeight || 0) + 1)
+            || document.scrollingElement
+            || document.documentElement
+            || document.body;
+    }
+
+    function getScrollTop() {
+        const scroller = getScrollElement();
+        const top = scroller && Number.isFinite(scroller.scrollTop) ? scroller.scrollTop : 0;
+        return Math.max(top, window.scrollY || 0, document.documentElement?.scrollTop || 0, document.body?.scrollTop || 0);
+    }
+
+    function setScrollTop(top, behavior = 'smooth') {
+        const targetTop = Math.max(0, top);
+        const scroller = getScrollElement();
+        if (scroller && typeof scroller.scrollTo === 'function') {
+            try {
+                scroller.scrollTo({top: targetTop, behavior});
+            } catch (_) {
+                scroller.scrollTop = targetTop;
+            }
+        } else {
+            try {
+                window.scrollTo({top: targetTop, behavior});
+            } catch (_) {
+                window.scrollTo(0, targetTop);
+            }
+        }
+        if (behavior === 'smooth') return;
+        if (scroller) {
+            scroller.scrollTop = targetTop;
+        }
+        if (document.body) document.body.scrollTop = targetTop;
+        if (document.documentElement) document.documentElement.scrollTop = targetTop;
+    }
+
+    function getDocumentHeight() {
+        const body = document.body;
+        const doc = document.documentElement;
+        return Math.max(
+            body?.scrollHeight || 0,
+            body?.offsetHeight || 0,
+            doc?.clientHeight || 0,
+            doc?.scrollHeight || 0,
+            doc?.offsetHeight || 0
+        );
+    }
+
+    function collectDayEntries() {
+        const rows = Array.from(document.querySelectorAll('tr.line[data-type="day"], tr[id^="day-"][data-date]'));
+        const seen = new Set();
+        return rows
+            .map(row => ({row, iso: extractIsoDate(row)}))
+            .filter(entry => {
+                if (!entry.iso || seen.has(entry.iso)) return false;
+                seen.add(entry.iso);
+                entry.row.dataset.bnUserPlanDate = entry.iso;
+                if (!entry.row.id) entry.row.id = `bn-user-plan-day-${entry.iso}`;
+                return true;
+            });
+    }
+
+    function formatDateLabel(iso) {
+        if (typeof iso !== 'string' || iso.length < 10) return iso || '';
+        return iso.slice(5);
+    }
+
+    function scrollToDay(row, behavior = 'smooth') {
+        if (!row) return;
+        const rect = row.getBoundingClientRect();
+        const targetTop = Math.max(0, getScrollTop() + rect.top - getFixedHeaderOffset());
+        setScrollTop(targetTop, behavior);
+    }
+
+    function setActiveDate(iso) {
+        if (!navEl) return;
+        navEl.querySelectorAll('.bn-user-plan-date-nav-btn').forEach(btn => {
+            btn.classList.toggle('is-active', btn.dataset.date === iso);
+        });
+    }
+
+    function updateActiveDate() {
+        if (!navEl || !dayEntries.length) return;
+        if (selectedDateIso) {
+            if (dayEntries.some(entry => entry.iso === selectedDateIso)) {
+                setActiveDate(selectedDateIso);
+                return;
+            }
+            selectedDateIso = '';
+        }
+        const offset = getFixedHeaderOffset() + 16;
+        let active = dayEntries[0];
+        for (const entry of dayEntries) {
+            const rect = entry.row.getBoundingClientRect();
+            if (rect.top <= offset) active = entry;
+            else break;
+        }
+        setActiveDate(active.iso);
+    }
+
+    function scheduleActiveUpdate() {
+        if (scrollTimer) return;
+        scrollTimer = setTimeout(() => {
+            scrollTimer = null;
+            updateActiveDate();
+        }, 80);
+    }
+
+    function renderNavigator(entries) {
+        if (!entries.length) {
+            if (navEl) navEl.remove();
+            navEl = null;
+            return;
+        }
+        const today = getLocalIsoDate();
+        if (!navEl) {
+            navEl = document.createElement('nav');
+            navEl.id = NAV_ID;
+            navEl.setAttribute('aria-label', '个人计划日期导航');
+            navEl.innerHTML = '<div class="bn-user-plan-date-nav-title">日期</div><div class="bn-user-plan-date-nav-list"></div>';
+            document.body.appendChild(navEl);
+        }
+        const list = navEl.querySelector('.bn-user-plan-date-nav-list');
+        if (!list) return;
+        list.innerHTML = '';
+        entries.forEach(entry => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'bn-user-plan-date-nav-btn';
+            btn.dataset.date = entry.iso;
+            btn.textContent = formatDateLabel(entry.iso);
+            btn.title = entry.iso;
+            btn.setAttribute('aria-label', `跳转到 ${entry.iso} 的计划`);
+            if (entry.iso === today) btn.classList.add('is-today');
+            btn.addEventListener('click', () => {
+                cancelTodayAlignment();
+                selectedDateIso = entry.iso;
+                setActiveDate(entry.iso);
+                scrollToDay(entry.row);
+            });
+            list.appendChild(btn);
+        });
+        updateActiveDate();
+    }
+
+    function cancelTodayAlignment() {
+        autoScrollCancelled = true;
+        if (todayAlignmentTimer) {
+            clearTimeout(todayAlignmentTimer);
+            todayAlignmentTimer = null;
+        }
+    }
+
+    function handleManualScrollIntent() {
+        selectedDateIso = '';
+        cancelTodayAlignment();
+        updateActiveDate();
+    }
+
+    function scheduleTodayAlignment() {
+        if (location.hash || autoScrollCancelled) return;
+        const today = getLocalIsoDate();
+        const target = dayEntries.find(entry => entry.iso === today);
+        if (!target) return;
+        if (!autoScrollStarted) {
+            autoScrollStarted = true;
+            todayAlignmentDeadline = Date.now() + 45000;
+        }
+        todayAlignmentStableTicks = 0;
+        clearTimeout(todayAlignmentTimer);
+        todayAlignmentTimer = setTimeout(runTodayAlignment, 80);
+    }
+
+    function runTodayAlignment() {
+        todayAlignmentTimer = null;
+        if (location.hash || autoScrollCancelled) return;
+        const today = getLocalIsoDate();
+        const target = dayEntries.find(entry => entry.iso === today);
+        if (!target || !target.row.isConnected) return;
+
+        const rect = target.row.getBoundingClientRect();
+        const desiredTop = getFixedHeaderOffset();
+        const diff = rect.top - desiredTop;
+        const docHeight = getDocumentHeight();
+        const heightStable = Math.abs(docHeight - lastDocumentHeight) <= 2;
+        const aligned = Math.abs(diff) <= 10;
+
+        if (!aligned) {
+            scrollToDay(target.row, 'auto');
+            autoScrollAttemptCount += 1;
+            todayAlignmentStableTicks = 0;
+        } else if (heightStable) {
+            todayAlignmentStableTicks += 1;
+        } else {
+            todayAlignmentStableTicks = 0;
+        }
+
+        lastDocumentHeight = docHeight;
+        updateActiveDate();
+
+        if (Date.now() >= todayAlignmentDeadline || todayAlignmentStableTicks >= 5) return;
+        todayAlignmentTimer = setTimeout(runTodayAlignment, aligned ? 500 : 260);
+    }
+
+    function refreshNavigator() {
+        const nextEntries = collectDayEntries();
+        const nextKey = nextEntries.map(entry => entry.iso).join('|');
+        const oldKey = dayEntries.map(entry => entry.iso).join('|');
+        dayEntries = nextEntries;
+        if (nextKey !== oldKey || !navEl) renderNavigator(dayEntries);
+        else updateActiveDate();
+        scheduleTodayAlignment();
+    }
+
+    function scheduleRefresh() {
+        clearTimeout(refreshTimer);
+        refreshTimer = setTimeout(refreshNavigator, 120);
+    }
+
+    function startNavigator() {
+        if (navStarted) return;
+        navStarted = true;
+        ensureStyle();
+        refreshNavigator();
+        window.addEventListener('scroll', scheduleActiveUpdate, {passive: true});
+        window.addEventListener('resize', scheduleActiveUpdate, {passive: true});
+        window.addEventListener('wheel', handleManualScrollIntent, {passive: true});
+        window.addEventListener('touchstart', handleManualScrollIntent, {passive: true});
+        window.addEventListener('keydown', handleManualScrollIntent, {passive: true});
+        if (typeof MutationObserver === 'function') {
+            const observer = new MutationObserver((mutations) => {
+                for (const mutation of mutations) {
+                    if (navEl && (mutation.target === navEl || navEl.contains(mutation.target))) continue;
+                    const added = mutation.addedNodes;
+                    if (added && added.length) {
+                        let navOnly = true;
+                        for (let i = 0; i < added.length; i += 1) {
+                            const node = added[i];
+                            if (navEl && (node === navEl || (node.nodeType === ELEMENT_NODE && navEl.contains(node)))) continue;
+                            navOnly = false;
+                            break;
+                        }
+                        if (navOnly) continue;
+                    }
+                    scheduleRefresh();
+                    return;
+                }
+            });
+            const observeTarget = document.body || document.documentElement;
+            if (observeTarget) {
+                observer.observe(observeTarget, {
+                    childList: true,
+                    subtree: true,
+                    attributes: true,
+                    attributeFilter: ['class', 'id', 'data-date', 'data-type']
+                });
+            }
+        }
+        if (typeof ResizeObserver === 'function') {
+            const resizeObserver = new ResizeObserver(() => scheduleTodayAlignment());
+            if (document.body) resizeObserver.observe(document.body);
+            if (document.documentElement) resizeObserver.observe(document.documentElement);
+        }
+    }
+
+    ensureStyle();
+
+    isNavigatorEnabled().then(enabled => {
+        if (!enabled) return;
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', startNavigator, {once: true});
+        } else {
+            startNavigator();
+        }
+    });
+})();
+
 /* === BN PATCH: user plan quick skip === */
 (function () {
     const pathMatch = location.pathname.match(/^\/user_plans\/(\d+)(?:\/|$)/);

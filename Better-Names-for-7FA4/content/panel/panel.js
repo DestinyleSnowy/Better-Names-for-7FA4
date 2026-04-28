@@ -33,6 +33,7 @@
         enableContestDownloadButtons: true,
         enableContestReviewButtons: true,
         showUserNickname: true,
+        defaultHideSubmittedHomework: true,
         enableUserMenu: true,
         enablePlanAdder: true,
         enableTemplateBulkAdd: true,
@@ -44,6 +45,7 @@
         enableVjLink: true,
         hideDoneSkip: false,
         enableQuickSkip: undefined,
+        enableUserPlanDateNavigator: true,
         'quickSkip.migrated.v1': false,
         enableTitleOptimization: true,
         debug: false,
@@ -145,6 +147,7 @@
     const enableContestDownloadButtons = readConfigValue('enableContestDownloadButtons');
     const enableContestReviewButtons = readConfigValue('enableContestReviewButtons');
     const showUserNickname = readConfigValue('showUserNickname');
+    const defaultHideSubmittedHomework = readConfigValue('defaultHideSubmittedHomework');
     const enableMenu = readConfigValue('enableUserMenu');
     const enablePlanAdder = true;
     try {
@@ -213,6 +216,7 @@
         }
     }
     if (enableQuickSkip === undefined) enableQuickSkip = true;
+    const enableUserPlanDateNavigator = readConfigValue('enableUserPlanDateNavigator') !== false;
     const enableTitleOptimization = readConfigValue('enableTitleOptimization');
     const widthMode = readConfigValue(WIDTH_MODE_KEY);
     // Centralized configuration groups for easier export/reset flows.
@@ -239,6 +243,7 @@
         enableContestDownloadButtons,
         enableContestReviewButtons,
         showUserNickname,
+        defaultHideSubmittedHomework,
         enableMenu,
         enablePlanAdder,
         enableTemplateBulkAdd,
@@ -247,6 +252,7 @@
         enableVjLink,
         hideDoneSkip,
         enableQuickSkip,
+        enableUserPlanDateNavigator,
         enableTitleOptimization,
     };
     const rankingConfig = {
@@ -1374,6 +1380,7 @@
     const chkContestDownload = document.getElementById('bn-enable-contest-download');
     const chkContestReview = document.getElementById('bn-enable-contest-review');
     const chkShowNickname = document.getElementById('bn-show-user-nickname');
+    const chkDefaultHideSubmittedHomework = document.getElementById('bn-default-hide-submitted-homework');
     const chkMenu = document.getElementById('bn-enable-user-menu');
     let chkTemplateBulkAdd = document.getElementById('bn-enable-template-bulk-add');
     const chkAutoRenew = document.getElementById('bn-enable-renew');
@@ -1387,6 +1394,7 @@
     const chkVj = document.getElementById('bn-enable-vj');
     const chkHideDoneSkip = document.getElementById('bn-hide-done-skip');
     const chkQuickSkip = document.getElementById('bn-enable-quick-skip');
+    const chkUserPlanDateNavigator = document.getElementById('bn-enable-user-plan-date-navigator');
     const chkTitleOpt = document.getElementById('bn-enable-title-optimization');
 
     if (!chkTemplateBulkAdd) {
@@ -1420,6 +1428,7 @@
     chkContestDownload.checked = enableContestDownloadButtons;
     chkContestReview.checked = enableContestReviewButtons;
     chkShowNickname.checked = showUserNickname;
+    if (chkDefaultHideSubmittedHomework) chkDefaultHideSubmittedHomework.checked = defaultHideSubmittedHomework;
     chkMenu.checked = enableMenu;
     if (chkTemplateBulkAdd) chkTemplateBulkAdd.checked = enableTemplateBulkAdd;
     chkAutoRenew.checked = enableAutoRenew;
@@ -1432,6 +1441,7 @@
     chkVj.checked = enableVjLink;
     chkHideDoneSkip.checked = hideDoneSkip;
     chkQuickSkip.checked = enableQuickSkip;
+    if (chkUserPlanDateNavigator) chkUserPlanDateNavigator.checked = enableUserPlanDateNavigator;
     chkTitleOpt.checked = enableTitleOptimization;
     if (bgOpacityValueSpan) bgOpacityValueSpan.textContent = formatOpacityText(normalizedBgOpacity);
     if (bgBlurInput && bgBlurValueSpan) {
@@ -1503,6 +1513,7 @@
         enableContestDownloadButtons,
         enableContestReviewButtons,
         showUserNickname,
+        defaultHideSubmittedHomework,
         enableMenu,
         enablePlanAdder,
         enableTemplateBulkAdd,
@@ -1517,6 +1528,7 @@
         enableVjLink,
         hideDoneSkip,
         enableQuickSkip,
+        enableUserPlanDateNavigator,
         enableTitleOptimization,
         widthMode,
         bgEnabled: storedBgEnabled,
@@ -2366,7 +2378,7 @@
         const currentBtEnabled = getHiToiletEnabledState();
         const templateBulkAddChk = document.getElementById('bn-enable-template-bulk-add');
 
-        const changed = (document.getElementById('bn-enable-title-truncate').checked !== originalConfig.titleTruncate) || (document.getElementById('bn-enable-user-truncate').checked !== originalConfig.userTruncate) || (document.getElementById('bn-enable-title-truncate').checked && ti !== originalConfig.maxTitleUnits) || (document.getElementById('bn-enable-user-truncate').checked && ui !== originalConfig.maxUserUnits) || (document.getElementById('bn-hide-avatar').checked !== originalConfig.hideAvatar) || (document.getElementById('bn-enable-copy').checked !== originalConfig.enableCopy) || (document.getElementById('bn-enable-desc-copy').checked !== originalConfig.enableDescCopy) || (document.getElementById('bn-hide-orig').checked !== originalConfig.hideOrig) || (document.getElementById('bn-enable-contest-download').checked !== originalConfig.enableContestDownloadButtons) || (document.getElementById('bn-enable-contest-review').checked !== originalConfig.enableContestReviewButtons) || (document.getElementById('bn-show-user-nickname').checked !== originalConfig.showUserNickname) || (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) || ((templateBulkAddChk ? templateBulkAddChk.checked : originalConfig.enableTemplateBulkAdd) !== originalConfig.enableTemplateBulkAdd) || (document.getElementById('bn-enable-renew').checked !== originalConfig.enableAutoRenew) || (document.getElementById('bn-enable-ranking-filter').checked !== originalConfig.enableRankingFilter) || (document.getElementById('bn-enable-column-switch').checked !== originalConfig.columnSwitchEnabled) || (document.getElementById('bn-enable-merge-assistant').checked !== originalConfig.mergeAssistantEnabled) || (document.getElementById('bn-enable-vj').checked !== originalConfig.enableVjLink) || (document.getElementById('bn-hide-done-skip').checked !== originalConfig.hideDoneSkip) || (document.getElementById('bn-enable-quick-skip').checked !== originalConfig.enableQuickSkip) || (document.getElementById('bn-enable-title-optimization').checked !== originalConfig.enableTitleOptimization) || (document.getElementById('bn-use-custom-color').checked !== originalConfig.useCustomColors) || ((document.getElementById('bn-width-mode')?.value ?? originalConfig.widthMode) !== originalConfig.widthMode) || (currentBgEnabled !== originalConfig.bgEnabled) || bgSourceChanged || (currentBgfillway !== originalConfig.bgfillway) || (currentBgOpacity !== originalConfig.bgOpacity) || (clampBlur(currentBgBlur) !== clampBlur(originalConfig.bgBlur)) || (currentBtEnabled !== originalConfig.btEnabled) || (hiToiletIntervalInput && clampHiToiletInterval(hiToiletIntervalInput.value) !== originalConfig.btInterval) || (getSelectedThemeMode() !== originalConfig.themeMode) || themeColorChanged || paletteChanged;
+        const changed = (document.getElementById('bn-enable-title-truncate').checked !== originalConfig.titleTruncate) || (document.getElementById('bn-enable-user-truncate').checked !== originalConfig.userTruncate) || (document.getElementById('bn-enable-title-truncate').checked && ti !== originalConfig.maxTitleUnits) || (document.getElementById('bn-enable-user-truncate').checked && ui !== originalConfig.maxUserUnits) || (document.getElementById('bn-hide-avatar').checked !== originalConfig.hideAvatar) || (document.getElementById('bn-enable-copy').checked !== originalConfig.enableCopy) || (document.getElementById('bn-enable-desc-copy').checked !== originalConfig.enableDescCopy) || (document.getElementById('bn-hide-orig').checked !== originalConfig.hideOrig) || (document.getElementById('bn-enable-contest-download').checked !== originalConfig.enableContestDownloadButtons) || (document.getElementById('bn-enable-contest-review').checked !== originalConfig.enableContestReviewButtons) || (document.getElementById('bn-show-user-nickname').checked !== originalConfig.showUserNickname) || ((document.getElementById('bn-default-hide-submitted-homework')?.checked ?? originalConfig.defaultHideSubmittedHomework) !== originalConfig.defaultHideSubmittedHomework) || (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) || ((templateBulkAddChk ? templateBulkAddChk.checked : originalConfig.enableTemplateBulkAdd) !== originalConfig.enableTemplateBulkAdd) || (document.getElementById('bn-enable-renew').checked !== originalConfig.enableAutoRenew) || (document.getElementById('bn-enable-ranking-filter').checked !== originalConfig.enableRankingFilter) || (document.getElementById('bn-enable-column-switch').checked !== originalConfig.columnSwitchEnabled) || (document.getElementById('bn-enable-merge-assistant').checked !== originalConfig.mergeAssistantEnabled) || (document.getElementById('bn-enable-vj').checked !== originalConfig.enableVjLink) || (document.getElementById('bn-hide-done-skip').checked !== originalConfig.hideDoneSkip) || (document.getElementById('bn-enable-quick-skip').checked !== originalConfig.enableQuickSkip) || ((document.getElementById('bn-enable-user-plan-date-navigator')?.checked ?? originalConfig.enableUserPlanDateNavigator) !== originalConfig.enableUserPlanDateNavigator) || (document.getElementById('bn-enable-title-optimization').checked !== originalConfig.enableTitleOptimization) || (document.getElementById('bn-use-custom-color').checked !== originalConfig.useCustomColors) || ((document.getElementById('bn-width-mode')?.value ?? originalConfig.widthMode) !== originalConfig.widthMode) || (currentBgEnabled !== originalConfig.bgEnabled) || bgSourceChanged || (currentBgfillway !== originalConfig.bgfillway) || (currentBgOpacity !== originalConfig.bgOpacity) || (clampBlur(currentBgBlur) !== clampBlur(originalConfig.bgBlur)) || (currentBtEnabled !== originalConfig.btEnabled) || (hiToiletIntervalInput && clampHiToiletInterval(hiToiletIntervalInput.value) !== originalConfig.btInterval) || (getSelectedThemeMode() !== originalConfig.themeMode) || themeColorChanged || paletteChanged;
 
         saveActions.classList.toggle('bn-visible', changed);
     }
@@ -2432,6 +2444,7 @@
     chkContestDownload.onchange = checkChanged;
     chkContestReview.onchange = checkChanged;
     chkShowNickname.onchange = checkChanged;
+    if (chkDefaultHideSubmittedHomework) chkDefaultHideSubmittedHomework.onchange = checkChanged;
     chkMenu.onchange = checkChanged;
     chkVj.onchange = checkChanged;
     chkHideDoneSkip.onchange = () => {
@@ -2442,6 +2455,7 @@
         applyQuickSkip(chkQuickSkip.checked);
         checkChanged();
     };
+    if (chkUserPlanDateNavigator) chkUserPlanDateNavigator.onchange = checkChanged;
     chkTitleOpt.onchange = checkChanged;
     if (chkTemplateBulkAdd) {
         chkTemplateBulkAdd.onchange = () => {
@@ -2510,8 +2524,10 @@
         GM_setValue('enableContestDownloadButtons', chkContestDownload.checked);
         GM_setValue('enableContestReviewButtons', chkContestReview.checked);
         GM_setValue('showUserNickname', chkShowNickname.checked);
+        GM_setValue('defaultHideSubmittedHomework', chkDefaultHideSubmittedHomework ? chkDefaultHideSubmittedHomework.checked : defaultHideSubmittedHomework);
         GM_setValue('hideDoneSkip', chkHideDoneSkip.checked);
         GM_setValue('enableQuickSkip', chkQuickSkip.checked);
+        GM_setValue('enableUserPlanDateNavigator', chkUserPlanDateNavigator ? chkUserPlanDateNavigator.checked : enableUserPlanDateNavigator);
         GM_setValue('enableTitleOptimization', chkTitleOpt.checked);
         GM_setValue('enableUserMenu', chkMenu.checked);
         GM_setValue('enableVjLink', chkVj.checked);
@@ -2605,12 +2621,14 @@
         chkContestDownload.checked = originalConfig.enableContestDownloadButtons;
         chkContestReview.checked = originalConfig.enableContestReviewButtons;
         chkShowNickname.checked = originalConfig.showUserNickname;
+        if (chkDefaultHideSubmittedHomework) chkDefaultHideSubmittedHomework.checked = originalConfig.defaultHideSubmittedHomework;
         chkMenu.checked = originalConfig.enableMenu;
         chkVj.checked = originalConfig.enableVjLink;
         chkHideDoneSkip.checked = originalConfig.hideDoneSkip;
         applyHideDoneSkip(originalConfig.hideDoneSkip);
         chkQuickSkip.checked = originalConfig.enableQuickSkip;
         applyQuickSkip(originalConfig.enableQuickSkip);
+        if (chkUserPlanDateNavigator) chkUserPlanDateNavigator.checked = originalConfig.enableUserPlanDateNavigator;
         chkTitleOpt.checked = originalConfig.enableTitleOptimization;
         if (chkTemplateBulkAdd) chkTemplateBulkAdd.checked = originalConfig.enableTemplateBulkAdd;
         const bulkEnabled = chkTemplateBulkAdd ? chkTemplateBulkAdd.checked : originalConfig.enableTemplateBulkAdd;
@@ -3976,6 +3994,89 @@
         } catch (e) {
             return false;
         }
+    }
+
+    let submittedHomeworkStyleInjected = false;
+
+    function ensureSubmittedHomeworkStyle() {
+        if (submittedHomeworkStyleInjected) return;
+        submittedHomeworkStyleInjected = true;
+        GM_addStyle(`
+.bn-submitted-homework-header {
+  cursor: pointer;
+  user-select: none;
+}
+.bn-submitted-homework-header.bn-submitted-homework-collapsed {
+  border-bottom-left-radius: .28571429rem !important;
+  border-bottom-right-radius: .28571429rem !important;
+}
+.bn-submitted-homework-toggle.ui.button {
+  float: right;
+  margin: -4px 0 -4px 12px;
+}
+.bn-submitted-homework-toggle.ui.button > .icon {
+  margin: 0 .35em 0 0 !important;
+}
+`);
+    }
+
+    function isSubmittedHomeworkHeader(header) {
+        if (!header || !header.matches?.('h4.ui.top.block.attached.header')) return false;
+        const text = (header.textContent || '').replace(/\s+/g, '');
+        return text.includes('已提交作业');
+    }
+
+    function collectSubmittedHomeworkHeaders(scopeRoot) {
+        const root = scopeRoot || document;
+        const headers = [];
+        if (root.matches?.('h4.ui.top.block.attached.header')) headers.push(root);
+        root.querySelectorAll?.('h4.ui.top.block.attached.header').forEach(header => headers.push(header));
+        return headers.filter(isSubmittedHomeworkHeader);
+    }
+
+    function applySubmittedHomeworkCollapse(scopeRoot) {
+        if (!defaultHideSubmittedHomework) return;
+        if (!/\/problem\//.test(location.pathname || '')) return;
+        const headers = collectSubmittedHomeworkHeaders(scopeRoot);
+        if (!headers.length) return;
+        ensureSubmittedHomeworkStyle();
+
+        headers.forEach(header => {
+            if (header.dataset.bnSubmittedHomeworkCollapse === '1') return;
+            const content = header.nextElementSibling;
+            if (!content || !content.matches?.('.ui.bottom.attached.segment')) return;
+            const form = header.closest('form#submit_code');
+            if (!form) return;
+
+            header.dataset.bnSubmittedHomeworkCollapse = '1';
+            header.classList.add('bn-submitted-homework-header');
+
+            const toggleButton = document.createElement('button');
+            toggleButton.type = 'button';
+            toggleButton.className = 'ui mini basic button bn-submitted-homework-toggle';
+
+            const setCollapsed = (collapsed) => {
+                content.hidden = collapsed;
+                header.classList.toggle('bn-submitted-homework-collapsed', collapsed);
+                toggleButton.setAttribute('aria-expanded', String(!collapsed));
+                toggleButton.innerHTML = collapsed
+                    ? '<i class="angle down icon"></i>展开'
+                    : '<i class="angle up icon"></i>收起';
+            };
+
+            toggleButton.addEventListener('click', event => {
+                event.preventDefault();
+                event.stopPropagation();
+                setCollapsed(!content.hidden);
+            });
+            header.addEventListener('click', event => {
+                if (event.target?.closest?.('button, a, input, select, textarea, label')) return;
+                setCollapsed(!content.hidden);
+            });
+
+            header.appendChild(toggleButton);
+            setCollapsed(true);
+        });
     }
 
     function applyHideDoneSkip(enabled, scopeRoot) {
@@ -6307,6 +6408,7 @@
     document.querySelectorAll('#vueAppFuckSafari > tbody > tr > td:nth-child(2) > a > span').forEach(processProblemTitle)
     applyQuickSkip(enableQuickSkip);
     applyHideDoneSkip(hideDoneSkip);
+    applySubmittedHomeworkCollapse();
     applyTemplateBulkAddButton(enableTemplateBulkAdd);
     scheduleTemplateBulkButton(enableTemplateBulkAdd);
 
@@ -6339,6 +6441,10 @@
             node.querySelectorAll?.('#vueAppFuckSafari > tbody > tr > td:nth-child(2) > a > span').forEach(processProblemTitle);
             try {
                 applyQuickSkip(quickSkipSetting, node);
+            } catch (e) {
+            }
+            try {
+                applySubmittedHomeworkCollapse(node);
             } catch (e) {
             }
         }
