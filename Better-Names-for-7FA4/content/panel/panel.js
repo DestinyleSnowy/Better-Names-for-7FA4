@@ -32,8 +32,7 @@
         hideOrig: true,
         enableContestDownloadButtons: true,
         enableContestReviewButtons: true,
-        showUserRealname: "none",
-        showUser: "none",
+        showUserNickname: true,
         enableUserMenu: true,
         enablePlanAdder: true,
         enableTemplateBulkAdd: true,
@@ -145,8 +144,7 @@
     const hideOrig = readConfigValue('hideOrig');
     const enableContestDownloadButtons = readConfigValue('enableContestDownloadButtons');
     const enableContestReviewButtons = readConfigValue('enableContestReviewButtons');
-    const showUserRealname = readConfigValue('showUserRealname');
-    const showUser = readConfigValue('showUser');
+    const showUserNickname = readConfigValue('showUserNickname');
     const enableMenu = readConfigValue('enableUserMenu');
     const enablePlanAdder = true;
     try {
@@ -240,8 +238,7 @@
         hideOrig,
         enableContestDownloadButtons,
         enableContestReviewButtons,
-        showUserRealname,
-        showUser,
+        showUserNickname,
         enableMenu,
         enablePlanAdder,
         enableTemplateBulkAdd,
@@ -655,19 +652,19 @@
 
     const palettes = {
         light: {
-            x4: '#5a5a5a',
-            x5: '#92800b',
-            x6: '#b2ad2a',
-            c1: '#ff0000',
-            c2: '#ff6629',
-            c3: '#ffbb00',
+            x4: '#8c8c8c',
+            x5: '#722ed1',
+            x6: '#9254de',
+            c1: '#ff4d4f',
+            c2: '#fa8c16',
+            c3: '#faad14',
             g1: '#ca00ca',
-            g2: '#62ca00',
+            g2: '#52c41a',
             g3: '#13c2c2',
-            d1: '#9900ff',
-            d2: '#000cff',
-            d3: '#597ef7',
-            d4: '#186334',
+            d1: '#9254de',
+            d2: '#597ef7',
+            d3: '#73d13d',
+            d4: '#bfbfbf',
             by: '#8c8c8c',
             jl: '#ff85c0',
             uk: '#5e6e5e'
@@ -838,6 +835,7 @@
         messagesByKey: new Map(),
         oldestSecByKey: new Map(),
         lastActivitySecByKey: new Map(),
+        activityAlertBaselineSecByKey: new Map(),
         unreadCountByKey: new Map(),
         noOlderConversationKeys: new Set(),
         trackedConversationKeys: new Set(),
@@ -1375,9 +1373,7 @@
     const chkHo = document.getElementById('bn-hide-orig');
     const chkContestDownload = document.getElementById('bn-enable-contest-download');
     const chkContestReview = document.getElementById('bn-enable-contest-review');
-    const chkShowRealname = document.getElementById('bn-show-user-realname');
-    const selectShowRealnameAnd = document.getElementById("bn-show-user-realname-and");
-    const selectShowUserShow = document.getElementById("bn-show-user-show");
+    const chkShowNickname = document.getElementById('bn-show-user-nickname');
     const chkMenu = document.getElementById('bn-enable-user-menu');
     let chkTemplateBulkAdd = document.getElementById('bn-enable-template-bulk-add');
     const chkAutoRenew = document.getElementById('bn-enable-renew');
@@ -1423,9 +1419,7 @@
     chkHo.checked = hideOrig;
     chkContestDownload.checked = enableContestDownloadButtons;
     chkContestReview.checked = enableContestReviewButtons;
-    chkShowRealname.checked = !!showUserRealname;
-    selectShowRealnameAnd.value = showUserRealname ?? "none";
-    selectShowUserShow.value = showUser;
+    chkShowNickname.checked = showUserNickname;
     chkMenu.checked = enableMenu;
     if (chkTemplateBulkAdd) chkTemplateBulkAdd.checked = enableTemplateBulkAdd;
     chkAutoRenew.checked = enableAutoRenew;
@@ -1508,8 +1502,7 @@
         hideOrig,
         enableContestDownloadButtons,
         enableContestReviewButtons,
-        showUserRealname,
-        showUser,
+        showUserNickname,
         enableMenu,
         enablePlanAdder,
         enableTemplateBulkAdd,
@@ -1876,7 +1869,8 @@
             }, 200);
         }
         checkChanged();
-        users = await loadUsersData(isChecked);
+        users = await loadUsersData();
+        applySpecialRules(users, specialRules);
         updateUserShow();
     };
 
@@ -2372,7 +2366,7 @@
         const currentBtEnabled = getHiToiletEnabledState();
         const templateBulkAddChk = document.getElementById('bn-enable-template-bulk-add');
 
-        const changed = (document.getElementById('bn-enable-title-truncate').checked !== originalConfig.titleTruncate) || (document.getElementById('bn-enable-user-truncate').checked !== originalConfig.userTruncate) || (document.getElementById('bn-enable-title-truncate').checked && ti !== originalConfig.maxTitleUnits) || (document.getElementById('bn-enable-user-truncate').checked && ui !== originalConfig.maxUserUnits) || (document.getElementById('bn-hide-avatar').checked !== originalConfig.hideAvatar) || (document.getElementById('bn-enable-copy').checked !== originalConfig.enableCopy) || (document.getElementById('bn-enable-desc-copy').checked !== originalConfig.enableDescCopy) || (document.getElementById('bn-hide-orig').checked !== originalConfig.hideOrig) || (document.getElementById('bn-enable-contest-download').checked !== originalConfig.enableContestDownloadButtons) || (document.getElementById('bn-enable-contest-review').checked !== originalConfig.enableContestReviewButtons) || (document.getElementById('bn-show-user-realname').checked ? selectShowRealnameAnd.value : null !== originalConfig.showUserRealname) || (selectShowUserShow !== originalConfig.showUser) || (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) || ((templateBulkAddChk ? templateBulkAddChk.checked : originalConfig.enableTemplateBulkAdd) !== originalConfig.enableTemplateBulkAdd) || (document.getElementById('bn-enable-renew').checked !== originalConfig.enableAutoRenew) || (document.getElementById('bn-enable-ranking-filter').checked !== originalConfig.enableRankingFilter) || (document.getElementById('bn-enable-column-switch').checked !== originalConfig.columnSwitchEnabled) || (document.getElementById('bn-enable-merge-assistant').checked !== originalConfig.mergeAssistantEnabled) || (document.getElementById('bn-enable-vj').checked !== originalConfig.enableVjLink) || (document.getElementById('bn-hide-done-skip').checked !== originalConfig.hideDoneSkip) || (document.getElementById('bn-enable-quick-skip').checked !== originalConfig.enableQuickSkip) || (document.getElementById('bn-enable-title-optimization').checked !== originalConfig.enableTitleOptimization) || (document.getElementById('bn-use-custom-color').checked !== originalConfig.useCustomColors) || ((document.getElementById('bn-width-mode')?.value ?? originalConfig.widthMode) !== originalConfig.widthMode) || (currentBgEnabled !== originalConfig.bgEnabled) || bgSourceChanged || (currentBgfillway !== originalConfig.bgfillway) || (currentBgOpacity !== originalConfig.bgOpacity) || (clampBlur(currentBgBlur) !== clampBlur(originalConfig.bgBlur)) || (currentBtEnabled !== originalConfig.btEnabled) || (hiToiletIntervalInput && clampHiToiletInterval(hiToiletIntervalInput.value) !== originalConfig.btInterval) || (getSelectedThemeMode() !== originalConfig.themeMode) || themeColorChanged || paletteChanged;
+        const changed = (document.getElementById('bn-enable-title-truncate').checked !== originalConfig.titleTruncate) || (document.getElementById('bn-enable-user-truncate').checked !== originalConfig.userTruncate) || (document.getElementById('bn-enable-title-truncate').checked && ti !== originalConfig.maxTitleUnits) || (document.getElementById('bn-enable-user-truncate').checked && ui !== originalConfig.maxUserUnits) || (document.getElementById('bn-hide-avatar').checked !== originalConfig.hideAvatar) || (document.getElementById('bn-enable-copy').checked !== originalConfig.enableCopy) || (document.getElementById('bn-enable-desc-copy').checked !== originalConfig.enableDescCopy) || (document.getElementById('bn-hide-orig').checked !== originalConfig.hideOrig) || (document.getElementById('bn-enable-contest-download').checked !== originalConfig.enableContestDownloadButtons) || (document.getElementById('bn-enable-contest-review').checked !== originalConfig.enableContestReviewButtons) || (document.getElementById('bn-show-user-nickname').checked !== originalConfig.showUserNickname) || (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) || ((templateBulkAddChk ? templateBulkAddChk.checked : originalConfig.enableTemplateBulkAdd) !== originalConfig.enableTemplateBulkAdd) || (document.getElementById('bn-enable-renew').checked !== originalConfig.enableAutoRenew) || (document.getElementById('bn-enable-ranking-filter').checked !== originalConfig.enableRankingFilter) || (document.getElementById('bn-enable-column-switch').checked !== originalConfig.columnSwitchEnabled) || (document.getElementById('bn-enable-merge-assistant').checked !== originalConfig.mergeAssistantEnabled) || (document.getElementById('bn-enable-vj').checked !== originalConfig.enableVjLink) || (document.getElementById('bn-hide-done-skip').checked !== originalConfig.hideDoneSkip) || (document.getElementById('bn-enable-quick-skip').checked !== originalConfig.enableQuickSkip) || (document.getElementById('bn-enable-title-optimization').checked !== originalConfig.enableTitleOptimization) || (document.getElementById('bn-use-custom-color').checked !== originalConfig.useCustomColors) || ((document.getElementById('bn-width-mode')?.value ?? originalConfig.widthMode) !== originalConfig.widthMode) || (currentBgEnabled !== originalConfig.bgEnabled) || bgSourceChanged || (currentBgfillway !== originalConfig.bgfillway) || (currentBgOpacity !== originalConfig.bgOpacity) || (clampBlur(currentBgBlur) !== clampBlur(originalConfig.bgBlur)) || (currentBtEnabled !== originalConfig.btEnabled) || (hiToiletIntervalInput && clampHiToiletInterval(hiToiletIntervalInput.value) !== originalConfig.btInterval) || (getSelectedThemeMode() !== originalConfig.themeMode) || themeColorChanged || paletteChanged;
 
         saveActions.classList.toggle('bn-visible', changed);
     }
@@ -2437,11 +2431,7 @@
     chkHo.onchange = checkChanged;
     chkContestDownload.onchange = checkChanged;
     chkContestReview.onchange = checkChanged;
-    chkShowRealname.onchange = selectShowRealnameAnd.onchange = selectShowUserShow.onchange = () => {
-        checkChanged();
-        shownames = getShowNames();
-        updateUserShow();
-    }
+    chkShowNickname.onchange = checkChanged;
     chkMenu.onchange = checkChanged;
     chkVj.onchange = checkChanged;
     chkHideDoneSkip.onchange = () => {
@@ -2519,8 +2509,7 @@
         GM_setValue('hideOrig', chkHo.checked);
         GM_setValue('enableContestDownloadButtons', chkContestDownload.checked);
         GM_setValue('enableContestReviewButtons', chkContestReview.checked);
-        GM_setValue('showUserRealname', chkShowRealname.checked ? selectShowRealnameAnd.value : null);
-        GM_setValue('showUser', selectShowUserShow.value);
+        GM_setValue('showUserNickname', chkShowNickname.checked);
         GM_setValue('hideDoneSkip', chkHideDoneSkip.checked);
         GM_setValue('enableQuickSkip', chkQuickSkip.checked);
         GM_setValue('enableTitleOptimization', chkTitleOpt.checked);
@@ -2615,8 +2604,7 @@
         chkHo.checked = originalConfig.hideOrig;
         chkContestDownload.checked = originalConfig.enableContestDownloadButtons;
         chkContestReview.checked = originalConfig.enableContestReviewButtons;
-        chkShowRealname.checked = !!originalConfig.showUserRealname;
-        selectShowRealnameAnd.value = originalConfig.showUserRealname ?? "none";
+        chkShowNickname.checked = originalConfig.showUserNickname;
         chkMenu.checked = originalConfig.enableMenu;
         chkVj.checked = originalConfig.enableVjLink;
         chkHideDoneSkip.checked = originalConfig.hideDoneSkip;
@@ -2916,64 +2904,7 @@
         return out;
     }
 
-    async function __getShowName(user) {
-        let add = null;
-        if (showUserRealname !== undefined && user.real_name) {
-            add = user.real_name;
-            if (user[showUserRealname]) add += `（${user[showUserRealname]}）`;
-        } else {
-            if (user[showUser]) {
-                add = user[showUser];
-            }
-            // else if (showUser === "username") {
-            //     const htmlres = await fetch(`/user/${user.id}`);
-            //     const html = await htmlres.text();
-            //     add = html.match(/<title>(.*) - 用户.*<\/title>/)[1];
-            // } else if (showUser === "nickname") {
-            //     const htmlres = await fetch(`/user/${user.id}`);
-            //     console.log(htmlres);
-            //     const html = await htmlres.text();
-            //     console.log(html);
-            //     add = html.match(/<h4.*>\s*昵称\s*<\/h4>\s*<div.*>\s*(.*?)\s*<\/div>/)
-            //         ?? html.match(/<h4.*>\s*昵称 \/ 姓名\s*<\/h4><div.*>\s*(.*?) \/ .* \/ .*\s*<\/div>/);
-            //     if (add) add = add[1];
-            //     else throw new Error("");
-            // }
-        }
-        return add;
-    }
-
-    async function getShowNames() {
-        const chatInfo = await fetch("/chat/info");
-        const response = (await chatInfo.json()).friends;
-        let ret = {};
-        for (let user of response.concat(await fetchBetterNamesUsers())) {
-            const add = await __getShowName(user);
-            ret[user.id] = add;
-        }
-        // const promises = [];
-        // const SIZE = 300;
-        // for (let i = 1; i <= SIZE; i++)
-        //     promises.push(async () => {
-        //         for (let j = i; j <= 4000; j += SIZE) {
-        //             if (ret[i]) continue;
-        //             console.log("Get", i);
-        //             try {
-        //                 const add = await __getShowName({
-        //                     id: i,
-        //                 });
-        //                 ret[i] = add;
-        //                 console.log(i, add);
-        //             } catch (e) {
-        //                 break;
-        //             }
-        //         }
-        //     });
-        // await Promise.all(promises);
-        return ret;
-    }
-
-    async function loadUsersData(get) {
+    async function loadUsersData() {
         const urls = [];
         if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function') {
             try {
@@ -2990,11 +2921,6 @@
                     const json = await resp.json();
                     let users;
                     if ("users" in json) users = json.users; else users = json;
-                    if (!get) {
-                        for (let user in users) {
-                            users[user].colorKey = "clear";
-                        }
-                    }
                     return users;
                 }
                 console.warn(`Failed to load users.json from ${url}: ${resp ? resp.status : 'no response'}`);
@@ -3108,13 +3034,8 @@
         }
     }
 
-    let [users, specialRules] = await Promise.all([loadUsersData(GM_getValue("useCustomColors")), loadSpecialRules(),]);
+    let [users, specialRules] = await Promise.all([loadUsersData(), loadSpecialRules(),]);
     applySpecialRules(users, specialRules);
-    let shownames = await getShowNames();
-
-    function getShowName(uid, arg) {
-        return shownames[uid] ?? arg;
-    }
 
     function firstVisibleCharOfTitle() {
         const h1 = document.querySelector('body > div:nth-child(2) > div > div.ui.center.aligned.grid > div > h1');
@@ -3639,6 +3560,7 @@
         baseText = baseText.trim();
         const defaultSource = baseText || (a.textContent || '').trim();
         if (isLikelyUrlLabel(defaultSource, rawHref)) return;
+        const originalNickname = (showUserNickname && info) ? extractOriginalNickname(baseText) : '';
 
         const img = a.querySelector('img');
         if (img && hideAvatar) img.remove();
@@ -3648,19 +3570,31 @@
 
         let combinedName = defaultSource;
         if (info) {
-            if (getShowName(uid, null)) {
-                a.childNodes.forEach(n => {
-                    if (n.nodeType === Node.TEXT_NODE) n.remove();
-                });
-                a.innerHTML += getShowName(uid);
+            combinedName = typeof info.name === 'string' ? info.name : (defaultSource || '');
+            if (showUserNickname && originalNickname) {
+                combinedName += `（${originalNickname}）`;
             }
-            if (info.colorKey === "clear") a.style.color = ''; else {
+            if (info.colorKey === "clear") a.style.color = '';
+            else {
                 const c = palette[info.colorKey];
                 if (c) a.style.color = c;
             }
         }
 
+        const limitedName = truncateByUnits(combinedName || '', maxUserUnits);
+        const finalText = (img ? '\u00A0' : '') + limitedName;
+
+        Array.from(a.childNodes).forEach(n => {
+            if (n.nodeType === Node.TEXT_NODE) n.remove();
+        });
+        a.appendChild(document.createTextNode(finalText));
         renderUserTags(a, info?.tags);
+    }
+
+    function chatDisplayNameForMember(member, uid) {
+        const info = users[String(uid)];
+        if (info && typeof info.name === 'string' && info.name.trim()) return info.name.trim();
+        return chatExtractDisplayName(member, `用户 ${uid}`);
     }
 
     function processProblemTitle(span) {
@@ -4810,6 +4744,7 @@
         cleanupMap(chatState.messagesByKey);
         cleanupMap(chatState.oldestSecByKey);
         cleanupMap(chatState.lastActivitySecByKey);
+        cleanupMap(chatState.activityAlertBaselineSecByKey);
         cleanupMap(chatState.unreadCountByKey);
         cleanupMap(chatState.lastNotifiedMessageIdByKey);
         Array.from(chatState.noOlderConversationKeys.values()).forEach((key) => {
@@ -4824,7 +4759,7 @@
     function chatMaybeNotifyNewMessages(conversation, newMessages) {
         if (!conversation || !Array.isArray(newMessages) || !newMessages.length) return;
         if (typeof GM_notification !== 'function') return;
-        if (chatWindowIsVisible()) return;
+        if (chatWindowIsVisible() && conversation.key === chatState.activeKey) return;
         const latest = newMessages[newMessages.length - 1];
         if (!latest || latest.isSelf) return;
         if (chatState.lastNotifiedMessageIdByKey.get(conversation.key) === latest.id) return;
@@ -4838,6 +4773,19 @@
         });
     }
 
+    function chatRememberConversationActivityFromInfo(key, activitySec) {
+        if (!key || !Number.isFinite(activitySec) || activitySec <= 0) return;
+        const previousActivitySec = chatGetConversationLastActivitySec(key);
+        if (!chatState.trackedConversationKeys.has(key)
+            && Number.isFinite(previousActivitySec)
+            && previousActivitySec > 0
+            && activitySec > previousActivitySec
+            && !chatState.activityAlertBaselineSecByKey.has(key)) {
+            chatState.activityAlertBaselineSecByKey.set(key, previousActivitySec);
+        }
+        chatState.lastActivitySecByKey.set(key, activitySec);
+    }
+
     function chatRememberConversationMessages(conversation, incomingMessages, {
         trackUnread = false, notify = false, rerenderList = false, updateOldest = true,
     } = {}) {
@@ -4845,9 +4793,12 @@
         const key = conversation.key;
         const existing = chatState.messagesByKey.get(key) || [];
         const hadBaseline = chatState.trackedConversationKeys.has(key);
-        const existingIds = hadBaseline ? new Set(existing.map(item => item && item.id)) : null;
+        const pendingActivityBaselineSec = chatNormalizeTimestampToSec(chatState.activityAlertBaselineSecByKey.get(key));
+        const activityBaselineSec = Number.isFinite(pendingActivityBaselineSec) ? pendingActivityBaselineSec : chatGetConversationLastActivitySec(key);
+        const canTrackFromActivityBaseline = !hadBaseline && Number.isFinite(activityBaselineSec) && activityBaselineSec > 0;
+        const existingIds = (hadBaseline || canTrackFromActivityBaseline) ? new Set(existing.map(item => item && item.id)) : null;
         const existingTimes = existing.map(item => chatNormalizeTimestampToSec(item && item.sec)).filter(Number.isFinite);
-        const previousLatestSec = hadBaseline && existingTimes.length ? Math.max(...existingTimes) : NaN;
+        const previousLatestSec = hadBaseline && existingTimes.length ? Math.max(...existingTimes) : (canTrackFromActivityBaseline ? activityBaselineSec : NaN);
         const merged = chatMergeMessages(existing, incomingMessages);
         chatState.messagesByKey.set(key, merged);
         const mergedTimes = merged.map(item => chatNormalizeTimestampToSec(item && item.sec)).filter(Number.isFinite);
@@ -4861,15 +4812,19 @@
 
         let newIncoming = [];
         const shouldMarkRead = key === chatState.activeKey && chatWindowIsVisible();
-        if (trackUnread && hadBaseline && existingIds) {
+        if (trackUnread && (hadBaseline || canTrackFromActivityBaseline) && existingIds) {
             newIncoming = incomingMessages.filter((item) => {
                 if (!item || item.isSelf) return false;
                 if (existingIds.has(item.id)) return false;
                 const currentSec = chatNormalizeTimestampToSec(item.sec);
                 if (!Number.isFinite(previousLatestSec)) return true;
-                if (!Number.isFinite(currentSec)) return true;
+                if (!Number.isFinite(currentSec)) return hadBaseline;
+                if (canTrackFromActivityBaseline && !hadBaseline) return currentSec > previousLatestSec;
                 return currentSec >= previousLatestSec;
             });
+            if (canTrackFromActivityBaseline && !hadBaseline) {
+                chatState.activityAlertBaselineSecByKey.delete(key);
+            }
             if (shouldMarkRead) {
                 chatState.unreadCountByKey.delete(key);
             } else if (newIncoming.length) {
@@ -5371,7 +5326,7 @@
             const subtitle = `已互加 · ID ${fid}`;
             const activitySec = chatExtractConversationActivitySec(friend) || chatExtractConversationActivitySec(friendUserInfo);
             chatState.userNameById.set(fid, name);
-            if (Number.isFinite(activitySec) && activitySec > 0) chatState.lastActivitySecByKey.set(key, activitySec);
+            chatRememberConversationActivityFromInfo(key, activitySec);
             conversations.push({
                 key, id: fid, type: 'user', name, subtitle,
             });
@@ -5391,7 +5346,7 @@
             members.forEach((member) => {
                 const uid = chatToInteger(member && (member.id ?? member.user_id ?? member.uid));
                 if (!Number.isFinite(uid) || uid <= 0) return;
-                const memberName = getShowName(uid, `用户 ${uid}`);
+                const memberName = chatDisplayNameForMember(member, uid);
                 const showMemberHtml = `<a href="/user/${uid}">${escapeHtml(memberName)}</a>`;
                 if (member.type === "Owner") ownerName = showMemberHtml; else (member.type === "Member" ? membersName : administratorsName).push(showMemberHtml);
                 if (!chatState.userNameById.has(uid) || !chatState.userNameById.get(uid)) {
@@ -5400,7 +5355,7 @@
             });
             chatState.groupById.set(gid, group);
             const activitySec = chatExtractConversationActivitySec(group);
-            if (Number.isFinite(activitySec) && activitySec > 0) chatState.lastActivitySecByKey.set(key, activitySec);
+            chatRememberConversationActivityFromInfo(key, activitySec);
             conversations.push({
                 key,
                 id: gid,
@@ -5651,10 +5606,10 @@
     async function chatProbeConversationForNewMessages(conversation) {
         if (!conversation || !chatState.conversationByKey.has(conversation.key)) return;
         const probeMessages = await chatFetchConversationProbeMessages(conversation);
-        const {hadBaseline, newIncoming} = chatRememberConversationMessages(conversation, probeMessages, {
+        const {newIncoming} = chatRememberConversationMessages(conversation, probeMessages, {
             trackUnread: true, notify: true, rerenderList: false, updateOldest: false,
         });
-        if (!hadBaseline || !newIncoming.length) return;
+        if (!newIncoming.length) return;
         const latestMessages = await chatFetchConversationMessages(conversation);
         chatRememberConversationMessages(conversation, latestMessages, {
             trackUnread: true, notify: false, rerenderList: true,

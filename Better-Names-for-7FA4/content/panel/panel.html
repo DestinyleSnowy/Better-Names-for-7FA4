@@ -260,17 +260,7 @@
                         <div class="bn-option-group">
                             <div class="bn-option-group-title">显示选项</div>
                             <label><input type="checkbox" id="bn-hide-avatar"/> 隐藏用户头像</label>
-                            <label><input type="checkbox" id="bn-show-user-realname"/> 尝试显示用户真名 + <select id="bn-show-user-realname-and">
-                                <option value="username">用户名</option>
-                                <option value="nickname">昵称（没有昵称不显示）</option>
-                                <option value="none" selected>无</option>
-                            </select></label>
-                            <label>显示用户的<select id="bn-show-user-show">
-                                <option value="username">用户名</option>
-                                <option value="nickname">昵称（没有昵称显示原来的）</option>
-                                <option value="none" selected>原本要显示的内容</option>
-                            </select></label>
-                            注：以上两个选项仅在已关注对方时生效
+                            <label><input type="checkbox" id="bn-show-user-nickname"/> 显示用户昵称</label>
                         </div>
                         <div class="bn-option-group">
                             <div class="bn-option-group-title">优化选项</div>
@@ -410,7 +400,7 @@
 <div id="bn-chat-window" role="dialog" aria-label="7FA4 聊天室" aria-hidden="true">
     <div class="bn-chat-window-header">
         <div class="bn-chat-window-title">7FA4 聊天室</div>
-        <div class="bn-chat-window-subtitle">Better Names for 7FA4 · ChatRoom.0.1.Beta</div>
+        <div class="bn-chat-window-subtitle">Better Names for 7FA4 · ChatRoom 2.0</div>
         <div class="bn-chat-window-actions">
             <button type="button" id="bn-chat-group-ops-toggle" class="bn-chat-window-action" aria-label="打开群组管理"
                     aria-controls="bn-chat-group-ops-panel" aria-expanded="false">群组管理
