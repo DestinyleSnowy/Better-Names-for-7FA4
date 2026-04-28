@@ -24,11 +24,15 @@ const storage = {
 };
 
 async function fetchText(url) {
-  console.log("正在fetch " + url);
-  const r = await fetch(url, { cache: 'no-cache', referrerPolicy: 'unsafe-url' });
-  if (!r.ok) throw new Error(`fetch ${url} failed ${r.status}`);
-  const t = await r.text();
-  return (t ?? '').trim();
+  try {
+    const r = await fetch(url, { cache: 'no-cache' });
+    if (!r.ok) throw new Error(`fetch ${url} failed ${r.status}`);
+    const t = await r.text();
+    return (t ?? '').trim();
+  } catch (e) {
+    console.warn('update.js: fetch failed', e);
+    return null;
+  }
 }
 
 async function getLocalVersion() {

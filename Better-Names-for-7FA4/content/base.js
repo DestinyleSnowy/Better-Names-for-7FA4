@@ -1,5 +1,7 @@
 (function () {
     'use strict';
+    marked.use({breaks: true});
+    Prism.manual = true;
 
     const hasChromeStorage = !!(typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local);
 
@@ -163,8 +165,8 @@
     }
 
     const RENDER_MATH_DELIMITERS = [
-        {left: '$$', right: '$$', display: true},
         {left: '$', right: '$', display: false},
+        {left: '$$', right: '$$', display: true},
         {left: '\\(', right: '\\)', display: false},
         {left: '\\[', right: '\\]', display: true}
     ];
@@ -189,61 +191,14 @@
         }
     }
 
-    function sanitizeRichHtml(unsafeHtml) {
-        if (typeof DOMPurify === 'undefined' || typeof DOMPurify.sanitize !== 'function') {
-            const fallback = document.createElement('div');
-            fallback.textContent = String(unsafeHtml ?? '');
-            return fallback.innerHTML;
-        }
-        return DOMPurify.sanitize(String(unsafeHtml ?? ''), {
-            FORBID_TAGS: ['style', 'link', 'aframe', 'script', 'frame', 'iframe', 'object', 'embed', 'form'],
-            FORBID_ATTR: ['style', 'onclick', 'onerror', 'onload', 'srcdoc']
-        });
-    }
-
-    function postProcessRenderedImages(root) {
-        if (!root) return;
-        root.querySelectorAll('img').forEach((img) => {
-            const source = (img.getAttribute('src') || img.dataset.src || '').trim();
-            if (!source) {
-                img.remove();
-                return;
-            }
-            if (CanShow(source)) {
-                img.setAttribute('src', source);
-                img.removeAttribute('data-src');
-                img.classList.remove('bn-img-lazy');
-                return;
-            }
-            img.dataset.src = source;
-            img.removeAttribute('src');
-            img.classList.add('bn-img-lazy');
-            img.src = '/';
-            const showtext = `${source}，\n点击加载`;
-            const container = document.createElement('span');
-            container.dataset.tooltip = showtext;
-            img.parentNode.insertBefore(container, img);
-            container.appendChild(img);
-        });
-    }
-
     function RenderMarkdown(el, md) {
-        if (!el) return;
-        const rawText = typeof md === 'string' ? md : String(md ?? '');
-        let renderedHtml = rawText;
-        if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
-            renderedHtml = marked.parse(rawText);
-        }
-        el.innerHTML = sanitizeRichHtml(renderedHtml);
-        if (typeof renderMathInElement === 'function') {
-            renderMathInElement(el, {
-                delimiters: RENDER_MATH_DELIMITERS,
-                ignoredTags: ['script', 'noscript', 'style', 'textarea', 'option', 'code'],
-                throwOnError: false,
-                strict: 'ignore'
-            });
-        }
-        postProcessRenderedImages(el);
+        el.innerHTML = marked.parse(md);
+        renderMathInElement(el, {
+            delimeters: RENDER_MATH_DELIMITERS,
+            throwOnError: false
+        });
+        for (let elem of el.querySelectorAll("pre"))
+            addPrism(elem);
     }
 
     function removeFixed(el) {
@@ -253,15 +208,118 @@
         }
     }
 
+    function addPrism(pre) {
+        pre.setAttribute("data-prismjs-copy", "复制");
+        pre.setAttribute("data-prismjs-copy-error", "复制失败");
+        pre.setAttribute("data-prismjs-copy-success", "复制成功");
+        pre.setAttribute("data-prismjs-copy-timeout", 1000);
+        pre.classList.add("line-numbers");
+    }
+
+    function downloadCode(codeElement, langClass, fileName) {
+        const codeContent = codeElement;
+        const {fileType, fileExt} = getSuffix(langClass);
+        if (! fileName) fileName = "code." + fileExt;
+        const blob = new Blob([codeContent], {type: fileType});
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        link.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function getSuffix(langClass) {
+        const extMap = {
+            'python': 'py',
+            'javascript': 'js',
+            'c': 'c',
+            'cpp': 'cpp',
+            'java': 'java',
+            'bash': 'sh',
+            'typescript': 'ts',
+            'py': 'py', // 新增短名称映射
+            'js': 'js',
+            'html': 'html',
+            'css': 'css',
+            'txt': 'txt',
+            'shell': 'sh',
+            'text': 'txt',
+            'json': 'json',
+            'xml': 'xml',
+            'yaml': 'yaml',
+            'markdown': 'md',
+            'md': 'md',
+            'sql': 'sql',
+            'ruby': 'rb',
+            'php': 'php',
+            'go': 'go',
+            'perl': 'pl',
+            'rust': 'rs',
+            'kotlin': 'kt',
+            'swift': 'swift',
+            'dart': 'dart',
+            'lua': 'lua',
+            'sh': 'sh',
+            'powershell': 'ps1',
+            'haskell': 'hs',
+            'r': 'r',
+            'scala': 'scala',
+            'vb': 'vb',
+            'bat': 'bat',
+            'ps1': 'ps1',
+        };
+        // 修改类名解析逻辑
+        const lang = langClass ?
+            langClass.replace('language-', '')
+                .replace(/^html$/, 'markup')  // 转换html到markup
+                .toLowerCase()
+            : 'txt';
+        const fileExt = extMap[lang] || "txt";  // 优先使用映射表
+
+        // 设置MIME类型映射
+        const mimeTypes = {
+            js: 'application/javascript',
+            py: 'text/x-python',
+            html: 'text/html',
+            css: 'text/css',
+            txt: 'text/plain',
+            sh: 'text/x-shellscript',
+            ts: 'text/typescript',
+            c: 'text/x-c',
+            cpp: 'text/x-c++',
+            java: 'text/x-java-source'
+        };
+
+        const fileType = mimeTypes[fileExt] || 'text/plain';
+        return {fileType, fileExt};
+    }
+
+    function getLang(suffix){
+        const extMap = {
+            py: 'python',
+            js: 'javascript',
+            html: 'html',
+            css: 'css',
+            txt: 'text',
+            sh: 'shell',
+            ts: 'typescript',
+            c: 'c',
+            cpp: 'cpp',
+            java: 'java',
+            md: "markdown",
+        };
+        return extMap[suffix] || suffix;
+    }
+
     function WriteCleanHTML(el, dirtyHTML) {
         if (!el) return;
-<<<<<<< HEAD
-        RenderMarkdown(el, sanitizeRichHtml(dirtyHTML));
-=======
+        dirtyHTML = marked.parse(dirtyHTML);
         let cleanHTML = DOMPurify.sanitize(
             dirtyHTML, {
-                FORBID_TAGS: ["style", "link", "aframe", "script", 'frame'],
-                FORBID_ATTR: ["style", "onclick", "id"]
+                FORBID_TAGS: ["style", "link", "iframe", "script", 'frame'],
+                FORBID_ATTR: ["id"],
+                ALLOWED_URI_REGEXP: /^.*/
             }
         );
         cleanHTML = cleanHTML.replaceAll(
@@ -269,10 +327,14 @@
             "$1data-src=$2"
         )
         cleanHTML = cleanHTML.replaceAll(
-            /![(.*)](.*)/g,
+            /[a-zA-Z\-] *: *url\((.*)\)/g,
+            ""
+        )
+        cleanHTML = cleanHTML.replaceAll(
+            /!\[(.*)](.*)/g,
             `<img alt="$1" data-src="$2">`
         )
-        RenderMarkdown(el, cleanHTML);
+        el.innerHTML = cleanHTML;
         // 输出安全 HTML
         el.querySelectorAll("img").forEach(img => {
             if (CanShow(img.dataset.src)) {
@@ -281,7 +343,7 @@
                 return;
             }
             img.classList.add("bn-img-lazy");
-            img.src = "/";
+            img.removeAttribute("src");
             const showtext = `${img.dataset.src}，\n点击加载`;
             const container = document.createElement("span");
             container.dataset.tooltip = showtext;
@@ -289,23 +351,35 @@
             container.appendChild(img);
         })
         removeFixed(el);
->>>>>>> a812624192473cfc0ec7b939755c7bc3647f086b
+        renderMathInElement(el, {
+            delimeters: RENDER_MATH_DELIMITERS,
+            throwOnError: false
+        });
+        for (let elem of el.querySelectorAll("pre"))
+            addPrism(elem);
     }
 
     window.RenderMarkdown = RenderMarkdown;
-    window.CanShow = CanShow;
+    window.addPrism = addPrism;
+    window.getLang = getLang;
     window.WriteCleanHTML = WriteCleanHTML;
     window.GM_addStyle = GM_addStyle;
     window.GM_setClipboard = GM_setClipboard;
     window.GM_notification = GM_notification;
     window.GM_xmlhttpRequest = GM_xmlhttpRequest;
+    Prism.plugins.lineNumbers = true;
+    Prism.plugins.toolbar.registerButton('download', {
+        text: '下载代码',
+        onClick: function (env) {
+            downloadCode(env.code, env.language, env.element.parentElement.dataset.download);
+        }
+    });
     window.GM_getValue = function (key, defVal) {
         return gmLocalGet(key, defVal);
     };
     window.GM_setValue = function (key, val) {
         return gmLocalSet(key, val);
     };
-
     window.GM = window.GM || {};
     window.GM.addStyle = GM_addStyle;
     window.GM.setClipboard = GM_setClipboard;
