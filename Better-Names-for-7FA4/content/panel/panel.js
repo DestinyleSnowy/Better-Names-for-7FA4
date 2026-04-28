@@ -890,9 +890,6 @@
         container.remove();
         return;
     }
-    if (!fireworksBtn) {
-        fireworksBtn = createFireworksButton(pinBtn);
-    }
     if (versionTextEl && manifestVersion) {
         const slogan = (versionTextEl.dataset && versionTextEl.dataset.slogan) ? String(versionTextEl.dataset.slogan).trim() : '';
         versionTextEl.textContent = slogan ? `${manifestVersion} · ${slogan}` : manifestVersion;
@@ -929,6 +926,22 @@
     let currentBgImageDataName = normalizedBgFileName;
     let fireworksEngine = null;
     let fireworksActiveTimer = null;
+    let birthdayWishTimer = null;
+    const BIRTHDAY_PERSON = '@鱼oe不缺氧';
+    const BIRTHDAY_DATE_TEXT = '5月5日';
+    const BIRTHDAY_BUTTON_LABEL = '生日快乐';
+    const BIRTHDAY_ICON_SVG = `
+      <svg class="bn-icon bn-icon-birthday" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M12 2.2c.85.86 1.5 1.73 1.5 2.55A1.5 1.5 0 0 1 12 6.25a1.5 1.5 0 0 1-1.5-1.5c0-.82.65-1.69 1.5-2.55Z" fill="#ffb020"/>
+        <path d="M11.15 6.1h1.7v3.2h-1.7z" fill="#3b82f6"/>
+        <path d="M6.25 9.1h11.5A2.25 2.25 0 0 1 20 11.35v1.28c0 .69-.56 1.25-1.25 1.25-.46 0-.88-.25-1.1-.65l-.16-.28-.2.25a2.18 2.18 0 0 1-3.42 0l-.2-.25-.2.25a2.18 2.18 0 0 1-3.42 0l-.2-.25-.2.25c-.22.4-.64.65-1.1.65A1.25 1.25 0 0 1 7.3 12.63v-1.28A2.25 2.25 0 0 1 9.55 9.1h-3.3Z" fill="#f973a6"/>
+        <path d="M5 13.35c.43.31.96.49 1.55.49.83 0 1.55-.34 2.05-.93.51.59 1.23.93 2.05.93.83 0 1.55-.34 2.06-.93.5.59 1.22.93 2.05.93.82 0 1.54-.34 2.05-.93.5.59 1.22.93 2.05.93.43 0 .84-.1 1.2-.28v4.19A2.25 2.25 0 0 1 17.8 20H6.2A2.25 2.25 0 0 1 4 17.75v-4.4Z" fill="#8b5cf6"/>
+        <path d="M5.9 16.5h12.2v1.45c0 .42-.33.75-.75.75H6.65a.75.75 0 0 1-.75-.75V16.5Z" fill="#6d28d9"/>
+        <circle cx="8" cy="15.25" r=".65" fill="#fff3a3"/>
+        <circle cx="12" cy="15.25" r=".65" fill="#bbf7d0"/>
+        <circle cx="16" cy="15.25" r=".65" fill="#bfdbfe"/>
+      </svg>
+  `;
     const FIREWORKS_ICON_SVG = `
       <svg class="bn-icon bn-icon-fireworks" viewBox="0 0 1088 1024" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <path d="M528.991209 435.636191c-0.50423-4.117882-0.840384-7.563457-1.176537-11.345185s-0.50423-7.39538-0.672308-11.177108v-22.102101a379.853598 379.853598 0 0 1 4.117882-44.540355 279.763855 279.763855 0 0 1 10.504801-44.288241 249.341952 249.341952 0 0 1 77.987641-118.494153 285.730582 285.730582 0 0 1 85.130906-48.574199h0.672307a42.523434 42.523434 0 0 1 29.58152 79.752448 44.120163 44.120163 0 0 1-7.899611 2.184998 208.247171 208.247171 0 0 0-67.987071 22.774409 185.724878 185.724878 0 0 0-29.833634 20.673448A195.809487 195.809487 0 0 0 603.617314 287.224365a221.777355 221.777355 0 0 0-21.177678 32.18671 272.284437 272.284437 0 0 0-16.219413 36.304591A304.219032 304.219032 0 0 0 554.791 394.457372c-1.428653 6.723073-2.773267 13.278068-3.781728 20.169217-0.50423 3.445575-1.008461 6.723073-1.260576 10.168647s-0.672307 6.891149-0.840384 9.832494v0.50423a9.916532 9.916532 0 0 1-10.924993 9.328264 10.168647 10.168647 0 0 1-9.328263-8.824033z" fill="#FFC229"></path>
@@ -944,17 +957,28 @@
       </svg>
   `;
 
+    function applyBirthdayButton(button) {
+        if (!button) return;
+        button.setAttribute('title', BIRTHDAY_BUTTON_LABEL);
+        button.setAttribute('aria-label', BIRTHDAY_BUTTON_LABEL);
+        button.innerHTML = BIRTHDAY_ICON_SVG;
+    }
+
     function createFireworksButton(pinElement) {
         if (!pinElement || !pinElement.parentElement) return null;
         const button = document.createElement('div');
         button.id = 'bn-fireworks';
-        button.setAttribute('title', '放烟花');
         button.setAttribute('role', 'button');
         button.setAttribute('tabindex', '0');
-        button.setAttribute('aria-label', '放烟花');
-        button.innerHTML = FIREWORKS_ICON_SVG;
+        applyBirthdayButton(button);
         pinElement.insertAdjacentElement('beforebegin', button);
         return button;
+    }
+
+    if (!fireworksBtn) {
+        fireworksBtn = createFireworksButton(pinBtn);
+    } else {
+        applyBirthdayButton(fireworksBtn);
     }
 
     function createFireworksEngine() {
@@ -1270,10 +1294,52 @@
         return fireworksEngine;
     }
 
+    function showBirthdayWish() {
+        if (!document.body) return;
+        let wish = document.getElementById('bn-birthday-wish');
+        if (!wish) {
+            wish = document.createElement('div');
+            wish.id = 'bn-birthday-wish';
+            wish.setAttribute('role', 'status');
+            wish.setAttribute('aria-live', 'polite');
+            document.body.appendChild(wish);
+        }
+        if (wish.parentElement && wish.parentElement.lastElementChild !== wish) {
+            wish.parentElement.appendChild(wish);
+        }
+        wish.innerHTML = `
+            <div class="bn-birthday-card">
+                <div class="bn-birthday-copy">
+                    <div class="bn-birthday-wish-date">${BIRTHDAY_DATE_TEXT}</div>
+                    <div class="bn-birthday-wish-title"><span>生日快乐</span><span>${BIRTHDAY_PERSON}</span></div>
+                    <div class="bn-birthday-wish-subtitle">Better Names for 7FA4</div>
+                </div>
+                <div class="bn-birthday-cake" aria-hidden="true">
+                    <div class="bn-birthday-candle bn-birthday-candle-1"><span></span></div>
+                    <div class="bn-birthday-candle bn-birthday-candle-2"><span></span></div>
+                    <div class="bn-birthday-candle bn-birthday-candle-3"><span></span></div>
+                    <div class="bn-birthday-cake-top"></div>
+                    <div class="bn-birthday-cake-layer bn-birthday-cake-layer-1"></div>
+                    <div class="bn-birthday-cake-layer bn-birthday-cake-layer-2"></div>
+                    <div class="bn-birthday-cake-base"></div>
+                    <div class="bn-birthday-cake-shadow"></div>
+                </div>
+            </div>
+        `;
+        wish.classList.remove('bn-show');
+        void wish.offsetWidth;
+        wish.classList.add('bn-show');
+        if (birthdayWishTimer) clearTimeout(birthdayWishTimer);
+        birthdayWishTimer = setTimeout(() => {
+            wish.classList.remove('bn-show');
+            birthdayWishTimer = null;
+        }, 3600);
+    }
+
     function triggerFireworks() {
         const engine = ensureFireworksEngine();
-        if (!engine) return;
-        engine.launch();
+        if (engine) engine.launch();
+        showBirthdayWish();
         if (!fireworksBtn) return;
         fireworksBtn.classList.add('bn-active');
         if (fireworksActiveTimer) clearTimeout(fireworksActiveTimer);
@@ -2341,9 +2407,14 @@
         });
     }
     window.addEventListener('pagehide', () => {
-        if (!fireworksEngine) return;
-        fireworksEngine.destroy();
-        fireworksEngine = null;
+        if (fireworksEngine) {
+            fireworksEngine.destroy();
+            fireworksEngine = null;
+        }
+        if (birthdayWishTimer) {
+            clearTimeout(birthdayWishTimer);
+            birthdayWishTimer = null;
+        }
     }, {once: true});
 
     function markOnce(el, key) {

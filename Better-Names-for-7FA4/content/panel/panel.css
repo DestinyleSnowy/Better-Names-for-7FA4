@@ -291,25 +291,16 @@
 }
 
 #bn-fireworks {
-    right: 40px;
-    top: 12px;
-    width: 20px;
-    height: 20px;
+    right: 36px;
+    top: 8px;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
     border: 0;
     background: transparent;
     box-shadow: none;
     touch-action: manipulation;
-    transition: none;
-}
-
-#bn-fireworks::before {
-    content: '';
-    position: absolute;
-    top: 2px;
-    right: -8px;
-    bottom: -18px;
-    left: -8px;
-    background: rgba(0, 0, 0, 0);
+    transition: background .18s ease;
 }
 
 #bn-pin svg {
@@ -319,8 +310,8 @@
 }
 
 #bn-fireworks svg {
-    width: 100%;
-    height: 100%;
+    width: 20px;
+    height: 20px;
     display: block;
     pointer-events: none;
     transition: transform .18s ease;
@@ -332,7 +323,7 @@
 }
 
 #bn-fireworks:hover {
-    transform: none;
+    background: rgba(139, 92, 246, 0.1);
 }
 
 #bn-pin.bn-pinned {
@@ -341,7 +332,7 @@
 }
 
 #bn-fireworks.bn-active {
-    transform: none;
+    background: rgba(249, 115, 22, 0.12);
 }
 
 #bn-fireworks:hover svg {
@@ -363,6 +354,264 @@
     height: 100vh;
     pointer-events: none;
     z-index: 2147483647;
+}
+
+#bn-birthday-wish {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    z-index: 2147483647;
+    width: min(560px, calc(100vw - 32px));
+    min-height: 360px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.72);
+    border-radius: 24px;
+    background:
+            radial-gradient(circle at 18% 18%, rgba(251, 191, 36, 0.26), transparent 28%),
+            radial-gradient(circle at 82% 12%, rgba(236, 72, 153, 0.22), transparent 30%),
+            radial-gradient(circle at 50% 96%, rgba(139, 92, 246, 0.18), transparent 36%),
+            linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(255, 247, 237, 0.94));
+    box-shadow: 0 30px 80px rgba(17, 24, 39, 0.28);
+    color: #1f2937;
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    overflow: hidden;
+    transform: translate(-50%, -48%) scale(0.92);
+    transition: opacity .28s ease, transform .28s ease;
+}
+
+#bn-birthday-wish.bn-show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+#bn-birthday-wish::before,
+#bn-birthday-wish::after {
+    content: '';
+    position: absolute;
+    inset: auto;
+    border-radius: 999px;
+    pointer-events: none;
+}
+
+#bn-birthday-wish::before {
+    width: 170px;
+    height: 170px;
+    left: -72px;
+    top: -62px;
+    background: rgba(251, 146, 60, 0.22);
+}
+
+#bn-birthday-wish::after {
+    width: 210px;
+    height: 210px;
+    right: -98px;
+    bottom: -88px;
+    background: rgba(124, 58, 237, 0.18);
+}
+
+.bn-birthday-card {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: minmax(190px, .9fr) minmax(220px, 1.1fr);
+    align-items: center;
+    gap: 18px;
+    min-height: 360px;
+    padding: 28px 30px;
+}
+
+.bn-birthday-copy {
+    text-align: left;
+}
+
+.bn-birthday-wish-date {
+    color: #f97316;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.bn-birthday-wish-title {
+    margin-top: 8px;
+    color: #111827;
+    font-size: 30px;
+    line-height: 1.16;
+    font-weight: 800;
+}
+
+.bn-birthday-wish-title span {
+    display: block;
+}
+
+.bn-birthday-wish-subtitle {
+    margin-top: 12px;
+    color: #6b7280;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+#bn-birthday-wish {
+    backdrop-filter: blur(10px);
+}
+
+.bn-birthday-cake {
+    position: relative;
+    width: 250px;
+    height: 250px;
+    margin: 0 auto;
+}
+
+.bn-birthday-cake-top {
+    position: absolute;
+    left: 62px;
+    top: 68px;
+    width: 126px;
+    height: 42px;
+    border-radius: 50%;
+    background:
+            radial-gradient(circle at 28% 42%, rgba(255, 255, 255, 0.85) 0 6px, transparent 7px),
+            radial-gradient(circle at 54% 34%, rgba(255, 255, 255, 0.76) 0 5px, transparent 6px),
+            linear-gradient(180deg, #fff7ed, #fecdd3);
+    box-shadow: 0 10px 0 #f9a8d4;
+}
+
+.bn-birthday-cake-layer,
+.bn-birthday-cake-base {
+    position: absolute;
+    left: 34px;
+    width: 182px;
+    border-radius: 22px 22px 28px 28px;
+    box-shadow: inset 0 -10px 0 rgba(109, 40, 217, 0.16);
+}
+
+.bn-birthday-cake-layer-1 {
+    top: 92px;
+    height: 62px;
+    background:
+            linear-gradient(90deg, transparent 0 12%, rgba(255, 255, 255, 0.55) 12% 16%, transparent 16% 28%, rgba(255, 255, 255, 0.5) 28% 32%, transparent 32% 100%),
+            linear-gradient(180deg, #f472b6, #db2777);
+}
+
+.bn-birthday-cake-layer-2 {
+    left: 22px;
+    top: 140px;
+    width: 206px;
+    height: 70px;
+    background:
+            linear-gradient(90deg, transparent 0 18%, rgba(255, 255, 255, 0.38) 18% 22%, transparent 22% 44%, rgba(255, 255, 255, 0.38) 44% 48%, transparent 48% 100%),
+            linear-gradient(180deg, #a78bfa, #7c3aed);
+}
+
+.bn-birthday-cake-base {
+    left: 10px;
+    top: 200px;
+    width: 230px;
+    height: 24px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #fde68a, #f59e0b);
+    box-shadow: 0 16px 30px rgba(124, 58, 237, 0.24);
+}
+
+.bn-birthday-cake-shadow {
+    position: absolute;
+    left: 28px;
+    bottom: 8px;
+    width: 194px;
+    height: 18px;
+    border-radius: 999px;
+    background: rgba(88, 28, 135, 0.18);
+    filter: blur(6px);
+}
+
+.bn-birthday-candle {
+    position: absolute;
+    top: 30px;
+    width: 14px;
+    height: 42px;
+    border-radius: 7px 7px 3px 3px;
+    background:
+            repeating-linear-gradient(135deg, #fff 0 6px, #60a5fa 6px 11px);
+    box-shadow: inset 0 -4px 0 rgba(37, 99, 235, 0.16);
+}
+
+.bn-birthday-candle span {
+    position: absolute;
+    left: 50%;
+    top: -18px;
+    width: 16px;
+    height: 22px;
+    border-radius: 12px 12px 12px 3px;
+    background: radial-gradient(circle at 42% 68%, #fff7ed 0 4px, transparent 5px),
+    linear-gradient(180deg, #facc15, #f97316 72%, #ef4444);
+    transform: translateX(-50%) rotate(45deg);
+    filter: drop-shadow(0 0 10px rgba(249, 115, 22, 0.55));
+    animation: bn-birthday-flame 1.1s ease-in-out infinite alternate;
+}
+
+.bn-birthday-candle-1 {
+    left: 88px;
+}
+
+.bn-birthday-candle-2 {
+    left: 118px;
+    top: 22px;
+}
+
+.bn-birthday-candle-3 {
+    left: 148px;
+}
+
+@keyframes bn-birthday-flame {
+    from {
+        transform: translateX(-50%) rotate(39deg) scale(0.92);
+    }
+    to {
+        transform: translateX(-50%) rotate(49deg) scale(1.06);
+    }
+}
+
+#bn-container.bn-theme-dark ~ #bn-birthday-wish {
+    border-color: rgba(255, 255, 255, 0.16);
+    background:
+            linear-gradient(135deg, rgba(15, 23, 42, 0.94), rgba(67, 56, 202, 0.88)),
+            radial-gradient(circle at 14% 18%, rgba(251, 146, 60, 0.22), transparent 34%),
+            radial-gradient(circle at 86% 12%, rgba(216, 180, 254, 0.22), transparent 36%);
+    color: #f8fafc;
+}
+
+#bn-container.bn-theme-dark ~ #bn-birthday-wish .bn-birthday-wish-title {
+    color: #fff7ed;
+}
+
+#bn-container.bn-theme-dark ~ #bn-birthday-wish .bn-birthday-wish-subtitle {
+    color: #dbeafe;
+}
+
+@media (max-width: 560px) {
+    #bn-birthday-wish {
+        width: min(420px, calc(100vw - 24px));
+    }
+
+    .bn-birthday-card {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 24px 20px;
+    }
+
+    .bn-birthday-copy {
+        text-align: center;
+    }
+
+    .bn-birthday-wish-title {
+        font-size: 24px;
+    }
+
+    .bn-birthday-cake {
+        transform: scale(0.86);
+        transform-origin: top center;
+        margin-bottom: -28px;
+    }
 }
 
 .bn-panel-title {
