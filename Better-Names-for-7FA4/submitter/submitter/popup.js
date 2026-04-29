@@ -626,7 +626,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 				language: 'cpp17',
 				status: $(td[2]).text().trim(),
 				total_time: $(td[4]).text().split(' ')[0],
-				max_memory: $(td[5]).text(),
+				max_memory: $(td[5]).text().split(' ')[0],
 				score: $(td[3]).text()
 			}
 		}
