@@ -206,12 +206,13 @@
         {text: '更换彩蛋。'},
     ];
     const WELCOME_CHANGELOG_2026_07_01_ITEMS = [
-        {text: '移除历史代码高亮样式，改为可选启用内置浅色代码主题或上传 CSS。'},
+        {text: '移除**恶心的**历史代码高亮样式，改为可选启用内置浅色代码主题或上传 CSS。'},
     ];
     const WELCOME_CHANGELOG_2026_07_02_ITEMS = [
         {text: '修复未启用自定义代码高亮主题时，网站原先代码配色会闪一下后消失的问题。'},
         {text: '修复 “格式化代码” 按钮在不开启自定义主题位置便宜的问题'},
         {text: '优化个人计划日期导航样式，支持拖动调整位置。'},
+        {text: '修复聊天室存在的部分问题'},
     ];
     const WELCOME_PATCH_CHANGELOGS = [
         {
@@ -920,6 +921,7 @@
         oldestSecByKey: new Map(),
         lastActivitySecByKey: new Map(),
         activityAlertBaselineSecByKey: new Map(),
+        activityProbeKeys: new Set(),
         unreadCountByKey: new Map(),
         noOlderConversationKeys: new Set(),
         trackedConversationKeys: new Set(),
@@ -4983,9 +4985,14 @@
 
     async function chatOpenWindow() {
         chatSetWindowVisible(true);
-        if (chatState.initialized || !chatHasValidUi()) return;
+        if (!chatHasValidUi()) return;
         try {
-            await initChatroomFeature();
+            await initChatroomFeature({
+                silent: false,
+                preserveSelection: true,
+                autoSelect: true,
+                forceRefreshActive: true,
+            });
         } catch (error) {
             chatSetStatus(`聊天室初始化失败：${error && error.message ? error.message : '未知错误'}`, 'error');
         }
@@ -5278,6 +5285,9 @@
         cleanupMap(chatState.activityAlertBaselineSecByKey);
         cleanupMap(chatState.unreadCountByKey);
         cleanupMap(chatState.lastNotifiedMessageIdByKey);
+        Array.from(chatState.activityProbeKeys.values()).forEach((key) => {
+            if (!keep.has(key)) chatState.activityProbeKeys.delete(key);
+        });
         Array.from(chatState.noOlderConversationKeys.values()).forEach((key) => {
             if (!keep.has(key)) chatState.noOlderConversationKeys.delete(key);
         });
@@ -5307,12 +5317,12 @@
     function chatRememberConversationActivityFromInfo(key, activitySec) {
         if (!key || !Number.isFinite(activitySec) || activitySec <= 0) return;
         const previousActivitySec = chatGetConversationLastActivitySec(key);
-        if (!chatState.trackedConversationKeys.has(key)
-            && Number.isFinite(previousActivitySec)
-            && previousActivitySec > 0
-            && activitySec > previousActivitySec
-            && !chatState.activityAlertBaselineSecByKey.has(key)) {
-            chatState.activityAlertBaselineSecByKey.set(key, previousActivitySec);
+        if (Number.isFinite(previousActivitySec) && previousActivitySec > 0 && activitySec > previousActivitySec) {
+            if (chatState.trackedConversationKeys.has(key)) {
+                chatState.activityProbeKeys.add(key);
+            } else if (!chatState.activityAlertBaselineSecByKey.has(key)) {
+                chatState.activityAlertBaselineSecByKey.set(key, previousActivitySec);
+            }
         }
         chatState.lastActivitySecByKey.set(key, activitySec);
     }
@@ -5322,7 +5332,8 @@
     } = {}) {
         if (!conversation) return {merged: [], newIncoming: [], hadBaseline: false};
         const key = conversation.key;
-        const existing = chatState.messagesByKey.get(key) || [];
+        const existing = (chatState.messagesByKey.get(key) || [])
+            .filter((item) => chatMessageBelongsToConversation(item, conversation, item && item.direction));
         const hadBaseline = chatState.trackedConversationKeys.has(key);
         const pendingActivityBaselineSec = chatNormalizeTimestampToSec(chatState.activityAlertBaselineSecByKey.get(key));
         const activityBaselineSec = Number.isFinite(pendingActivityBaselineSec) ? pendingActivityBaselineSec : chatGetConversationLastActivitySec(key);
@@ -5492,6 +5503,47 @@
         return out;
     }
 
+    function chatCollectPrivatePeerCandidates(message, directionHint = '') {
+        if (!message || typeof message !== 'object') return [];
+        const raw = message.raw && typeof message.raw === 'object' ? message.raw : {};
+        const selfId = Number.isFinite(chatState.selfId) && chatState.selfId > 0 ? chatState.selfId : NaN;
+        const sender = chatToInteger(message.senderId);
+        const target = chatToInteger(message.targetId);
+        const candidates = [];
+        const push = (value) => {
+            const parsed = chatToInteger(value);
+            if (!Number.isFinite(parsed) || parsed <= 0) return;
+            if (Number.isFinite(selfId) && parsed === selfId) return;
+            candidates.push(parsed);
+        };
+
+        if (Number.isFinite(selfId) && Number.isFinite(sender) && Number.isFinite(target)) {
+            if (sender === selfId) push(target);
+            if (target === selfId) push(sender);
+        }
+
+        if (directionHint === 'out') {
+            push(target);
+            push(raw.target_id ?? raw.targetId ?? raw.to_id ?? raw.toId ?? raw.receiver_id ?? raw.dest_id);
+            push(raw.user_id ?? raw.userId ?? raw.uid ?? raw.friend_id ?? raw.friendId ?? raw.other_id ?? raw.otherId);
+            push(sender);
+            push(raw.sender_id ?? raw.senderId ?? raw.from_id ?? raw.fromId ?? raw.source_id ?? raw.sourceId);
+        } else if (directionHint === 'in') {
+            push(sender);
+            push(raw.sender_id ?? raw.senderId ?? raw.from_id ?? raw.fromId ?? raw.source_id ?? raw.sourceId);
+            push(raw.user_id ?? raw.userId ?? raw.uid ?? raw.friend_id ?? raw.friendId ?? raw.other_id ?? raw.otherId);
+            push(target);
+        } else {
+            push(sender);
+            push(target);
+            push(raw.sender_id ?? raw.senderId ?? raw.from_id ?? raw.fromId ?? raw.source_id ?? raw.sourceId);
+            push(raw.target_id ?? raw.targetId ?? raw.to_id ?? raw.toId ?? raw.receiver_id ?? raw.dest_id);
+            push(raw.user_id ?? raw.userId ?? raw.uid ?? raw.friend_id ?? raw.friendId ?? raw.other_id ?? raw.otherId);
+        }
+
+        return Array.from(new Set(candidates));
+    }
+
     function chatMessageBelongsToConversation(message, conversation, directionHint = '') {
         if (!message || !conversation) return false;
         const convId = chatToInteger(conversation.id);
@@ -5510,16 +5562,7 @@
                 if (sender === selfId && target === convId) return true;
                 if (sender === convId && target === selfId) return true;
             }
-            if (directionHint === 'in') {
-                if (Number.isFinite(sender) && sender === convId) return true;
-                // if (Number.isFinite(target) && target === selfId && ids.includes(convId)) return true;
-            }
-            if (directionHint === 'out') {
-                if (Number.isFinite(target) && target === convId) return true;
-                if (Number.isFinite(sender) && sender === convId) return true;
-                if (ids.includes(convId)) return true;
-            }
-            return false;
+            return chatCollectPrivatePeerCandidates(message, directionHint).includes(convId);
         }
 
         return ids.some((value) => value === convId);
@@ -5934,6 +5977,7 @@
             chatRenderMessages();
             void chatHydrateConversationActivity({force: false});
             chatStartMonitorTimer();
+            void chatProbeActivityChangedConversations();
             if (!silent) {
                 chatSetStatus(`列表已更新：${chatState.conversations.length} 个会话`, 'success');
             }
@@ -6149,12 +6193,30 @@
         });
     }
 
+    async function chatProbeActivityChangedConversations(maxCount = 6) {
+        if (!chatState.activityProbeKeys.size) return;
+        const visible = chatWindowIsVisible();
+        const targets = [];
+        for (const key of Array.from(chatState.activityProbeKeys.values())) {
+            if (targets.length >= maxCount) break;
+            const conversation = chatGetConversationByKey(key);
+            chatState.activityProbeKeys.delete(key);
+            if (!conversation) continue;
+            if (visible && conversation.key === chatState.activeKey) continue;
+            targets.push(conversation);
+        }
+        if (!targets.length) return;
+        await Promise.all(targets.map(conversation => chatProbeConversationForNewMessages(conversation)));
+        chatUpdateUnreadUi({rerenderList: true});
+    }
+
     async function chatRunMonitorTick() {
         if (chatState.monitoring) return;
         if (!chatAutoRefreshInputEl || !chatAutoRefreshInputEl.checked) return;
         if (!chatState.conversations.length) return;
         chatState.monitoring = true;
         try {
+            await chatProbeActivityChangedConversations();
             const visible = chatWindowIsVisible();
             const maxBatch = Math.min(CHAT_MONITOR_BATCH_SIZE, chatState.conversations.length);
             const targets = [];
@@ -6172,6 +6234,7 @@
             await Promise.all(targets.map(conversation => chatProbeConversationForNewMessages(conversation)));
             if (Date.now() - chatState.lastInfoLoadedAt > 45000) {
                 await chatLoadInfo({silent: true, preserveSelection: true});
+                await chatProbeActivityChangedConversations();
             }
         } catch (_) {
             // keep monitor failures silent to avoid noisy status churn
@@ -6367,9 +6430,34 @@
         }
     }
 
-    async function initChatroomFeature() {
+    async function initChatroomFeature({
+        silent = false,
+        preserveSelection = false,
+        autoSelect = true,
+        forceRefreshActive = true,
+    } = {}) {
         if (!chatHasValidUi()) return;
-        if (chatState.initialized) return;
+        if (chatState.initialized) {
+            if (!chatState.conversations.length && !chatState.loadingInfo) {
+                await chatLoadInfo({silent, preserveSelection: true});
+            }
+            if (autoSelect) {
+                if (chatState.activeKey && chatState.conversationByKey.has(chatState.activeKey)) {
+                    chatSelectConversation(chatState.activeKey, {forceRefresh: forceRefreshActive});
+                } else if (chatState.conversations.length > 0) {
+                    chatSelectConversation(chatState.conversations[0].key, {forceRefresh: forceRefreshActive});
+                } else if (!silent) {
+                    chatSetStatus('未发现可用会话，可点击“重载列表”重试');
+                }
+            } else {
+                chatRenderConversationList();
+                chatUpdateCurrentConversationHeader();
+                chatRenderMessages();
+            }
+            chatStartAutoRefreshTimer();
+            chatStartMonitorTimer();
+            return;
+        }
         chatState.initialized = true;
         chatSetControlsDisabled(false);
 
@@ -6482,14 +6570,14 @@
         chatUpdateTriggerUnreadUi();
         chatRenderConversationList();
         chatRenderMessages();
-        chatSetStatus('聊天室初始化中...');
+        if (!silent) chatSetStatus('聊天室初始化中...');
 
-        await chatLoadInfo({silent: false, preserveSelection: false});
-        if (chatState.activeKey) {
-            chatSelectConversation(chatState.activeKey, {forceRefresh: true});
-        } else if (chatState.conversations.length > 0) {
-            chatSelectConversation(chatState.conversations[0].key, {forceRefresh: true});
-        } else {
+        await chatLoadInfo({silent, preserveSelection});
+        if (autoSelect && chatState.activeKey) {
+            chatSelectConversation(chatState.activeKey, {forceRefresh: forceRefreshActive});
+        } else if (autoSelect && chatState.conversations.length > 0) {
+            chatSelectConversation(chatState.conversations[0].key, {forceRefresh: forceRefreshActive});
+        } else if (!chatState.conversations.length && !silent) {
             chatSetStatus('未发现可用会话，可点击“重载列表”重试');
         }
         chatStartAutoRefreshTimer();
@@ -6499,6 +6587,34 @@
             chatStopAutoRefreshTimer();
             chatStopMonitorTimer();
         }, {once: true});
+    }
+
+    let chatBackgroundSyncTimer = null;
+
+    function chatScheduleBackgroundMonitorSync(delayMs = 0) {
+        if (chatBackgroundSyncTimer) {
+            window.clearTimeout(chatBackgroundSyncTimer);
+            chatBackgroundSyncTimer = null;
+        }
+        const delay = Math.max(0, Number(delayMs) || 0);
+        chatBackgroundSyncTimer = window.setTimeout(async () => {
+            chatBackgroundSyncTimer = null;
+            if (document.visibilityState === 'hidden') return;
+            try {
+                await initChatroomFeature({
+                    silent: true,
+                    preserveSelection: true,
+                    autoSelect: false,
+                    forceRefreshActive: false,
+                });
+                chatStartMonitorTimer();
+                await chatLoadInfo({silent: true, preserveSelection: true});
+                await chatProbeActivityChangedConversations(20);
+                await chatRunMonitorTick();
+            } catch (error) {
+                console.warn('[BN] Failed to sync chat background monitor', error);
+            }
+        }, delay);
     }
 
     const JOIN_PLAN_DETAIL_TEXT = `加入 Better Names 计划将会把您的基本个人信息（姓名、班级、性别、用户名、邮箱、学校、座位、教练、电话号码）公开给也加入此项目的同学，所有加入此项目的人均可用 ./better_names 查看所有其他人的这些信息，以便 Better Names 的数据库更新。
@@ -6835,6 +6951,12 @@
         refreshJoinPlanStatus();
     }
     chatSetWindowVisible(false);
+    chatScheduleBackgroundMonitorSync(1500);
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') chatScheduleBackgroundMonitorSync(100);
+    });
+    window.addEventListener('focus', () => chatScheduleBackgroundMonitorSync(100));
+    window.addEventListener('pageshow', () => chatScheduleBackgroundMonitorSync(100));
     // 初次遍历
     document.querySelectorAll(USER_LINK_SELECTOR).forEach(processUserLink);
     document.querySelectorAll('#vueAppFuckSafari > tbody > tr > td:nth-child(2) > a > span').forEach(processProblemTitle)
