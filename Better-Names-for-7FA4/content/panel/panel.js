@@ -178,8 +178,11 @@
     const manifestVersion = normalizeVersionString(readManifestVersion());
     const manifestVersionInfo = parseComparableVersion(manifestVersion);
     const WELCOME_SEEN_VERSION_KEY = 'bn.welcome.seenVersion';
+    const WELCOME_BASE_VERSION = '2026.07';
+    const WELCOME_PATCH_VERSION = '2026.07.01';
+    const WELCOME_PATCH_TITLE = '新增补丁 Better Names for 7FA4 2026.07.01';
     const WELCOME_CHANGELOG_CODE_NAME = '好久不见';
-    const WELCOME_CHANGELOG_ITEMS = [
+    const WELCOME_CHANGELOG_2026_07_ITEMS = [
         {
             text: '添加并修复聊天室功能。',
             children: [
@@ -201,9 +204,11 @@
         {text: '修复配置面板在未修改设置时仍显示“保存配置”和“取消更改”的问题。'},
         {text: '修复默认关闭自定义颜色时用户颜色不渲染的问题。'},
         {text: '调整默认年级用户颜色显示效果。'},
-        {text: '移除历史代码高亮样式，改为可选启用内置浅色代码主题或上传 CSS。'},
         {text: '更换彩蛋。'},
         {text: '新增首次加载版本欢迎弹窗，展示 2026.07 更新内容。'},
+    ];
+    const WELCOME_CHANGELOG_2026_07_01_ITEMS = [
+        {text: '移除历史代码高亮样式，改为可选启用内置浅色代码主题或上传 CSS。'},
     ];
     const isSupportedHostname = (host) => {
         if (typeof host !== 'string' || !host) return false;
@@ -1370,13 +1375,40 @@
         }).join('');
     }
 
-    function shouldShowFirstLoadWelcome() {
-        if (!manifestVersion) return false;
+    function renderWelcomeChangelogSections(sections) {
+        return sections.map(section => `
+            <section class="bn-welcome-changelog-section">
+                <h3>${escapeHtml(section.title)}</h3>
+                <ul>${renderWelcomeChangelogItems(section.items)}</ul>
+            </section>
+        `).join('');
+    }
+
+    function readWelcomeSeenVersion() {
         try {
-            return String(GM_getValue(WELCOME_SEEN_VERSION_KEY, '') || '') !== manifestVersion;
+            return normalizeVersionString(String(GM_getValue(WELCOME_SEEN_VERSION_KEY, '') || ''));
         } catch (_) {
-            return false;
+            return '';
         }
+    }
+
+    function shouldShowFirstLoadWelcome() {
+        return Boolean(manifestVersion && readWelcomeSeenVersion() !== manifestVersion);
+    }
+
+    function getWelcomeChangelogSections(seenVersion) {
+        const sections = [];
+        if (normalizeVersionString(seenVersion) !== WELCOME_BASE_VERSION) {
+            sections.push({
+                title: WELCOME_BASE_VERSION,
+                items: WELCOME_CHANGELOG_2026_07_ITEMS,
+            });
+        }
+        sections.push({
+            title: WELCOME_PATCH_VERSION,
+            items: WELCOME_CHANGELOG_2026_07_01_ITEMS,
+        });
+        return sections;
     }
 
     function markFirstLoadWelcomeSeen() {
@@ -1391,6 +1423,9 @@
         if (!document.body || !shouldShowFirstLoadWelcome()) return;
         const existing = document.getElementById('bn-welcome-modal');
         if (existing) return;
+        const seenVersion = readWelcomeSeenVersion();
+        const changelogSections = getWelcomeChangelogSections(seenVersion);
+        const changelogLabel = changelogSections.map(section => section.title).join(' 和 ');
         const modal = document.createElement('div');
         modal.id = 'bn-welcome-modal';
         modal.setAttribute('role', 'dialog');
@@ -1400,11 +1435,11 @@
             <div class="bn-welcome-dialog">
                 <div class="bn-welcome-header">
                     <div class="bn-welcome-kicker">Better Names for 7FA4</div>
-                    <h2 id="bn-welcome-title">隆重推出 Better Names for 7FA4 ${escapeHtml(manifestVersion)}</h2>
+                    <h2 id="bn-welcome-title">${escapeHtml(WELCOME_PATCH_TITLE)}</h2>
                     <div class="bn-welcome-code-name">版本代号：${escapeHtml(WELCOME_CHANGELOG_CODE_NAME)}</div>
                 </div>
-                <div class="bn-welcome-changelog" aria-label="${escapeHtml(manifestVersion)} 更新内容">
-                    <ul>${renderWelcomeChangelogItems(WELCOME_CHANGELOG_ITEMS)}</ul>
+                <div class="bn-welcome-changelog" aria-label="${escapeHtml(changelogLabel)} 更新内容">
+                    ${renderWelcomeChangelogSections(changelogSections)}
                 </div>
                 <div class="bn-welcome-actions">
                     <button type="button" class="bn-welcome-close" data-bn-welcome-close="1">知道了</button>

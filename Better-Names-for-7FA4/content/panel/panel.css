@@ -690,6 +690,20 @@
     padding: 18px 32px 6px;
 }
 
+.bn-welcome-changelog-section + .bn-welcome-changelog-section {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid #dfe7f2;
+}
+
+.bn-welcome-changelog-section h3 {
+    margin: 0 0 10px;
+    color: #12355f;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
 .bn-welcome-changelog ul {
     margin: 0;
     padding-left: 20px;
@@ -775,6 +789,14 @@
 #bn-container.bn-theme-dark ~ #bn-welcome-modal .bn-welcome-code-name,
 #bn-container.bn-theme-dark ~ #bn-welcome-modal .bn-welcome-changelog li li {
     color: #aab8cc;
+}
+
+#bn-container.bn-theme-dark ~ #bn-welcome-modal .bn-welcome-changelog-section + .bn-welcome-changelog-section {
+    border-color: rgba(148, 163, 184, 0.18);
+}
+
+#bn-container.bn-theme-dark ~ #bn-welcome-modal .bn-welcome-changelog-section h3 {
+    color: #dbeafe;
 }
 
 #bn-container.bn-theme-dark ~ #bn-welcome-modal .bn-welcome-changelog li {
