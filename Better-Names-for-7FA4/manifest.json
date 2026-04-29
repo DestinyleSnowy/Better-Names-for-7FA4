@@ -137,7 +137,9 @@
         "data/users.json",
         "data/special_users.json",
         "content/panel/panel.html",
-        "content/panel/avatar-blocker.js"
+        "content/panel/avatar-blocker.js",
+        "content/libs/prism-light.css",
+        "content/libs/prism-dark.css"
       ],
       "matches": [
         "<all_urls>"

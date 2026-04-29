@@ -736,7 +736,6 @@
 
     const palette = Object.assign({}, palettes.light, useCustomColors ? storedPalette : {});
     let currentThemeMode = themeMode;
-
     const runtimeApi = (typeof browser !== 'undefined' && browser.runtime && typeof browser.runtime.getURL === 'function') ? browser.runtime : ((typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function') ? chrome.runtime : null);
 
     async function fetchPanelTemplate() {
@@ -757,6 +756,14 @@
             return FALLBACK_PANEL_TEMPLATE;
         }
     }
+    
+    async function addPrismCSS() {
+        const path = `content/libs/prism-${currentThemeMode}.css`;
+        const url = runtimeApi.getURL(path);
+        const response = await fetch(url);
+        GM_addStyle(await response.text());
+    }
+    addPrismCSS();
 
     const colorInputsHTML = COLOR_KEYS.map(k => `
     <div class="bn-color-item">
@@ -3282,7 +3289,30 @@
         return out;
     }
 
-    async function loadUsersData() {
+    async function __getShowName(user) {
+        let add;
+        if (showUserRealname !== null && user.real_name) {
+            add = user.real_name;
+            if (user[showUserRealname]) add += `（${user[showUserRealname]}）`;
+        } else {
+            add = user[showUser];
+        }
+        return add;
+    }
+
+    async function getShowNames() {
+        const chatInfo = await fetch("/chat/info");
+        const response = (await chatInfo.json()).friends;
+        let ret = {};
+        for (let user of response.concat(await fetchBetterNamesUsers())){
+            if (ret[user.id] === undefined) {
+                ret[user.id] = await __getShowName(user);
+            }
+        }
+        return ret;
+    }
+
+    async function loadUsersData(get) {
         const urls = [];
         if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function') {
             try {
@@ -3412,9 +3442,29 @@
         }
     }
 
-    let [users, specialRules] = await Promise.all([loadUsersData(), loadSpecialRules(),]);
+    let [users, specialRules] = await Promise.all([loadUsersData(GM_getValue("useCustomColors")), loadSpecialRules(),]);
     applySpecialRules(users, specialRules);
+    let shownames = await getShowNames();
 
+    async function getShowName(uid, arg) {
+        if (shownames[uid] !== undefined)
+            return shownames[uid] ?? arg;
+        if (showUser === "username") {
+            const htmlres = await fetch(`/user/${uid}`);
+            const html = await htmlres.text();
+            arg = html.match(/<title>(.*) - 用户.*<\/title>/)[1];
+            shownames[uid] = arg;
+        } else if (showUser === "nickname") {
+            const htmlres = await fetch(`/user/${uid}`);
+            const html = await htmlres.text();
+            arg = html.match(/<h4.*>\s*昵称\s*<\/h4>\s*<div.*>(.*?)<\/div>/)
+                ?? html.match(/<h4.*>\s*昵称 \/ 姓名\s*<\/h4><div.*>(.*) \/ .* \/ .*<\/div>/);
+            if (arg) arg = arg[1];
+            else throw new Error("Can't find nickname");
+            shownames[uid] = arg;
+        }
+        return arg;
+    }
     function firstVisibleCharOfTitle() {
         const h1 = document.querySelector('body > div:nth-child(2) > div > div.ui.center.aligned.grid > div > h1');
         if (!h1) return '';
@@ -3748,31 +3798,6 @@
         }, true);
     }
 
-    function extractOriginalNickname(rawText) {
-        if (typeof rawText !== 'string') return '';
-        let normalized = rawText.replace(/[\u00A0\s]+/g, ' ');
-        normalized = normalized.trim();
-        if (!normalized) return '';
-        const fullIdx = normalized.indexOf('（');
-        const halfIdx = normalized.indexOf('(');
-        let firstParenIdx;
-        if (fullIdx >= 0 && halfIdx >= 0) {
-            firstParenIdx = Math.min(fullIdx, halfIdx);
-        } else {
-            firstParenIdx = Math.max(fullIdx, halfIdx);
-        }
-        if (firstParenIdx > 0) {
-            const prefix = normalized.slice(0, firstParenIdx).trim();
-            if (prefix) return prefix;
-        }
-        const match = normalized.match(/[（(]\s*([^（）()]+?)\s*[）)]/);
-        if (match && match[1]) {
-            const inner = match[1].trim();
-            if (inner) return inner;
-        }
-        return '';
-    }
-
     function parseColorToRgb(color) {
         if (typeof color !== 'string') return null;
         const value = color.trim();
@@ -3946,14 +3971,19 @@
         a.querySelectorAll('.bn-icon').forEach(el => el.remove());
         a.querySelectorAll('.bn-user-tags').forEach(el => el.remove());
 
-        let combinedName = defaultSource;
         if (info) {
-            combinedName = typeof info.name === 'string' ? info.name : (defaultSource || '');
-            if (showUserNickname && originalNickname) {
-                combinedName += `（${originalNickname}）`;
-            }
-            if (info.colorKey === "clear") a.style.color = '';
-            else {
+            getShowName(uid, null).then(
+                (name) => {
+                    if (name) {
+                        a.childNodes.forEach(n => {
+                            if (n.nodeType === Node.TEXT_NODE) n.remove();
+                        });
+                        a.innerHTML += name;
+                    }
+                }
+            )
+
+            if (info.colorKey === "clear") a.style.color = ''; else {
                 const c = palette[info.colorKey];
                 if (c) a.style.color = c;
             }
@@ -5797,7 +5827,15 @@
         return NaN;
     }
 
-    function chatRebuildStateFromInfo(payload) {
+    function asyncForeach(array, func) {
+        let promises = [];
+        array.forEach((el) => {
+            promises.push(func(el));
+        })
+        return Promise.all(promises);
+    }
+
+    async function chatRebuildStateFromInfo(payload) {
         const info = payload && typeof payload === 'object' ? payload : {};
         const limit = info.limit && typeof info.limit === 'object' ? info.limit : {};
         const friends = Array.isArray(info.friends) ? info.friends : [];
@@ -5838,7 +5876,7 @@
             });
         });
 
-        groups.forEach((group) => {
+        await asyncForeach(groups, async (group) => {
             if (!group || typeof group !== 'object') return;
             const gid = chatToInteger(group.id ?? group.group_id);
             if (!Number.isFinite(gid) || gid <= 0) return;
@@ -5848,11 +5886,10 @@
             const membersName = [];
             const administratorsName = [];
             let ownerName;
-
-            members.forEach((member) => {
+            await asyncForeach(members, async (member) => {
                 const uid = chatToInteger(member && (member.id ?? member.user_id ?? member.uid));
                 if (!Number.isFinite(uid) || uid <= 0) return;
-                const memberName = chatDisplayNameForMember(member, uid);
+                const memberName = await getShowName(uid, `用户 ${uid}`);
                 const showMemberHtml = `<a href="/user/${uid}">${escapeHtml(memberName)}</a>`;
                 if (member.type === "Owner") ownerName = showMemberHtml; else (member.type === "Member" ? membersName : administratorsName).push(showMemberHtml);
                 if (!chatState.userNameById.has(uid) || !chatState.userNameById.get(uid)) {
