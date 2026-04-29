@@ -242,6 +242,29 @@
                             </label>
                         </div>
                     </div>
+                    <label class="bn-section-toggle"><input type="checkbox" id="bn-code-theme-enabled"/>
+                        启用自定义代码高亮主题</label>
+                    <div id="bn-code-theme-options" hidden>
+                        <div class="bn-theme-mode" role="radiogroup" aria-label="代码高亮主题来源">
+                            <div class="bn-theme-mode-label">代码主题</div>
+                            <div class="bn-theme-mode-options" role="group" aria-label="代码高亮主题来源切换">
+                                <label class="bn-theme-mode-option">
+                                    <input type="radio" name="bn-code-theme-source" value="builtin" checked/>
+                                    <span class="bn-theme-mode-chip">内置</span>
+                                </label>
+                                <label class="bn-theme-mode-option">
+                                    <input type="radio" name="bn-code-theme-source" value="custom"/>
+                                    <span class="bn-theme-mode-chip">上传 CSS</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="bn-bg-local-row" id="bn-custom-css-row" hidden>
+                            <input type="file" id="bn-custom-css-file" accept=".css,text/css" hidden>
+                            <button type="button" class="bn-btn" id="bn-custom-css-file-btn">上传自定义 CSS</button>
+                            <span class="bn-bg-file-name" id="bn-custom-css-file-name">未上传 CSS</span>
+                            <button type="button" class="bn-btn-link" id="bn-custom-css-clear">清除</button>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="bn-section-column bn-section-column-right">

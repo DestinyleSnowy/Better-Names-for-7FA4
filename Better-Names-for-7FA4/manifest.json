@@ -55,8 +55,7 @@
       ],
       "css": [
         "content/panel/panel.css",
-        "content/libs/katex/katex.min.css",
-        "content/libs/prism.css"
+        "content/libs/katex/katex.min.css"
       ],
       "js": [
         "content/libs/marked.min.js",
@@ -117,8 +116,7 @@
         "http://211.137.101.118:8888/user/*"
       ],
       "css": [
-        "content/libs/katex/katex.min.css",
-        "content/libs/prism.css"
+        "content/libs/katex/katex.min.css"
       ],
       "js": [
         "content/libs/marked.min.js",

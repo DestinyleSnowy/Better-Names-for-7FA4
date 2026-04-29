@@ -54,6 +54,10 @@
         [CORNER_KEY]: 'br',
         useCustomColors: false,
         userPalette: {},
+        codeThemeEnabled: false,
+        codeThemeSource: 'builtin',
+        customThemeCss: '',
+        customThemeCssName: '',
     });
 
     const readConfigValue = (key) => {
@@ -135,6 +139,10 @@
     const storedBgBlur = readConfigValue('bg_blur');
     const storedThemeModeRaw = readConfigValue('panelThemeMode');
     const storedThemeColorRaw = readConfigValue('themeColor');
+    const storedCodeThemeEnabledRaw = readConfigValue('codeThemeEnabled');
+    const storedCodeThemeSourceRaw = readConfigValue('codeThemeSource');
+    const storedCustomThemeCssRaw = readConfigValue('customThemeCss');
+    const storedCustomThemeCssNameRaw = readConfigValue('customThemeCssName');
     const storedTitleUnits = readConfigValue('maxTitleUnits');
     const storedUserUnits = readConfigValue('maxUserUnits');
     let templateBulkRetryTimer = null;
@@ -193,6 +201,7 @@
         {text: '修复配置面板在未修改设置时仍显示“保存配置”和“取消更改”的问题。'},
         {text: '修复默认关闭自定义颜色时用户颜色不渲染的问题。'},
         {text: '调整默认年级用户颜色显示效果。'},
+        {text: '移除历史代码高亮样式，改为可选启用内置浅色代码主题或上传 CSS。'},
         {text: '更换彩蛋。'},
         {text: '新增首次加载版本欢迎弹窗，展示 2026.07 更新内容。'},
     ];
@@ -308,6 +317,7 @@
     };
     const BN_TABLE_ROWS_SELECTOR = 'table.ui.very.basic.center.aligned.table tbody tr';
     const MAX_LOCAL_BG_SIZE = 2 * 1024 * 1024;
+    const MAX_CUSTOM_CSS_SIZE = 256 * 1024;
 
     const RENEW_PATH_RE = /^\/problems\/tag\/(\d+)\/?$/;
     const RENEW_SUFFIX_RE = /\/renew\/?$/;
@@ -455,6 +465,11 @@
         return 'light';
     }
 
+    function normalizeCodeThemeSource(value) {
+        if (typeof value === 'string' && value.toLowerCase() === 'custom') return 'custom';
+        return 'builtin';
+    }
+
     function ensureBody(callback) {
         if (document.body) {
             callback();
@@ -509,6 +524,10 @@
     const normalizedBgFileName = typeof storedBgImageDataName === 'string' ? storedBgImageDataName : '';
     const normalizedBgOpacity = String(clampOpacity(storedBgOpacity));
     const normalizedBgBlur = clampBlur(storedBgBlur);
+    const normalizedCodeThemeEnabled = !!storedCodeThemeEnabledRaw;
+    const normalizedCodeThemeSource = normalizeCodeThemeSource(storedCodeThemeSourceRaw);
+    const normalizedCustomThemeCss = typeof storedCustomThemeCssRaw === 'string' ? storedCustomThemeCssRaw : '';
+    const normalizedCustomThemeCssName = typeof storedCustomThemeCssNameRaw === 'string' ? storedCustomThemeCssNameRaw : '';
     const initialBackgroundSource = (normalizedBgSourceType === 'local' && normalizedBgData) ? normalizedBgData : normalizedBgUrl;
     applyBackgroundOverlay(storedBgEnabled, normalizedBgfillway, initialBackgroundSource, normalizedBgOpacity, normalizedBgBlur);
 
@@ -776,6 +795,14 @@
     const themeColorInput = document.getElementById('bn-theme-color');
     const themeColorHexInput = document.getElementById('bn-theme-color-hex');
     const themeModeRadios = container.querySelectorAll('input[name="bn-theme-mode"]');
+    const codeThemeEnabledInput = document.getElementById('bn-code-theme-enabled');
+    const codeThemeOptions = document.getElementById('bn-code-theme-options');
+    const codeThemeSourceRadios = container.querySelectorAll('input[name="bn-code-theme-source"]');
+    const customCssRow = document.getElementById('bn-custom-css-row');
+    const customCssFileInput = document.getElementById('bn-custom-css-file');
+    const customCssFilePickBtn = document.getElementById('bn-custom-css-file-btn');
+    const customCssFileNameSpan = document.getElementById('bn-custom-css-file-name');
+    const customCssClearBtn = document.getElementById('bn-custom-css-clear');
     const bgEnabledInput = document.getElementById('bn-bg-enabled');
     const bgfillwayInput = document.getElementById('bn-bg-fillway');
     const bgUrlInput = document.getElementById('bn-bg-image-url');
@@ -958,6 +985,10 @@
     let currentBgSourceType = normalizedBgSourceType;
     let currentBgImageData = normalizedBgData;
     let currentBgImageDataName = normalizedBgFileName;
+    let currentCodeThemeEnabled = normalizedCodeThemeEnabled;
+    let currentCodeThemeSource = normalizedCodeThemeSource;
+    let currentCustomThemeCss = normalizedCustomThemeCss;
+    let currentCustomThemeCssName = normalizedCustomThemeCssName;
     let fireworksEngine = null;
     let fireworksActiveTimer = null;
     let birthdayWishTimer = null;
@@ -1722,12 +1753,20 @@
         bgSourceType: normalizedBgSourceType,
         bgOpacity: normalizedBgOpacity,
         bgBlur: normalizedBgBlur,
+        codeThemeEnabled: normalizedCodeThemeEnabled,
+        codeThemeSource: normalizedCodeThemeSource,
+        customThemeCss: normalizedCustomThemeCss,
+        customThemeCssName: normalizedCustomThemeCssName,
         btEnabled: btEnabled,
         btInterval: storedBtInterval
     };
     currentBgSourceType = originalConfig.bgSourceType;
     currentBgImageData = originalConfig.bgImageData;
     currentBgImageDataName = originalConfig.bgImageDataName;
+    currentCodeThemeEnabled = originalConfig.codeThemeEnabled;
+    currentCodeThemeSource = originalConfig.codeThemeSource;
+    updateCodeThemeUI();
+    updateCustomCssUI();
 
     if (!enableGuard) {
         disableNeedWarn();
@@ -2563,10 +2602,12 @@
         } else if (originalConfig.bgSourceType !== 'remote' || currentBgUrl !== originalConfig.bgImageUrl) {
             bgSourceChanged = true;
         }
+        const codeThemeChanged = currentCodeThemeEnabled !== originalConfig.codeThemeEnabled || currentCodeThemeSource !== originalConfig.codeThemeSource;
+        const customCssChanged = currentCustomThemeCss !== originalConfig.customThemeCss || (currentCustomThemeCssName || '') !== (originalConfig.customThemeCssName || '');
         const currentBtEnabled = getHiToiletEnabledState();
         const templateBulkAddChk = document.getElementById('bn-enable-template-bulk-add');
 
-        const changed = (document.getElementById('bn-enable-title-truncate').checked !== originalConfig.titleTruncate) || (document.getElementById('bn-enable-user-truncate').checked !== originalConfig.userTruncate) || (document.getElementById('bn-enable-title-truncate').checked && ti !== originalConfig.maxTitleUnits) || (document.getElementById('bn-enable-user-truncate').checked && ui !== originalConfig.maxUserUnits) || (document.getElementById('bn-hide-avatar').checked !== originalConfig.hideAvatar) || (document.getElementById('bn-enable-copy').checked !== originalConfig.enableCopy) || (document.getElementById('bn-enable-desc-copy').checked !== originalConfig.enableDescCopy) || (document.getElementById('bn-hide-orig').checked !== originalConfig.hideOrig) || (document.getElementById('bn-enable-contest-download').checked !== originalConfig.enableContestDownloadButtons) || (document.getElementById('bn-enable-contest-review').checked !== originalConfig.enableContestReviewButtons) || (document.getElementById('bn-show-user-nickname').checked !== originalConfig.showUserNickname) || ((document.getElementById('bn-default-hide-submitted-homework')?.checked ?? originalConfig.defaultHideSubmittedHomework) !== originalConfig.defaultHideSubmittedHomework) || (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) || ((templateBulkAddChk ? templateBulkAddChk.checked : originalConfig.enableTemplateBulkAdd) !== originalConfig.enableTemplateBulkAdd) || (document.getElementById('bn-enable-renew').checked !== originalConfig.enableAutoRenew) || (document.getElementById('bn-enable-ranking-filter').checked !== originalConfig.enableRankingFilter) || (document.getElementById('bn-enable-column-switch').checked !== originalConfig.columnSwitchEnabled) || (document.getElementById('bn-enable-merge-assistant').checked !== originalConfig.mergeAssistantEnabled) || (document.getElementById('bn-enable-vj').checked !== originalConfig.enableVjLink) || (document.getElementById('bn-hide-done-skip').checked !== originalConfig.hideDoneSkip) || (document.getElementById('bn-enable-quick-skip').checked !== originalConfig.enableQuickSkip) || ((document.getElementById('bn-enable-user-plan-date-navigator')?.checked ?? originalConfig.enableUserPlanDateNavigator) !== originalConfig.enableUserPlanDateNavigator) || (document.getElementById('bn-enable-title-optimization').checked !== originalConfig.enableTitleOptimization) || (document.getElementById('bn-use-custom-color').checked !== originalConfig.useCustomColors) || ((document.getElementById('bn-width-mode')?.value ?? originalConfig.widthMode) !== originalConfig.widthMode) || (currentBgEnabled !== originalConfig.bgEnabled) || bgSourceChanged || (currentBgfillway !== originalConfig.bgfillway) || (currentBgOpacity !== originalConfig.bgOpacity) || (clampBlur(currentBgBlur) !== clampBlur(originalConfig.bgBlur)) || (currentBtEnabled !== originalConfig.btEnabled) || (hiToiletIntervalInput && clampHiToiletInterval(hiToiletIntervalInput.value) !== originalConfig.btInterval) || (getSelectedThemeMode() !== originalConfig.themeMode) || themeColorChanged || paletteChanged;
+        const changed = (document.getElementById('bn-enable-title-truncate').checked !== originalConfig.titleTruncate) || (document.getElementById('bn-enable-user-truncate').checked !== originalConfig.userTruncate) || (document.getElementById('bn-enable-title-truncate').checked && ti !== originalConfig.maxTitleUnits) || (document.getElementById('bn-enable-user-truncate').checked && ui !== originalConfig.maxUserUnits) || (document.getElementById('bn-hide-avatar').checked !== originalConfig.hideAvatar) || (document.getElementById('bn-enable-copy').checked !== originalConfig.enableCopy) || (document.getElementById('bn-enable-desc-copy').checked !== originalConfig.enableDescCopy) || (document.getElementById('bn-hide-orig').checked !== originalConfig.hideOrig) || (document.getElementById('bn-enable-contest-download').checked !== originalConfig.enableContestDownloadButtons) || (document.getElementById('bn-enable-contest-review').checked !== originalConfig.enableContestReviewButtons) || (document.getElementById('bn-show-user-nickname').checked !== originalConfig.showUserNickname) || ((document.getElementById('bn-default-hide-submitted-homework')?.checked ?? originalConfig.defaultHideSubmittedHomework) !== originalConfig.defaultHideSubmittedHomework) || (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) || ((templateBulkAddChk ? templateBulkAddChk.checked : originalConfig.enableTemplateBulkAdd) !== originalConfig.enableTemplateBulkAdd) || (document.getElementById('bn-enable-renew').checked !== originalConfig.enableAutoRenew) || (document.getElementById('bn-enable-ranking-filter').checked !== originalConfig.enableRankingFilter) || (document.getElementById('bn-enable-column-switch').checked !== originalConfig.columnSwitchEnabled) || (document.getElementById('bn-enable-merge-assistant').checked !== originalConfig.mergeAssistantEnabled) || (document.getElementById('bn-enable-vj').checked !== originalConfig.enableVjLink) || (document.getElementById('bn-hide-done-skip').checked !== originalConfig.hideDoneSkip) || (document.getElementById('bn-enable-quick-skip').checked !== originalConfig.enableQuickSkip) || ((document.getElementById('bn-enable-user-plan-date-navigator')?.checked ?? originalConfig.enableUserPlanDateNavigator) !== originalConfig.enableUserPlanDateNavigator) || (document.getElementById('bn-enable-title-optimization').checked !== originalConfig.enableTitleOptimization) || (document.getElementById('bn-use-custom-color').checked !== originalConfig.useCustomColors) || codeThemeChanged || customCssChanged || ((document.getElementById('bn-width-mode')?.value ?? originalConfig.widthMode) !== originalConfig.widthMode) || (currentBgEnabled !== originalConfig.bgEnabled) || bgSourceChanged || (currentBgfillway !== originalConfig.bgfillway) || (currentBgOpacity !== originalConfig.bgOpacity) || (clampBlur(currentBgBlur) !== clampBlur(originalConfig.bgBlur)) || (currentBtEnabled !== originalConfig.btEnabled) || (hiToiletIntervalInput && clampHiToiletInterval(hiToiletIntervalInput.value) !== originalConfig.btInterval) || (getSelectedThemeMode() !== originalConfig.themeMode) || themeColorChanged || paletteChanged;
 
         saveActions.classList.toggle('bn-visible', changed);
     }
@@ -2732,6 +2773,17 @@
         });
         GM_setValue('userPalette', JSON.stringify(obj));
         GM_setValue('useCustomColors', chkUseColor.checked);
+        GM_setValue('codeThemeEnabled', currentCodeThemeEnabled);
+        GM_setValue('codeThemeSource', currentCodeThemeSource);
+        GM_setValue('customThemeCss', currentCustomThemeCss);
+        GM_setValue('customThemeCssName', currentCustomThemeCssName);
+        if (typeof window.__BN_applyCodeThemePreference === 'function') {
+            window.__BN_applyCodeThemePreference(currentCodeThemeEnabled, currentCodeThemeSource, currentCustomThemeCss);
+        }
+        originalConfig.codeThemeEnabled = currentCodeThemeEnabled;
+        originalConfig.codeThemeSource = currentCodeThemeSource;
+        originalConfig.customThemeCss = currentCustomThemeCss;
+        originalConfig.customThemeCssName = currentCustomThemeCssName;
         const themeColorValue = themeColorInput ? normalizeHexColor(themeColorInput.value, originalConfig.themeColor) : originalConfig.themeColor;
         GM_setValue('themeColor', themeColorValue);
         container.style.setProperty('--bn-theme-color', themeColorValue);
@@ -2857,6 +2909,16 @@
         currentBgSourceType = originalConfig.bgSourceType;
         currentBgImageData = originalConfig.bgImageData;
         currentBgImageDataName = originalConfig.bgImageDataName;
+        currentCodeThemeEnabled = originalConfig.codeThemeEnabled;
+        currentCodeThemeSource = originalConfig.codeThemeSource;
+        currentCustomThemeCss = originalConfig.customThemeCss;
+        currentCustomThemeCssName = originalConfig.customThemeCssName;
+        updateCodeThemeUI();
+        updateCustomCssUI();
+        if (typeof window.__BN_applyCodeThemePreference === 'function') {
+            window.__BN_applyCodeThemePreference(currentCodeThemeEnabled, currentCodeThemeSource, currentCustomThemeCss);
+        }
+        if (customCssFileInput) customCssFileInput.value = '';
         if (bgFileInput) bgFileInput.value = '';
         if (bgOpacityInput) bgOpacityInput.value = originalConfig.bgOpacity;
         if (bgOpacityValueSpan) bgOpacityValueSpan.textContent = formatOpacityText(originalConfig.bgOpacity);
@@ -2872,6 +2934,81 @@
     document.getElementById('bn-cancel-changes').onclick = () => {
         restoreOriginalConfig();
     };
+
+    if (codeThemeEnabledInput) {
+        codeThemeEnabledInput.addEventListener('change', () => {
+            currentCodeThemeEnabled = !!codeThemeEnabledInput.checked;
+            updateCodeThemeUI();
+            applyCodeThemePreview();
+            checkChanged();
+        });
+    }
+    if (codeThemeSourceRadios && codeThemeSourceRadios.length) {
+        codeThemeSourceRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                currentCodeThemeSource = getSelectedCodeThemeSource();
+                updateCodeThemeUI();
+                applyCodeThemePreview();
+                checkChanged();
+            });
+        });
+    }
+
+    if (customCssFilePickBtn && customCssFileInput) {
+        customCssFilePickBtn.addEventListener('click', () => customCssFileInput.click());
+    }
+    if (customCssFileInput) {
+        customCssFileInput.addEventListener('change', () => {
+            const file = customCssFileInput.files && customCssFileInput.files[0];
+            if (!file) return;
+            const isCssFile = /\.css$/i.test(file.name || '') || file.type === 'text/css';
+            if (!isCssFile) {
+                if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+                    window.alert('仅支持上传 CSS 文件。');
+                }
+                customCssFileInput.value = '';
+                return;
+            }
+            if (file.size > MAX_CUSTOM_CSS_SIZE) {
+                const maxSizeKb = Math.round(MAX_CUSTOM_CSS_SIZE / 1024);
+                if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+                    window.alert(`CSS 文件大小超过 ${maxSizeKb} KB，请选择更小的文件。`);
+                }
+                customCssFileInput.value = '';
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = () => {
+                try {
+                    currentCustomThemeCss = typeof reader.result === 'string' ? reader.result : '';
+                    currentCustomThemeCssName = file.name || '';
+                    updateCustomCssUI();
+                    applyCodeThemePreview();
+                    checkChanged();
+                } finally {
+                    customCssFileInput.value = '';
+                }
+            };
+            reader.onerror = () => {
+                console.error('[BN] 读取自定义 CSS 失败', reader.error);
+                if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+                    window.alert('读取 CSS 文件失败，请重试。');
+                }
+                customCssFileInput.value = '';
+            };
+            reader.readAsText(file);
+        });
+    }
+    if (customCssClearBtn) {
+        customCssClearBtn.addEventListener('click', () => {
+            if (!currentCustomThemeCss) return;
+            currentCustomThemeCss = '';
+            currentCustomThemeCssName = '';
+            updateCustomCssUI();
+            applyCodeThemePreview();
+            checkChanged();
+        });
+    }
 
     if (bgEnabledInput && bgOpacityInput && bgOpacityValueSpan) {
         const updateBackgroundPreview = () => {
@@ -4181,6 +4318,51 @@
             return isPass || isSkip;
         } catch (e) {
             return false;
+        }
+    }
+
+    function updateCustomCssUI() {
+        if (customCssFileNameSpan) {
+            if (currentCustomThemeCss) {
+                const name = currentCustomThemeCssName || '已上传 CSS';
+                customCssFileNameSpan.textContent = name;
+                customCssFileNameSpan.title = name;
+            } else {
+                customCssFileNameSpan.textContent = '未上传 CSS';
+                customCssFileNameSpan.title = '';
+            }
+        }
+        const canManageCss = !!currentCodeThemeEnabled && currentCodeThemeSource === 'custom';
+        if (customCssFilePickBtn) customCssFilePickBtn.disabled = !canManageCss;
+        if (customCssClearBtn) customCssClearBtn.disabled = !canManageCss || !currentCustomThemeCss;
+    }
+
+    function getSelectedCodeThemeSource() {
+        if (!codeThemeSourceRadios || !codeThemeSourceRadios.length) return currentCodeThemeSource;
+        const active = Array.from(codeThemeSourceRadios).find(radio => radio.checked);
+        return normalizeCodeThemeSource(active ? active.value : currentCodeThemeSource);
+    }
+
+    function syncCodeThemeSourceUI(source) {
+        if (!codeThemeSourceRadios || !codeThemeSourceRadios.length) return;
+        const normalized = normalizeCodeThemeSource(source);
+        codeThemeSourceRadios.forEach(radio => {
+            radio.checked = radio.value === normalized;
+        });
+    }
+
+    function updateCodeThemeUI() {
+        currentCodeThemeSource = normalizeCodeThemeSource(currentCodeThemeSource);
+        if (codeThemeEnabledInput) codeThemeEnabledInput.checked = !!currentCodeThemeEnabled;
+        if (codeThemeOptions) codeThemeOptions.hidden = !currentCodeThemeEnabled;
+        syncCodeThemeSourceUI(currentCodeThemeSource);
+        if (customCssRow) customCssRow.hidden = !currentCodeThemeEnabled || currentCodeThemeSource !== 'custom';
+        updateCustomCssUI();
+    }
+
+    function applyCodeThemePreview() {
+        if (typeof window.__BN_applyCodeThemePreference === 'function') {
+            window.__BN_applyCodeThemePreference(currentCodeThemeEnabled, currentCodeThemeSource, currentCustomThemeCss);
         }
     }
 
