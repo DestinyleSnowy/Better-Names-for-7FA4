@@ -6909,8 +6909,16 @@
 
     document.addEventListener('click', (e) => {
         if (e.target.classList.contains('bn-img-lazy')) {
-            e.target.src = e.target.getAttribute("data-src");
-            access_src.set(e.target.src, true);
+            const rawSrc = e.target.getAttribute("data-src");
+            let safeSrc = null;
+            try {
+                const parsed = new URL(rawSrc, window.location.href);
+                if (parsed.protocol === 'http:' || parsed.protocol === 'https:') safeSrc = parsed.href;
+            } catch (e) {
+            }
+            if (!safeSrc) return;
+            e.target.src = safeSrc;
+            access_src.set(safeSrc, true);
             e.target.classList.remove('bn-img-lazy');
             e.target.parentElement.removeAttribute("data-tooltip");
         }
