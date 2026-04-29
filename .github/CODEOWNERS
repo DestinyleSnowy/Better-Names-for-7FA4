@@ -1,0 +1,12 @@
+# GitHub only uses this file when branch protection enables "Require review from Code Owners".
+# Keep this list small enough that review requests remain actionable.
+
+* @DestinyleSnowy
+
+.github/ @DestinyleSnowy
+Better-Names-for-7FA4/manifest.json @DestinyleSnowy
+Better-Names-for-7FA4/background.js @DestinyleSnowy
+Better-Names-for-7FA4/content/ @DestinyleSnowy
+Better-Names-for-7FA4/data/ @DestinyleSnowy
+database/ @DestinyleSnowy
+build.py @DestinyleSnowy

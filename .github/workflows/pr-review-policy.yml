@@ -1,0 +1,75 @@
+name: PR Review Policy
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  validate-pr-description:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate PR description
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import sys
+
+          with open(os.environ["GITHUB_EVENT_PATH"], "r", encoding="utf-8") as f:
+              event = json.load(f)
+
+          body = event.get("pull_request", {}).get("body") or ""
+
+          required_sections = [
+              "## 改动说明",
+              "## 影响范围",
+              "## 风险与回滚",
+              "## 自测记录",
+              "## 作者检查清单",
+          ]
+          required_checks = [
+              "我已经描述了改动目的和影响范围",
+              "我已经写明自测结果或未自测原因",
+              "我确认没有提交密钥、Cookie、账号信息或本地调试垃圾",
+              "我确认涉及安全、权限、数据库、发布流程或大范围 UI 的改动已经点名请求维护者重点审核",
+          ]
+
+          errors = []
+
+          for section in required_sections:
+              if section not in body:
+                  errors.append(f"缺少 PR 模板章节：{section}")
+
+          for item in required_checks:
+              pattern = re.compile(rf"^- \[[xX]\]\s+{re.escape(item)}\s*$", re.MULTILINE)
+              if not pattern.search(body):
+                  errors.append(f"作者检查清单未勾选：{item}")
+
+          impact_match = re.search(
+              r"## 影响范围(?P<section>.*?)(?:\n## |\Z)",
+              body,
+              re.DOTALL,
+          )
+          impact_checked = impact_match and re.search(
+              r"^- \[[xX]\]\s+",
+              impact_match.group("section"),
+              re.MULTILINE,
+          )
+          if not impact_checked:
+              errors.append("至少需要勾选一个影响范围。")
+
+          if errors:
+              print("PR 描述未通过审核流程检查：")
+              for error in errors:
+                  print(f"- {error}")
+              print("\n请补全 PR 描述。这个检查只保证最低信息量，不能替代人工 review。")
+              sys.exit(1)
+
+          print("PR 描述满足最低审核流程要求。")
+          PY
