@@ -179,8 +179,7 @@
     const manifestVersionInfo = parseComparableVersion(manifestVersion);
     const WELCOME_SEEN_VERSION_KEY = 'bn.welcome.seenVersion';
     const WELCOME_BASE_VERSION = '2026.07';
-    const WELCOME_PATCH_VERSION = '2026.07.01';
-    const WELCOME_PATCH_TITLE = '新增补丁 Better Names for 7FA4 2026.07.01';
+    const WELCOME_PATCH_TITLE = '新增补丁 Better Names for 7FA4 2026.07.02';
     const WELCOME_CHANGELOG_CODE_NAME = '好久不见';
     const WELCOME_CHANGELOG_2026_07_ITEMS = [
         {
@@ -205,10 +204,24 @@
         {text: '修复默认关闭自定义颜色时用户颜色不渲染的问题。'},
         {text: '调整默认年级用户颜色显示效果。'},
         {text: '更换彩蛋。'},
-        {text: '新增首次加载版本欢迎弹窗，展示 2026.07 更新内容。'},
     ];
     const WELCOME_CHANGELOG_2026_07_01_ITEMS = [
         {text: '移除历史代码高亮样式，改为可选启用内置浅色代码主题或上传 CSS。'},
+    ];
+    const WELCOME_CHANGELOG_2026_07_02_ITEMS = [
+        {text: '修复未启用自定义代码高亮主题时，网站原先代码配色会闪一下后消失的问题。'},
+        {text: '修复 “格式化代码” 按钮在不开启自定义主题位置便宜的问题'},
+        {text: '优化个人计划日期导航样式，支持拖动调整位置。'},
+    ];
+    const WELCOME_PATCH_CHANGELOGS = [
+        {
+            version: '2026.07.01',
+            items: WELCOME_CHANGELOG_2026_07_01_ITEMS,
+        },
+        {
+            version: '2026.07.02',
+            items: WELCOME_CHANGELOG_2026_07_02_ITEMS,
+        },
     ];
     const isSupportedHostname = (host) => {
         if (typeof host !== 'string' || !host) return false;
@@ -1398,15 +1411,25 @@
 
     function getWelcomeChangelogSections(seenVersion) {
         const sections = [];
-        if (normalizeVersionString(seenVersion) !== WELCOME_BASE_VERSION) {
+        const normalizedSeenVersion = normalizeVersionString(seenVersion);
+        const seenVersionInfo = parseComparableVersion(normalizedSeenVersion);
+        const baseVersionInfo = parseComparableVersion(WELCOME_BASE_VERSION);
+        const shouldShowBase = !seenVersionInfo || !baseVersionInfo || compareParsedVersions(baseVersionInfo, seenVersionInfo) > 0;
+        if (shouldShowBase) {
             sections.push({
                 title: WELCOME_BASE_VERSION,
                 items: WELCOME_CHANGELOG_2026_07_ITEMS,
             });
         }
-        sections.push({
-            title: WELCOME_PATCH_VERSION,
-            items: WELCOME_CHANGELOG_2026_07_01_ITEMS,
+        WELCOME_PATCH_CHANGELOGS.forEach(section => {
+            const patchVersionInfo = parseComparableVersion(section.version);
+            const shouldShowPatch = !seenVersionInfo || !patchVersionInfo || compareParsedVersions(patchVersionInfo, seenVersionInfo) > 0;
+            if (shouldShowPatch) {
+                sections.push({
+                    title: section.version,
+                    items: section.items,
+                });
+            }
         });
         return sections;
     }
@@ -5140,7 +5163,9 @@
         chatUpdateInputCounter();
         if (!chatInputPreviewEl || !chatIsPreviewVisible()) return;
         WriteCleanHTML(chatInputPreviewEl, chatInputEl.value || '');
-        Prism.highlightAll();
+        if (typeof window.__BN_highlightCodeTheme === 'function') {
+            window.__BN_highlightCodeTheme(chatInputPreviewEl);
+        }
         if (!chatInputPreviewEl.innerHTML.trim()) chatInputPreviewEl.innerHTML = "<span style=\"color: #1e2a40; opacity: 0.5; user-select: none; padding: 10px 10px;\">预览</span>";
     }
 
@@ -5731,7 +5756,9 @@
             chatMessageListEl.appendChild(row);
         });
 
-        Prism.highlightAll();
+        if (typeof window.__BN_highlightCodeTheme === 'function') {
+            window.__BN_highlightCodeTheme(chatMessageListEl);
+        }
 
         if (forceScrollBottom || (!preserveScroll)) {
             chatMessagesScrollToBottom();
@@ -7074,15 +7101,17 @@
         }, 300);
         checkLoad();
     }, {passive: true});
-    for (let el of document.querySelectorAll("pre")) addPrism(el);
-    for (let el of document.querySelectorAll(".hljs")) el.classList.remove("hljs");
-    Prism.highlightAll();
+    if (typeof window.__BN_refreshCodeThemeEnhancements === 'function') {
+        window.__BN_refreshCodeThemeEnhancements();
+    }
     const el = document.querySelector(`a[onclick="toggleFormattedCode()"]`);
     if (el) {
-        const fa = document.getElementById("status_table");
-        fa.appendChild(el);
         el.addEventListener("click", () => {
-            setTimeout(Prism.highlightAll, 100);
+            setTimeout(() => {
+                if (typeof window.__BN_refreshCodeThemeEnhancements === 'function') {
+                    window.__BN_refreshCodeThemeEnhancements();
+                }
+            }, 100);
         });
     }
 })();

@@ -392,13 +392,45 @@ div.code-toolbar > .toolbar > .toolbar-item > span:hover {
             codeThemeStyleEl = null;
             const content = getCodeThemeCss(!!enabled, source, css).trim();
             if (!content) {
+                updateFormattedCodeButtonPosition();
                 cleanupCodeThemeEnhancements();
                 return;
             }
             codeThemeStyleEl = GM_addStyle(content);
             if (codeThemeStyleEl) codeThemeStyleEl.id = 'bn-code-theme-css';
             refreshCodeThemeEnhancements();
+            updateFormattedCodeButtonPosition();
         } catch (e) {
+        }
+    }
+
+    function isCodeThemeEnabled() {
+        return !!currentCodeThemeEnabled;
+    }
+
+    function updateFormattedCodeButtonPosition(root) {
+        try {
+            const scope = root && root.querySelectorAll ? root : document;
+            scope.querySelectorAll('a[onclick*="toggleFormattedCode"]').forEach(button => {
+                if (!Object.prototype.hasOwnProperty.call(button.dataset, 'bnFormattedCodeOriginalStyle')) {
+                    button.dataset.bnFormattedCodeOriginalStyle = button.getAttribute('style') || '';
+                }
+                if (!currentCodeThemeEnabled) {
+                    const originalStyle = button.dataset.bnFormattedCodeOriginalStyle;
+                    if (originalStyle) {
+                        button.setAttribute('style', originalStyle);
+                    } else {
+                        button.removeAttribute('style');
+                    }
+                    delete button.dataset.bnFormattedCodeOriginalStyle;
+                    return;
+                }
+                button.style.position = 'fixed';
+                button.style.top = '72px';
+                button.style.right = '24px';
+                button.style.zIndex = '2147483647';
+            });
+        } catch (_) {
         }
     }
 
@@ -413,12 +445,14 @@ div.code-toolbar > .toolbar > .toolbar-item > span:hover {
             const scope = root || document;
             scope.querySelectorAll('div.code-toolbar').forEach(wrapper => {
                 const pre = Array.from(wrapper.children).find(child => child && child.tagName === 'PRE');
-                if (pre && wrapper.parentNode) {
+                if (!pre || !pre.dataset || pre.dataset.bnCodeThemeEnhanced !== '1') return;
+                if (wrapper.parentNode) {
                     wrapper.parentNode.insertBefore(pre, wrapper);
                 }
                 wrapper.remove();
             });
             scope.querySelectorAll('pre').forEach(pre => {
+                if (!pre.dataset || pre.dataset.bnCodeThemeEnhanced !== '1') return;
                 pre.classList.remove('line-numbers', 'linkable-line-numbers');
                 pre.removeAttribute('data-prismjs-copy');
                 pre.removeAttribute('data-prismjs-copy-error');
@@ -455,7 +489,25 @@ div.code-toolbar > .toolbar > .toolbar-item > span:hover {
         try {
             if (!currentCodeThemeEnabled) return;
             document.querySelectorAll('pre').forEach(pre => addPrism(pre));
+            document.querySelectorAll('.hljs').forEach(el => el.classList.remove('hljs'));
             if (Prism && typeof Prism.highlightAll === 'function') Prism.highlightAll();
+            updateFormattedCodeButtonPosition();
+        } catch (e) {
+        }
+    }
+
+    function highlightCodeTheme(root) {
+        try {
+            if (!currentCodeThemeEnabled) return;
+            const scope = root || document;
+            scope.querySelectorAll('pre').forEach(pre => addPrism(pre));
+            scope.querySelectorAll('.hljs').forEach(el => el.classList.remove('hljs'));
+            if (Prism && typeof Prism.highlightAllUnder === 'function' && scope !== document) {
+                Prism.highlightAllUnder(scope);
+            } else if (Prism && typeof Prism.highlightAll === 'function') {
+                Prism.highlightAll();
+            }
+            updateFormattedCodeButtonPosition(scope);
         } catch (e) {
         }
     }
@@ -749,6 +801,10 @@ div.code-toolbar > .toolbar > .toolbar-item > span:hover {
     window.RenderMarkdown = RenderMarkdown;
     window.addPrism = addPrism;
     window.__BN_applyCodeThemePreference = applyCodeThemePreference;
+    window.__BN_isCodeThemeEnabled = isCodeThemeEnabled;
+    window.__BN_highlightCodeTheme = highlightCodeTheme;
+    window.__BN_refreshCodeThemeEnhancements = refreshCodeThemeEnhancements;
+    window.__BN_updateFormattedCodeButtonPosition = updateFormattedCodeButtonPosition;
     window.getLang = getLang;
     window.WriteCleanHTML = WriteCleanHTML;
     window.GM_addStyle = GM_addStyle;

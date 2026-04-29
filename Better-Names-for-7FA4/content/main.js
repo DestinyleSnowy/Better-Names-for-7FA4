@@ -2583,6 +2583,7 @@ window.getCurrentUserId = getCurrentUserId;
     if (!pathMatch) return;
 
     const SETTING_KEY = 'enableUserPlanDateNavigator';
+    const NAV_POSITION_KEY = 'bn.userPlanDateNavigator.position.v1';
     const STYLE_ID = 'bn-user-plan-date-nav-style';
     const NAV_ID = 'bn-user-plan-date-nav';
     const ELEMENT_NODE = (typeof Node === 'function' && Node.ELEMENT_NODE) || 1;
@@ -2649,7 +2650,7 @@ html.bn-user-plan-page .katex-display {
 #${NAV_ID} {
   position: fixed;
   top: 76px;
-  left: max(10px, calc(50vw - 650px));
+  left: max(10px, calc(50vw - 690px));
   z-index: 99;
   width: 86px;
   max-height: calc(100vh - 104px);
@@ -2659,18 +2660,33 @@ html.bn-user-plan-page .katex-display {
   background: rgba(255, 255, 255, .94);
   box-shadow: 0 10px 28px rgba(0, 0, 0, .10);
   overflow-y: auto;
-  scrollbar-gutter: stable;
-  scrollbar-width: thin;
+  scrollbar-gutter: auto;
+  scrollbar-width: none;
+  scrollbar-color: rgba(34, 36, 38, .20) transparent;
   font-size: 12px;
   line-height: 1.25;
 }
+#${NAV_ID}.is-dragging {
+  opacity: .96;
+  user-select: none;
+  cursor: grabbing;
+}
 #${NAV_ID}::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
+}
+#${NAV_ID}::-webkit-scrollbar-track {
+  background: transparent;
 }
 #${NAV_ID}::-webkit-scrollbar-thumb {
-  background: rgba(34, 36, 38, .22);
+  background: rgba(34, 36, 38, .18);
   border-radius: 999px;
+}
+#${NAV_ID}:hover::-webkit-scrollbar-thumb {
+  background: rgba(34, 36, 38, .30);
+}
+#${NAV_ID}:hover {
+  scrollbar-width: thin;
 }
 #${NAV_ID} .bn-user-plan-date-nav-title {
   margin: 0 0 6px;
@@ -2679,6 +2695,12 @@ html.bn-user-plan-page .katex-display {
   color: rgba(0, 0, 0, .60);
   font-weight: 700;
   text-align: center;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+#${NAV_ID}.is-dragging .bn-user-plan-date-nav-title {
+  cursor: grabbing;
 }
 #${NAV_ID} .bn-user-plan-date-nav-list {
   display: flex;
@@ -2725,6 +2747,7 @@ html.bn-user-plan-page .katex-display {
     align-items: center;
     overflow-x: auto;
     overflow-y: hidden;
+    transform: none !important;
   }
   #${NAV_ID} .bn-user-plan-date-nav-title {
     flex: 0 0 auto;
@@ -2732,6 +2755,8 @@ html.bn-user-plan-page .katex-display {
     padding: 0 8px 0 0;
     border-right: 1px solid rgba(34, 36, 38, .10);
     border-bottom: 0;
+    cursor: default;
+    touch-action: auto;
   }
   #${NAV_ID} .bn-user-plan-date-nav-list {
     flex-direction: row;
@@ -2777,6 +2802,154 @@ html.bn-user-plan-page .katex-display {
         } catch (_) {
             return true;
         }
+    }
+
+    function isCompactNavigatorLayout() {
+        try {
+            return window.matchMedia && window.matchMedia('(max-width: 1320px)').matches;
+        } catch (_) {
+            return window.innerWidth <= 1320;
+        }
+    }
+
+    function getDefaultNavPosition() {
+        return {
+            left: Math.max(10, Math.round(window.innerWidth / 2 - 690)),
+            top: 76,
+        };
+    }
+
+    function normalizeNavPosition(value) {
+        let raw = value;
+        if (typeof raw === 'string') {
+            try {
+                raw = JSON.parse(raw);
+            } catch (_) {
+                return null;
+            }
+        }
+        if (!raw || typeof raw !== 'object') return null;
+        const left = Number(raw.left);
+        const top = Number(raw.top);
+        if (!Number.isFinite(left) || !Number.isFinite(top)) return null;
+        return {left, top};
+    }
+
+    function readStoredNavPosition() {
+        try {
+            return normalizeNavPosition(GM_getValue(NAV_POSITION_KEY, null));
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function saveNavPosition(position) {
+        const normalized = normalizeNavPosition(position);
+        if (!normalized) return;
+        try {
+            GM_setValue(NAV_POSITION_KEY, JSON.stringify({
+                left: Math.round(normalized.left),
+                top: Math.round(normalized.top),
+            }));
+        } catch (_) { /* ignore */
+        }
+    }
+
+    function clampNavPosition(position) {
+        const normalized = normalizeNavPosition(position) || getDefaultNavPosition();
+        const rect = navEl ? navEl.getBoundingClientRect() : {width: 86, height: 320};
+        const margin = 8;
+        const width = Math.max(60, rect.width || 86);
+        const height = Math.max(56, Math.min(rect.height || 320, window.innerHeight - margin * 2));
+        const maxLeft = Math.max(margin, window.innerWidth - width - margin);
+        const maxTop = Math.max(margin, window.innerHeight - Math.min(height, 160) - margin);
+        return {
+            left: Math.min(maxLeft, Math.max(margin, normalized.left)),
+            top: Math.min(maxTop, Math.max(margin, normalized.top)),
+        };
+    }
+
+    function applyNavPosition(position = readStoredNavPosition() || getDefaultNavPosition()) {
+        if (!navEl) return;
+        if (isCompactNavigatorLayout()) {
+            navEl.style.left = '';
+            navEl.style.top = '';
+            navEl.style.right = '';
+            return;
+        }
+        const clamped = clampNavPosition(position);
+        navEl.style.left = `${clamped.left}px`;
+        navEl.style.top = `${clamped.top}px`;
+        navEl.style.right = 'auto';
+    }
+
+    function installNavDrag() {
+        if (!navEl || navEl.dataset.bnDragInstalled === '1') return;
+        navEl.dataset.bnDragInstalled = '1';
+        const handle = navEl.querySelector('.bn-user-plan-date-nav-title') || navEl;
+        let dragState = null;
+
+        const finishDrag = (event) => {
+            if (!dragState) return;
+            const state = dragState;
+            dragState = null;
+            navEl.classList.remove('is-dragging');
+            try {
+                handle.releasePointerCapture?.(state.pointerId);
+            } catch (_) { /* ignore */
+            }
+            document.removeEventListener('pointermove', moveDrag, true);
+            document.removeEventListener('pointerup', finishDrag, true);
+            document.removeEventListener('pointercancel', finishDrag, true);
+            if (event) event.preventDefault();
+            applyNavPosition({left: state.left, top: state.top});
+            saveNavPosition(clampNavPosition({left: state.left, top: state.top}));
+        };
+
+        const moveDrag = (event) => {
+            if (!dragState || event.pointerId !== dragState.pointerId) return;
+            event.preventDefault();
+            const next = clampNavPosition({
+                left: dragState.startLeft + event.clientX - dragState.startX,
+                top: dragState.startTop + event.clientY - dragState.startY,
+            });
+            dragState.left = next.left;
+            dragState.top = next.top;
+            navEl.style.left = `${next.left}px`;
+            navEl.style.top = `${next.top}px`;
+            navEl.style.right = 'auto';
+        };
+
+        handle.addEventListener('pointerdown', (event) => {
+            if (event.button !== 0 || isCompactNavigatorLayout()) return;
+            event.preventDefault();
+            const rect = navEl.getBoundingClientRect();
+            const start = clampNavPosition({left: rect.left, top: rect.top});
+            dragState = {
+                pointerId: event.pointerId,
+                startX: event.clientX,
+                startY: event.clientY,
+                startLeft: start.left,
+                startTop: start.top,
+                left: start.left,
+                top: start.top,
+            };
+            navEl.classList.add('is-dragging');
+            try {
+                handle.setPointerCapture?.(event.pointerId);
+            } catch (_) { /* ignore */
+            }
+            document.addEventListener('pointermove', moveDrag, true);
+            document.addEventListener('pointerup', finishDrag, true);
+            document.addEventListener('pointercancel', finishDrag, true);
+        });
+
+        handle.addEventListener('dblclick', () => {
+            if (isCompactNavigatorLayout()) return;
+            const next = getDefaultNavPosition();
+            applyNavPosition(next);
+            saveNavPosition(next);
+        });
     }
 
     function getLocalIsoDate(date = new Date()) {
@@ -2932,6 +3105,8 @@ html.bn-user-plan-page .katex-display {
             navEl.setAttribute('aria-label', '个人计划日期导航');
             navEl.innerHTML = '<div class="bn-user-plan-date-nav-title">日期</div><div class="bn-user-plan-date-nav-list"></div>';
             document.body.appendChild(navEl);
+            installNavDrag();
+            applyNavPosition();
         }
         const list = navEl.querySelector('.bn-user-plan-date-nav-list');
         if (!list) return;
@@ -3036,7 +3211,10 @@ html.bn-user-plan-page .katex-display {
         ensureStyle();
         refreshNavigator();
         window.addEventListener('scroll', scheduleActiveUpdate, {passive: true});
-        window.addEventListener('resize', scheduleActiveUpdate, {passive: true});
+        window.addEventListener('resize', () => {
+            applyNavPosition();
+            scheduleActiveUpdate();
+        }, {passive: true});
         window.addEventListener('wheel', handleManualScrollIntent, {passive: true});
         window.addEventListener('touchstart', handleManualScrollIntent, {passive: true});
         window.addEventListener('keydown', handleManualScrollIntent, {passive: true});
