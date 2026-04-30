@@ -11902,7 +11902,7 @@ var mathmlBuilder$3 = (group, options) => {
     var withDelims = [];
 
     if (group.leftDelim != null) {
-      var leftOp = new mathMLTree.MathNode("mo", [new mathMLTree.TextNode(group.leftDelim.replace("\\", ""))]);
+      var leftOp = new mathMLTree.MathNode("mo", [new mathMLTree.TextNode(group.leftDelim.replace(/\\/g, ""))]);
       leftOp.setAttribute("fence", "true");
       withDelims.push(leftOp);
     }
@@ -11910,7 +11910,7 @@ var mathmlBuilder$3 = (group, options) => {
     withDelims.push(node);
 
     if (group.rightDelim != null) {
-      var rightOp = new mathMLTree.MathNode("mo", [new mathMLTree.TextNode(group.rightDelim.replace("\\", ""))]);
+      var rightOp = new mathMLTree.MathNode("mo", [new mathMLTree.TextNode(group.rightDelim.replace(/\\/g, ""))]);
       rightOp.setAttribute("fence", "true");
       withDelims.push(rightOp);
     }
