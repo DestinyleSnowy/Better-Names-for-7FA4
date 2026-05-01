@@ -16,44 +16,52 @@
     });
 
     // ---- 注入资源 ----
-    function injectAssets() {
-        if (document.getElementById('bn-pe-style')) return;
-        const link = document.createElement('link');
-        link.id = 'bn-pe-style';
-        link.rel = 'stylesheet';
-        link.href = chrome.runtime.getURL('content/paper-editor/editor.css');
-        document.head.appendChild(link);
+    async function injectAssets() {
+        // 用 <style> 内联注入 CSS，而非 <link>，这样 html2canvas 克隆 DOM 时 CSS 文本会被一同复制
+        if (!document.getElementById('bn-pe-style')) {
+            const style = document.createElement('style');
+            style.id = 'bn-pe-style';
+            try {
+                const url = chrome.runtime.getURL('content/paper-editor/editor.css');
+                const resp = await fetch(url);
+                style.textContent = await resp.text();
+            } catch (e) {
+                console.error('[BN-Paper] 加载 editor.css 失败:', e);
+            }
+            document.head.appendChild(style);
+        }
 
-        if (document.getElementById('bn-pe-katex-fonts')) return;
-        const base = chrome.runtime.getURL('content/libs/katex/fonts/');
-        const fonts = [
-            ['KaTeX_AMS','KaTeX_AMS-Regular.woff2'],
-            ['KaTeX_Caligraphic','KaTeX_Caligraphic-Regular.woff2'],
-            ['KaTeX_Caligraphic','KaTeX_Caligraphic-Bold.woff2','bold'],
-            ['KaTeX_Fraktur','KaTeX_Fraktur-Regular.woff2'],
-            ['KaTeX_Fraktur','KaTeX_Fraktur-Bold.woff2','bold'],
-            ['KaTeX_Main','KaTeX_Main-Regular.woff2'],
-            ['KaTeX_Main','KaTeX_Main-Italic.woff2','normal','italic'],
-            ['KaTeX_Main','KaTeX_Main-Bold.woff2','bold'],
-            ['KaTeX_Main','KaTeX_Main-BoldItalic.woff2','bold','italic'],
-            ['KaTeX_Math','KaTeX_Math-Italic.woff2','normal','italic'],
-            ['KaTeX_Math','KaTeX_Math-BoldItalic.woff2','bold','italic'],
-            ['KaTeX_SansSerif','KaTeX_SansSerif-Regular.woff2'],
-            ['KaTeX_SansSerif','KaTeX_SansSerif-Italic.woff2','normal','italic'],
-            ['KaTeX_SansSerif','KaTeX_SansSerif-Bold.woff2','bold'],
-            ['KaTeX_Script','KaTeX_Script-Regular.woff2'],
-            ['KaTeX_Size1','KaTeX_Size1-Regular.woff2'],
-            ['KaTeX_Size2','KaTeX_Size2-Regular.woff2'],
-            ['KaTeX_Size3','KaTeX_Size3-Regular.woff2'],
-            ['KaTeX_Size4','KaTeX_Size4-Regular.woff2'],
-            ['KaTeX_Typewriter','KaTeX_Typewriter-Regular.woff2']
-        ];
-        const style = document.createElement('style');
-        style.id = 'bn-pe-katex-fonts';
-        style.textContent = fonts.map(([name, file, w = 'normal', st = 'normal']) =>
-            `@font-face{font-family:'${name}';src:url('${base}${file}') format('woff2');font-weight:${w};font-style:${st};font-display:swap;}`
-        ).join('');
-        document.head.appendChild(style);
+        if (!document.getElementById('bn-pe-katex-fonts')) {
+            const base = chrome.runtime.getURL('content/libs/katex/fonts/');
+            const fonts = [
+                ['KaTeX_AMS','KaTeX_AMS-Regular.woff2'],
+                ['KaTeX_Caligraphic','KaTeX_Caligraphic-Regular.woff2'],
+                ['KaTeX_Caligraphic','KaTeX_Caligraphic-Bold.woff2','bold'],
+                ['KaTeX_Fraktur','KaTeX_Fraktur-Regular.woff2'],
+                ['KaTeX_Fraktur','KaTeX_Fraktur-Bold.woff2','bold'],
+                ['KaTeX_Main','KaTeX_Main-Regular.woff2'],
+                ['KaTeX_Main','KaTeX_Main-Italic.woff2','normal','italic'],
+                ['KaTeX_Main','KaTeX_Main-Bold.woff2','bold'],
+                ['KaTeX_Main','KaTeX_Main-BoldItalic.woff2','bold','italic'],
+                ['KaTeX_Math','KaTeX_Math-Italic.woff2','normal','italic'],
+                ['KaTeX_Math','KaTeX_Math-BoldItalic.woff2','bold','italic'],
+                ['KaTeX_SansSerif','KaTeX_SansSerif-Regular.woff2'],
+                ['KaTeX_SansSerif','KaTeX_SansSerif-Italic.woff2','normal','italic'],
+                ['KaTeX_SansSerif','KaTeX_SansSerif-Bold.woff2','bold'],
+                ['KaTeX_Script','KaTeX_Script-Regular.woff2'],
+                ['KaTeX_Size1','KaTeX_Size1-Regular.woff2'],
+                ['KaTeX_Size2','KaTeX_Size2-Regular.woff2'],
+                ['KaTeX_Size3','KaTeX_Size3-Regular.woff2'],
+                ['KaTeX_Size4','KaTeX_Size4-Regular.woff2'],
+                ['KaTeX_Typewriter','KaTeX_Typewriter-Regular.woff2']
+            ];
+            const fontStyle = document.createElement('style');
+            fontStyle.id = 'bn-pe-katex-fonts';
+            fontStyle.textContent = fonts.map(([name, file, w = 'normal', st = 'normal']) =>
+                `@font-face{font-family:'${name}';src:url('${base}${file}') format('woff2');font-weight:${w};font-style:${st};font-display:swap;}`
+            ).join('');
+            document.head.appendChild(fontStyle);
+        }
     }
 
     // ---- 常量 ----
@@ -210,36 +218,31 @@
     };
 
     // ---- 截屏 ----
-    const waitHtml2Canvas = () => new Promise((resolve, reject) => {
-        if (typeof html2canvas === 'function') return resolve();
-        let n = 0;
-        const iv = setInterval(() => {
-            if (typeof html2canvas === 'function') { clearInterval(iv); resolve(); }
-            else if (++n > 80) { clearInterval(iv); reject(new Error('html2canvas 未加载')); }
-        }, 50);
+    const loadDomToImage = () => new Promise((resolve, reject) => {
+        if (typeof domtoimage !== 'undefined') return resolve();
+        const script = document.createElement('script');
+        script.src = chrome.runtime.getURL('content/libs/dom-to-image/dom-to-image.min.js');
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('dom-to-image 加载失败'));
+        document.head.appendChild(script);
     });
 
     async function capture(el) {
-        await waitHtml2Canvas();
-        const node = el.cloneNode(true);
-        node.id = 'bn-paper-capture';
-        node.style.width = Math.max(680, el.clientWidth || 680) + 'px';
-        document.body.appendChild(node);
+        await loadDomToImage();
+        await document.fonts.ready;
         try {
-            await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-            const canvas = await html2canvas(node, {
-                backgroundColor: '#fff',
+            const dataUrl = await domtoimage.toPng(el, {
                 scale: Math.min(2, devicePixelRatio || 1.5),
-                useCORS: true, allowTaint: false, logging: false,
-                windowWidth: node.scrollWidth, windowHeight: node.scrollHeight
+                bgcolor: '#ffffff',
+                quality: 1
             });
-            if (!canvas.width || !canvas.height) throw new Error('截图尺寸为空');
-            return canvas.toDataURL('image/png');
+            if (!dataUrl) throw new Error('截图生成失败');
+            return dataUrl;
         } catch (e) {
             console.error('[BN-Paper] 截屏失败:', e);
             alert('截屏失败: ' + e.message);
             return null;
-        } finally { node.remove(); }
+        }
     }
 
     const dataURLtoBlob = u => {
@@ -495,7 +498,7 @@
         if (!isPaperPage()) return;
         console.log('[BN-Paper-Editor] 初始化...');
         if (!(await waitForDeps())) return;
-        injectAssets();
+        await injectAssets();
         await new Promise(r => setTimeout(r, 300));
 
         const formEl = document.querySelector('#submit_code');
