@@ -29,49 +29,85 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPOSITORY: ${{ github.repository }}
 
+      - name: Build review prompt
+        id: build_prompt
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import os
+
+          diff = Path('pr.diff').read_text(encoding='utf-8', errors='replace')
+          max_chars = 60000
+          truncated = len(diff) > max_chars
+          if truncated:
+              diff = diff[:max_chars] + '\n\n[Diff truncated because it is too large. Review may be incomplete.]\n'
+
+          prompt = f"""你是 Better Names for 7FA4 的维护者审核助手。
+这个项目是 Manifest V3 浏览器扩展，会向 7FA4 页面注入 content scripts，包含用户名映射、页面增强、Markdown/LaTeX 渲染、聊天室、截图/导出、外站提交器和更新反馈等功能。
+
+PR 信息：
+- 标题：{os.environ.get('PR_TITLE', '')}
+- 描述：{os.environ.get('PR_BODY', '')}
+- PR 编号：#{os.environ.get('PR_NUMBER', '')}
+
+请根据下面的 PR diff 输出一份中文维护者审核报告，格式如下：
+
+## PR 审核摘要
+
+### 1. 这个 PR 改了什么
+用 3-6 条概括实际改动。
+
+### 2. 是否符合 PR 描述
+判断 diff 是否真的解决了 PR 描述的问题，指出不一致或描述缺失。
+
+### 3. 代码质量
+评价实现是否清晰、是否过度 hack、是否有重复代码、是否容易维护。
+
+### 4. 安全与权限风险
+重点检查：XSS、innerHTML/insertAdjacentHTML、URL scheme、Manifest 权限、host_permissions、web_accessible_resources、chrome.storage、clipboard、notifications、scripting、webRequest、GitHub Actions 注入、第三方库来源。
+
+### 5. 兼容性与回归风险
+判断是否可能破坏 7FA4 现有页面、浏览器兼容性、截图/导出、聊天室、面板、提交器或发布包。
+
+### 6. 合并前必须手动测试
+列出具体测试步骤，不要泛泛而谈。
+
+### 7. 结论
+必须三选一，并给出理由：
+- 建议：Merge
+- 建议：Request changes
+- 建议：Close
+
+规则：
+- 只做审核，不要修改代码。
+- 不要假装运行了测试或构建。
+- 如果 diff 太大或第三方压缩库无法充分审查，要明确说明。
+- 对安全问题宁可保守。
+- 输出要简洁、实用，方便维护者快速决定是否合并。
+
+PR diff：
+```diff
+{diff}
+```
+"""
+
+          delimiter = 'AI_REVIEW_PROMPT_EOF'
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
+              out.write(f'prompt<<{delimiter}\n')
+              out.write(prompt)
+              out.write(f'\n{delimiter}\n')
+          PY
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+
       - name: Run AI review
         id: inference
         uses: actions/ai-inference@v1
         with:
-          prompt-file: pr.diff
-          system-prompt: |
-            你是 Better Names for 7FA4 的维护者审核助手。
-            这个项目是 Manifest V3 浏览器扩展，会向 7FA4 页面注入 content scripts，包含用户名映射、页面增强、Markdown/LaTeX 渲染、聊天室、截图/导出、外站提交器和更新反馈等功能。
-
-            请根据 PR diff 输出一份中文维护者审核报告，格式如下：
-
-            ## PR 审核摘要
-
-            ### 1. 这个 PR 改了什么
-            用 3-6 条概括实际改动。
-
-            ### 2. 是否符合 PR 描述
-            判断 diff 是否真的解决了 PR 描述的问题，指出不一致或描述缺失。
-
-            ### 3. 代码质量
-            评价实现是否清晰、是否过度 hack、是否有重复代码、是否容易维护。
-
-            ### 4. 安全与权限风险
-            重点检查：XSS、innerHTML/insertAdjacentHTML、URL scheme、Manifest 权限、host_permissions、web_accessible_resources、chrome.storage、clipboard、notifications、scripting、webRequest、GitHub Actions 注入、第三方库来源。
-
-            ### 5. 兼容性与回归风险
-            判断是否可能破坏 7FA4 现有页面、浏览器兼容性、截图/导出、聊天室、面板、提交器或发布包。
-
-            ### 6. 合并前必须手动测试
-            列出具体测试步骤，不要泛泛而谈。
-
-            ### 7. 结论
-            必须三选一，并给出理由：
-            - 建议：Merge
-            - 建议：Request changes
-            - 建议：Close
-
-            规则：
-            - 只做审核，不要修改代码。
-            - 不要假装运行了测试或构建。
-            - 如果 diff 太大或第三方压缩库无法充分审查，要明确说明。
-            - 对安全问题宁可保守。
-            - 输出要简洁、实用，方便维护者快速决定是否合并。
+          model: openai/gpt-4o-mini
+          prompt: ${{ steps.build_prompt.outputs.prompt }}
 
       - name: Comment review summary
         run: |
