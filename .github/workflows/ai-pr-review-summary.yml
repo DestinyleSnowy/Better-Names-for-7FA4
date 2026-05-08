@@ -1,0 +1,83 @@
+name: AI PR Review Summary
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write
+  models: read
+
+jobs:
+  review-summary:
+    if: ${{ github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout base repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+
+      - name: Get PR diff
+        run: |
+          gh pr diff "$PR_NUMBER" --repo "$REPOSITORY" > pr.diff
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+
+      - name: Run AI review
+        id: inference
+        uses: actions/ai-inference@v1
+        with:
+          prompt-file: pr.diff
+          system-prompt: |
+            你是 Better Names for 7FA4 的维护者审核助手。
+            这个项目是 Manifest V3 浏览器扩展，会向 7FA4 页面注入 content scripts，包含用户名映射、页面增强、Markdown/LaTeX 渲染、聊天室、截图/导出、外站提交器和更新反馈等功能。
+
+            请根据 PR diff 输出一份中文维护者审核报告，格式如下：
+
+            ## PR 审核摘要
+
+            ### 1. 这个 PR 改了什么
+            用 3-6 条概括实际改动。
+
+            ### 2. 是否符合 PR 描述
+            判断 diff 是否真的解决了 PR 描述的问题，指出不一致或描述缺失。
+
+            ### 3. 代码质量
+            评价实现是否清晰、是否过度 hack、是否有重复代码、是否容易维护。
+
+            ### 4. 安全与权限风险
+            重点检查：XSS、innerHTML/insertAdjacentHTML、URL scheme、Manifest 权限、host_permissions、web_accessible_resources、chrome.storage、clipboard、notifications、scripting、webRequest、GitHub Actions 注入、第三方库来源。
+
+            ### 5. 兼容性与回归风险
+            判断是否可能破坏 7FA4 现有页面、浏览器兼容性、截图/导出、聊天室、面板、提交器或发布包。
+
+            ### 6. 合并前必须手动测试
+            列出具体测试步骤，不要泛泛而谈。
+
+            ### 7. 结论
+            必须三选一，并给出理由：
+            - 建议：Merge
+            - 建议：Request changes
+            - 建议：Close
+
+            规则：
+            - 只做审核，不要修改代码。
+            - 不要假装运行了测试或构建。
+            - 如果 diff 太大或第三方压缩库无法充分审查，要明确说明。
+            - 对安全问题宁可保守。
+            - 输出要简洁、实用，方便维护者快速决定是否合并。
+
+      - name: Comment review summary
+        run: |
+          gh pr comment "$PR_NUMBER" --repo "$REPOSITORY" --body "$RESPONSE"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+          RESPONSE: ${{ steps.inference.outputs.response }}
