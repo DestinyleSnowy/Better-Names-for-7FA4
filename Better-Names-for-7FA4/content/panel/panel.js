@@ -46,6 +46,7 @@
         hideDoneSkip: false,
         enableQuickSkip: undefined,
         enableUserPlanDateNavigator: true,
+        enablePaperEditor: true,
         'quickSkip.migrated.v1': false,
         enableTitleOptimization: true,
         debug: false,
@@ -179,7 +180,7 @@
     const manifestVersionInfo = parseComparableVersion(manifestVersion);
     const WELCOME_SEEN_VERSION_KEY = 'bn.welcome.seenVersion';
     const WELCOME_BASE_VERSION = '2026.07';
-    const WELCOME_PATCH_TITLE = '新增补丁 Better Names for 7FA4 2026.07.02';
+    const WELCOME_PATCH_TITLE = '新增版本 Better Names for 7FA4 2026.09';
     const WELCOME_CHANGELOG_CODE_NAME = '好久不见';
     const WELCOME_CHANGELOG_2026_07_ITEMS = [
         {
@@ -214,6 +215,16 @@
         {text: '优化个人计划日期导航样式，支持拖动调整位置。'},
         {text: '修复聊天室存在的部分问题'},
     ];
+    const WELCOME_CHANGELOG_2026_09_ITEMS = [
+        {text: '新增纸面作业编辑器。'},
+        {text: '新增纸面题编辑器“一键导出图片并提交”按钮。'},
+        {text: '新增纸面题编辑器“导出图片”按钮，可只下载预览图片。'},
+        {text: '修复提交后纸面题编辑器可能嵌入“已提交作业”展开面板的问题。'},
+        {text: '修复纸面题编辑器导出含 LaTeX 内容时 MathML 辅助层混入图片的问题。'},
+        {text: '修复聊天室部分好友缺少 real_name 时不显示的问题。'},
+        {text: '修复聊天室文本文件上传内容未转义导致预览结构异常的问题。'},
+        {text: '增强聊天室接口响应字段兼容性，并防止重复发送。'},
+    ];
     const WELCOME_PATCH_CHANGELOGS = [
         {
             version: '2026.07.01',
@@ -222,6 +233,10 @@
         {
             version: '2026.07.02',
             items: WELCOME_CHANGELOG_2026_07_02_ITEMS,
+        },
+        {
+            version: '2026.09',
+            items: WELCOME_CHANGELOG_2026_09_ITEMS,
         },
     ];
     const isSupportedHostname = (host) => {
@@ -272,6 +287,7 @@
     }
     if (enableQuickSkip === undefined) enableQuickSkip = true;
     const enableUserPlanDateNavigator = readConfigValue('enableUserPlanDateNavigator') !== false;
+    const enablePaperEditor = readConfigValue('enablePaperEditor') !== false;
     const enableTitleOptimization = readConfigValue('enableTitleOptimization');
     const widthMode = readConfigValue(WIDTH_MODE_KEY);
     // Centralized configuration groups for easier export/reset flows.
@@ -308,6 +324,7 @@
         hideDoneSkip,
         enableQuickSkip,
         enableUserPlanDateNavigator,
+        enablePaperEditor,
         enableTitleOptimization,
     };
     const rankingConfig = {
@@ -390,8 +407,8 @@
         try {
             if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getManifest === 'function') {
                 const manifest = chrome.runtime.getManifest();
-                if (manifest && manifest.version) {
-                    return String(manifest.version);
+                if (manifest && (manifest.version_name || manifest.version)) {
+                    return String(manifest.version_name || manifest.version);
                 }
             }
         } catch (error) {
@@ -1668,6 +1685,7 @@
     const chkHideDoneSkip = document.getElementById('bn-hide-done-skip');
     const chkQuickSkip = document.getElementById('bn-enable-quick-skip');
     const chkUserPlanDateNavigator = document.getElementById('bn-enable-user-plan-date-navigator');
+    const chkPaperEditor = document.getElementById('bn-enable-paper-editor');
     const chkTitleOpt = document.getElementById('bn-enable-title-optimization');
 
     if (!chkTemplateBulkAdd) {
@@ -1715,6 +1733,7 @@
     chkHideDoneSkip.checked = hideDoneSkip;
     chkQuickSkip.checked = enableQuickSkip;
     if (chkUserPlanDateNavigator) chkUserPlanDateNavigator.checked = enableUserPlanDateNavigator;
+    if (chkPaperEditor) chkPaperEditor.checked = enablePaperEditor;
     chkTitleOpt.checked = enableTitleOptimization;
     if (bgOpacityValueSpan) bgOpacityValueSpan.textContent = formatOpacityText(normalizedBgOpacity);
     if (bgOpacityInput) bgOpacityInput.value = normalizedBgOpacity;
@@ -1803,6 +1822,7 @@
         hideDoneSkip,
         enableQuickSkip,
         enableUserPlanDateNavigator,
+        enablePaperEditor,
         enableTitleOptimization,
         widthMode,
         bgEnabled: storedBgEnabled,
@@ -2667,7 +2687,7 @@
         const currentBtEnabled = getHiToiletEnabledState();
         const templateBulkAddChk = document.getElementById('bn-enable-template-bulk-add');
 
-        const changed = (document.getElementById('bn-enable-title-truncate').checked !== originalConfig.titleTruncate) || (document.getElementById('bn-enable-user-truncate').checked !== originalConfig.userTruncate) || (document.getElementById('bn-enable-title-truncate').checked && ti !== originalConfig.maxTitleUnits) || (document.getElementById('bn-enable-user-truncate').checked && ui !== originalConfig.maxUserUnits) || (document.getElementById('bn-hide-avatar').checked !== originalConfig.hideAvatar) || (document.getElementById('bn-enable-copy').checked !== originalConfig.enableCopy) || (document.getElementById('bn-enable-desc-copy').checked !== originalConfig.enableDescCopy) || (document.getElementById('bn-hide-orig').checked !== originalConfig.hideOrig) || (document.getElementById('bn-enable-contest-download').checked !== originalConfig.enableContestDownloadButtons) || (document.getElementById('bn-enable-contest-review').checked !== originalConfig.enableContestReviewButtons) || (document.getElementById('bn-show-user-nickname').checked !== originalConfig.showUserNickname) || ((document.getElementById('bn-default-hide-submitted-homework')?.checked ?? originalConfig.defaultHideSubmittedHomework) !== originalConfig.defaultHideSubmittedHomework) || (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) || ((templateBulkAddChk ? templateBulkAddChk.checked : originalConfig.enableTemplateBulkAdd) !== originalConfig.enableTemplateBulkAdd) || (document.getElementById('bn-enable-renew').checked !== originalConfig.enableAutoRenew) || (document.getElementById('bn-enable-ranking-filter').checked !== originalConfig.enableRankingFilter) || (document.getElementById('bn-enable-column-switch').checked !== originalConfig.columnSwitchEnabled) || (document.getElementById('bn-enable-merge-assistant').checked !== originalConfig.mergeAssistantEnabled) || (document.getElementById('bn-enable-vj').checked !== originalConfig.enableVjLink) || (document.getElementById('bn-hide-done-skip').checked !== originalConfig.hideDoneSkip) || (document.getElementById('bn-enable-quick-skip').checked !== originalConfig.enableQuickSkip) || ((document.getElementById('bn-enable-user-plan-date-navigator')?.checked ?? originalConfig.enableUserPlanDateNavigator) !== originalConfig.enableUserPlanDateNavigator) || (document.getElementById('bn-enable-title-optimization').checked !== originalConfig.enableTitleOptimization) || (document.getElementById('bn-use-custom-color').checked !== originalConfig.useCustomColors) || codeThemeChanged || customCssChanged || ((document.getElementById('bn-width-mode')?.value ?? originalConfig.widthMode) !== originalConfig.widthMode) || (currentBgEnabled !== originalConfig.bgEnabled) || bgSourceChanged || (currentBgfillway !== originalConfig.bgfillway) || (currentBgOpacity !== originalConfig.bgOpacity) || (clampBlur(currentBgBlur) !== clampBlur(originalConfig.bgBlur)) || (currentBtEnabled !== originalConfig.btEnabled) || (hiToiletIntervalInput && clampHiToiletInterval(hiToiletIntervalInput.value) !== originalConfig.btInterval) || (getSelectedThemeMode() !== originalConfig.themeMode) || themeColorChanged || paletteChanged;
+        const changed = (document.getElementById('bn-enable-title-truncate').checked !== originalConfig.titleTruncate) || (document.getElementById('bn-enable-user-truncate').checked !== originalConfig.userTruncate) || (document.getElementById('bn-enable-title-truncate').checked && ti !== originalConfig.maxTitleUnits) || (document.getElementById('bn-enable-user-truncate').checked && ui !== originalConfig.maxUserUnits) || (document.getElementById('bn-hide-avatar').checked !== originalConfig.hideAvatar) || (document.getElementById('bn-enable-copy').checked !== originalConfig.enableCopy) || (document.getElementById('bn-enable-desc-copy').checked !== originalConfig.enableDescCopy) || (document.getElementById('bn-hide-orig').checked !== originalConfig.hideOrig) || (document.getElementById('bn-enable-contest-download').checked !== originalConfig.enableContestDownloadButtons) || (document.getElementById('bn-enable-contest-review').checked !== originalConfig.enableContestReviewButtons) || (document.getElementById('bn-show-user-nickname').checked !== originalConfig.showUserNickname) || ((document.getElementById('bn-default-hide-submitted-homework')?.checked ?? originalConfig.defaultHideSubmittedHomework) !== originalConfig.defaultHideSubmittedHomework) || (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) || ((templateBulkAddChk ? templateBulkAddChk.checked : originalConfig.enableTemplateBulkAdd) !== originalConfig.enableTemplateBulkAdd) || (document.getElementById('bn-enable-renew').checked !== originalConfig.enableAutoRenew) || (document.getElementById('bn-enable-ranking-filter').checked !== originalConfig.enableRankingFilter) || (document.getElementById('bn-enable-column-switch').checked !== originalConfig.columnSwitchEnabled) || (document.getElementById('bn-enable-merge-assistant').checked !== originalConfig.mergeAssistantEnabled) || (document.getElementById('bn-enable-vj').checked !== originalConfig.enableVjLink) || (document.getElementById('bn-hide-done-skip').checked !== originalConfig.hideDoneSkip) || (document.getElementById('bn-enable-quick-skip').checked !== originalConfig.enableQuickSkip) || ((document.getElementById('bn-enable-user-plan-date-navigator')?.checked ?? originalConfig.enableUserPlanDateNavigator) !== originalConfig.enableUserPlanDateNavigator) || ((document.getElementById('bn-enable-paper-editor')?.checked ?? originalConfig.enablePaperEditor) !== originalConfig.enablePaperEditor) || (document.getElementById('bn-enable-title-optimization').checked !== originalConfig.enableTitleOptimization) || (document.getElementById('bn-use-custom-color').checked !== originalConfig.useCustomColors) || codeThemeChanged || customCssChanged || ((document.getElementById('bn-width-mode')?.value ?? originalConfig.widthMode) !== originalConfig.widthMode) || (currentBgEnabled !== originalConfig.bgEnabled) || bgSourceChanged || (currentBgfillway !== originalConfig.bgfillway) || (currentBgOpacity !== originalConfig.bgOpacity) || (clampBlur(currentBgBlur) !== clampBlur(originalConfig.bgBlur)) || (currentBtEnabled !== originalConfig.btEnabled) || (hiToiletIntervalInput && clampHiToiletInterval(hiToiletIntervalInput.value) !== originalConfig.btInterval) || (getSelectedThemeMode() !== originalConfig.themeMode) || themeColorChanged || paletteChanged;
 
         saveActions.classList.toggle('bn-visible', changed);
     }
@@ -2745,6 +2765,7 @@
         checkChanged();
     };
     if (chkUserPlanDateNavigator) chkUserPlanDateNavigator.onchange = checkChanged;
+    if (chkPaperEditor) chkPaperEditor.onchange = checkChanged;
     chkTitleOpt.onchange = checkChanged;
     if (chkTemplateBulkAdd) {
         chkTemplateBulkAdd.onchange = () => {
@@ -2817,6 +2838,7 @@
         GM_setValue('hideDoneSkip', chkHideDoneSkip.checked);
         GM_setValue('enableQuickSkip', chkQuickSkip.checked);
         GM_setValue('enableUserPlanDateNavigator', chkUserPlanDateNavigator ? chkUserPlanDateNavigator.checked : enableUserPlanDateNavigator);
+        GM_setValue('enablePaperEditor', chkPaperEditor ? chkPaperEditor.checked : enablePaperEditor);
         GM_setValue('enableTitleOptimization', chkTitleOpt.checked);
         GM_setValue('enableUserMenu', chkMenu.checked);
         GM_setValue('enableVjLink', chkVj.checked);
@@ -2929,6 +2951,7 @@
         chkQuickSkip.checked = originalConfig.enableQuickSkip;
         applyQuickSkip(originalConfig.enableQuickSkip);
         if (chkUserPlanDateNavigator) chkUserPlanDateNavigator.checked = originalConfig.enableUserPlanDateNavigator;
+        if (chkPaperEditor) chkPaperEditor.checked = originalConfig.enablePaperEditor;
         chkTitleOpt.checked = originalConfig.enableTitleOptimization;
         if (chkTemplateBulkAdd) chkTemplateBulkAdd.checked = originalConfig.enableTemplateBulkAdd;
         const bulkEnabled = chkTemplateBulkAdd ? chkTemplateBulkAdd.checked : originalConfig.enableTemplateBulkAdd;
@@ -5023,6 +5046,41 @@
         return body.toString();
     }
 
+    function chatGetPayloadRoot(payload) {
+        if (!payload || typeof payload !== 'object') return payload;
+        const data = payload.data ?? payload.result;
+        if (data && typeof data === 'object') return data;
+        return payload;
+    }
+
+    function chatPickArray(source, keys) {
+        if (Array.isArray(source)) return source;
+        if (!source || typeof source !== 'object') return [];
+        for (const key of keys) {
+            if (Array.isArray(source[key])) return source[key];
+        }
+        return [];
+    }
+
+    function chatPickIntegerFromPayload(payload, keys) {
+        const roots = [payload, chatGetPayloadRoot(payload)];
+        for (const root of roots) {
+            if (!root || typeof root !== 'object') continue;
+            for (const key of keys) {
+                const parsed = chatToInteger(root[key]);
+                if (Number.isFinite(parsed)) return parsed;
+            }
+        }
+        return NaN;
+    }
+
+    function chatReadTokenCounts(payload) {
+        return {
+            used: chatPickIntegerFromPayload(payload, ['used_token_count', 'usedTokenCount', 'used_token', 'usedToken', 'used']),
+            remain: chatPickIntegerFromPayload(payload, ['remain_token_count', 'remainTokenCount', 'remaining_token_count', 'remainingTokenCount', 'remain_token', 'remainToken', 'remaining']),
+        };
+    }
+
     async function chatApiRequest(method, path, options = {}) {
         const upperMethod = String(method || 'GET').toUpperCase();
         const timeoutMs = Math.max(1000, Number(options.timeoutMs) || 12000);
@@ -5111,9 +5169,11 @@
     }
 
     function chatGetChatsFromPayload(payload) {
-        if (!payload || typeof payload !== 'object') return [];
-        if (Array.isArray(payload.chat)) return payload.chat;
-        if (Array.isArray(payload.chats)) return payload.chats;
+        const roots = [payload, chatGetPayloadRoot(payload)];
+        for (const root of roots) {
+            const chats = chatPickArray(root, ['chat', 'chats', 'messages', 'message', 'records', 'list', 'items']);
+            if (chats.length) return chats;
+        }
         return [];
     }
 
@@ -5430,7 +5490,10 @@
 
             const subtitle = document.createElement('div');
             subtitle.className = 'bn-chat-conversation-sub';
-            subtitle.innerHTML = item.subtitle || (item.type === 'group' ? '群组会话' : '好友会话');
+            const subtitleHtml = item.subtitle || (item.type === 'group' ? '群组会话' : '好友会话');
+            subtitle.innerHTML = typeof DOMPurify !== 'undefined'
+                ? DOMPurify.sanitize(subtitleHtml, {ALLOWED_TAGS: ['a', 'br'], ALLOWED_ATTR: ['href']})
+                : escapeHtml(subtitleHtml);
 
             entry.appendChild(top);
             entry.appendChild(subtitle);
@@ -5868,11 +5931,13 @@
     }
 
     function chatRebuildStateFromInfo(payload) {
-        const info = payload && typeof payload === 'object' ? payload : {};
+        const root = chatGetPayloadRoot(payload);
+        const info = root && typeof root === 'object' && !Array.isArray(root) ? root : {};
         const limit = info.limit && typeof info.limit === 'object' ? info.limit : {};
-        const friends = Array.isArray(info.friends) ? info.friends : [];
-        const groups = Array.isArray(info.groups) ? info.groups : [];
-        const userInfo = info.user && typeof info.user === 'object' ? info.user : {};
+        const friends = chatPickArray(info, ['friends', 'friend', 'users', 'contacts']);
+        const groups = chatPickArray(info, ['groups', 'group']);
+        const userInfo = [info.user, info.self, info.me, info.profile]
+            .find(item => item && typeof item === 'object' && !Array.isArray(item)) || {};
 
         chatState.info = info;
         chatState.selfId = chatExtractSelfId(userInfo);
@@ -5898,7 +5963,6 @@
             const key = `user:${fid}`;
             const friendUserInfo = friend.user && typeof friend.user === 'object' ? friend.user : null;
             const name = chatExtractDisplayName(friend, chatExtractDisplayName(friendUserInfo, `用户 ${fid}`));
-            if (!(typeof friend.real_name === 'string' && friend.real_name.trim())) return;
             const subtitle = `已互加 · ID ${fid}`;
             const activitySec = chatExtractConversationActivitySec(friend) || chatExtractConversationActivitySec(friendUserInfo);
             chatState.userNameById.set(fid, name);
@@ -5937,7 +6001,7 @@
                 id: gid,
                 type: 'group',
                 name: title,
-                subtitle: `群成员 ${members.length || 0} 人 · ID ${gid}<br>群主：${ownerName}<br>管理员：${administratorsName.join("，")}<br>成员：${membersName.join("，")}`,
+                subtitle: `群成员 ${members.length || 0} 人 · ID ${gid}<br>群主：${ownerName || '未知'}<br>管理员：${administratorsName.length ? administratorsName.join("，") : '无'}<br>成员：${membersName.length ? membersName.join("，") : '无'}`,
             });
         });
 
@@ -6280,8 +6344,7 @@
             const payload = await chatApiRequest('POST', '/chat/chat', {
                 data: {type: 'none'}, timeoutMs: 12000,
             });
-            const used = chatToInteger(payload.used_token_count);
-            const remain = chatToInteger(payload.remain_token_count);
+            const {used, remain} = chatReadTokenCounts(payload);
             chatState.tokenUsed = Number.isFinite(used) ? used : null;
             chatState.tokenRemain = Number.isFinite(remain) ? remain : null;
             chatState.maxTokenCount = Number.isFinite(used) && Number.isFinite(remain) ? used + remain : null;
@@ -6295,6 +6358,7 @@
     }
 
     async function chatSendMessage() {
+        if (chatState.sending) return;
         const conversation = chatGetConversationByKey(chatState.activeKey);
         if (!conversation) {
             chatSetStatus('请先选择一个会话', 'error');
@@ -6323,8 +6387,7 @@
                 }, timeoutMs: 12000,
             });
 
-            const used = chatToInteger(payload.used_token_count);
-            const remain = chatToInteger(payload.remain_token_count);
+            const {used, remain} = chatReadTokenCounts(payload);
             chatState.tokenUsed = Number.isFinite(used) ? used : chatState.tokenUsed;
             chatState.tokenRemain = Number.isFinite(remain) ? remain : chatState.tokenRemain;
             chatUpdateTokenDisplay();
@@ -7044,16 +7107,18 @@
             e.target.classList.remove('bn-img-lazy');
             e.target.parentElement.removeAttribute("data-tooltip");
         }
-        if (e.target.classList.contains('bn-file')) {
-            const fileName = e.target.dataset.name;
-            const url = e.target.dataset.src;
+        const fileTarget = e.target && typeof e.target.closest === 'function' ? e.target.closest('.bn-file') : null;
+        if (fileTarget) {
+            const fileName = fileTarget.dataset.name || fileTarget.getAttribute('download') || 'download';
+            const url = fileTarget.dataset.src || fileTarget.getAttribute('href');
             if (!url) return;
+            e.preventDefault();
             const a = document.createElement('a');
             a.href = url;
             a.download = fileName;
             a.target = "_blank";
             a.click();
-            URL.revokeObjectURL(url);
+            if (url.startsWith('blob:')) URL.revokeObjectURL(url);
         }
     });
 
@@ -7075,8 +7140,10 @@
     async function buildUploadHtml(file, base64) {
         const safeName = escapeHtml(file.name);
         if (typeof base64 !== 'string') return '';
+        const safeHref = escapeHtml(base64);
+        const safeSize = Number.isFinite(file.size) ? file.size : 0;
         if (/^data:image\/(?:png|gif|jpe?g|webp|bmp);/i.test(base64)) {
-            return `<div data-tooltip="${safeName}"><img src="${base64}" alt="${safeName}"></div>`;
+            return `<div data-tooltip="${safeName}"><img src="${safeHref}" alt="${safeName}"></div>`;
         }
         if (base64.startsWith("data:text/") || base64.startsWith("data:application/json")) {
             const res = await fetch(base64);
@@ -7086,9 +7153,10 @@
                 const s = safeName.split(".");
                 lang = getLang(s[s.length - 1]);
             }
-            return `<pre data-download="${safeName}" class="language-${lang}"><code>${content}</code></pre>`;
+            const safeLang = String(lang || 'text').replace(/[^0-9A-Za-z_-]/g, '') || 'text';
+            return `<pre data-download="${safeName}" class="language-${safeLang}"><code>${escapeHtml(content)}</code></pre>`;
         }
-        return `<a class="bn-file" href="${base64}" download="${safeName}">${safeName}（${file.size} B）</a>`;
+        return `<a class="bn-file" href="${safeHref}" data-src="${safeHref}" data-name="${safeName}" download="${safeName}">${safeName}（${safeSize} B）</a>`;
     }
 
     function captureChatSelection() {
@@ -7171,36 +7239,38 @@
         }
     }
 
-    chatInputEl.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        checkCursorToMouse(e);
-        chatInputEl.classList.add('drag-over');
-    });
-    chatInputEl.addEventListener('dragleave', () => {
-        chatInputEl.classList.remove('drag-over');
-    });
-    chatInputEl.addEventListener("drop", (e) => {
-        e.preventDefault();
-        checkCursorToMouse(e);
-        void queueUploadFiles(e.dataTransfer.files);
-        chatInputEl.classList.remove('drag-over');
-    });
-    chatInputEl.addEventListener('paste', (e) => {
-        const items = e.clipboardData.items;
-        const files = [];
-        for (let i = 0; i < items.length; i++) {
-            const item = items[i];
-            if (item.kind === 'file') {
-                const file = item.getAsFile();
-                if (file) files.push(file);
+    if (chatInputEl) {
+        chatInputEl.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            checkCursorToMouse(e);
+            chatInputEl.classList.add('drag-over');
+        });
+        chatInputEl.addEventListener('dragleave', () => {
+            chatInputEl.classList.remove('drag-over');
+        });
+        chatInputEl.addEventListener("drop", (e) => {
+            e.preventDefault();
+            checkCursorToMouse(e);
+            void queueUploadFiles(e.dataTransfer ? e.dataTransfer.files : []);
+            chatInputEl.classList.remove('drag-over');
+        });
+        chatInputEl.addEventListener('paste', (e) => {
+            const items = e.clipboardData ? e.clipboardData.items : [];
+            const files = [];
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                if (item.kind === 'file') {
+                    const file = item.getAsFile();
+                    if (file) files.push(file);
+                }
             }
-        }
-        if (files.length) {
-            e.preventDefault(); // 阻止默认粘贴文本行为
-            void queueUploadFiles(files);
-        }
-        // 如果没有文件，让浏览器正常粘贴文本
-    });
+            if (files.length) {
+                e.preventDefault(); // 阻止默认粘贴文本行为
+                void queueUploadFiles(files);
+            }
+            // 如果没有文件，让浏览器正常粘贴文本
+        });
+    }
 
     const CHAT_LOAD_OLDER_EDGE_PX = 200;
 
@@ -7216,21 +7286,23 @@
 
     let checkLoadDebounceTimer = null;
     let checkLoadWheelThrottleTimer = null;
-    chatMessageListEl.addEventListener('scroll', () => {
-        if (checkLoadDebounceTimer) {
-            clearTimeout(checkLoadDebounceTimer);
-        }
-        checkLoadDebounceTimer = setTimeout(checkLoad, 100);
-    });
-    chatMessageListEl.addEventListener('wheel', (event) => {
-        if (!event || event.deltaY >= 0) return;
-        if (!chatIsMessageListNearTop()) return;
-        if (checkLoadWheelThrottleTimer) return;
-        checkLoadWheelThrottleTimer = setTimeout(() => {
-            checkLoadWheelThrottleTimer = null;
-        }, 300);
-        checkLoad();
-    }, {passive: true});
+    if (chatMessageListEl) {
+        chatMessageListEl.addEventListener('scroll', () => {
+            if (checkLoadDebounceTimer) {
+                clearTimeout(checkLoadDebounceTimer);
+            }
+            checkLoadDebounceTimer = setTimeout(checkLoad, 100);
+        });
+        chatMessageListEl.addEventListener('wheel', (event) => {
+            if (!event || event.deltaY >= 0) return;
+            if (!chatIsMessageListNearTop()) return;
+            if (checkLoadWheelThrottleTimer) return;
+            checkLoadWheelThrottleTimer = setTimeout(() => {
+                checkLoadWheelThrottleTimer = null;
+            }, 300);
+            checkLoad();
+        }, {passive: true});
+    }
     if (typeof window.__BN_refreshCodeThemeEnhancements === 'function') {
         window.__BN_refreshCodeThemeEnhancements();
     }

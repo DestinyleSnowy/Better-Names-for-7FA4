@@ -24,6 +24,7 @@
 /* ====== 容器 ====== */
 #bn-paper-container {
     width: 100%;
+    margin-top: 12px;
     margin-bottom: 16px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans SC", sans-serif;
     animation: bnSlideIn .25s ease;
@@ -236,11 +237,25 @@
 #bn-paper-preview .katex-display,
 #bn-paper-capture .katex-display { margin: 1em 0; overflow-x: auto; }
 
+#bn-paper-preview .katex-mathml,
+#bn-paper-capture .katex-mathml {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0 0 0 0) !important;
+    white-space: nowrap !important;
+}
+
 /* ====== 状态栏 ====== */
 .bn-pe-statusbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 10px;
     padding: 4px 12px;
     font-size: 11px;
     color: var(--bn-text-sub);
@@ -249,6 +264,61 @@
     border-top: none;
     border-radius: 0 0 var(--bn-radius) var(--bn-radius);
     font-variant-numeric: tabular-nums;
+}
+
+.bn-pe-actions {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.bn-pe-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-height: 28px;
+    padding: 0 12px;
+    border-radius: var(--bn-radius-sm);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--bn-transition), border-color var(--bn-transition), transform var(--bn-transition), opacity var(--bn-transition);
+    white-space: nowrap;
+}
+.bn-pe-submit {
+    border: 1px solid var(--bn-primary);
+    background: var(--bn-primary);
+    color: #fff;
+}
+.bn-pe-submit:hover {
+    background: var(--bn-primary-hover);
+    border-color: var(--bn-primary-hover);
+}
+.bn-pe-export {
+    border: 1px solid var(--bn-border);
+    background: #fff;
+    color: var(--bn-text);
+}
+.bn-pe-export:hover {
+    border-color: var(--bn-border-focus);
+    color: var(--bn-primary);
+    background: var(--bn-primary-lighter);
+}
+.bn-pe-action:active {
+    transform: scale(.97);
+}
+.bn-pe-action:disabled {
+    cursor: wait;
+    opacity: .68;
+    transform: none;
+}
+.bn-pe-action svg {
+    width: 14px;
+    height: 14px;
+    flex: none;
 }
 
 /* ====== 模态弹窗 ====== */

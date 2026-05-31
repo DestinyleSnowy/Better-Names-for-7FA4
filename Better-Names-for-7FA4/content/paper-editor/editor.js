@@ -5,6 +5,13 @@
     const path = location.pathname || '';
     if (!/^\/problem\/7\d{3,}/.test(path)) return;
 
+    const isEnabled = () => {
+        try {
+            if (typeof GM_getValue === 'function') return GM_getValue('enablePaperEditor', true) !== false;
+        } catch {}
+        return true;
+    };
+
     const isPaperPage = () => document.body?.textContent.includes('这是一道纸面作业');
 
     const waitForDeps = () => new Promise(resolve => {
@@ -16,13 +23,30 @@
     });
 
     // ---- 注入资源 ----
-    function injectAssets() {
-        if (document.getElementById('bn-pe-style')) return;
-        const link = document.createElement('link');
-        link.id = 'bn-pe-style';
-        link.rel = 'stylesheet';
-        link.href = chrome.runtime.getURL('content/paper-editor/editor.css');
-        document.head.appendChild(link);
+    async function injectAssets() {
+        if (!document.getElementById('bn-pe-style')) {
+            const link = document.createElement('link');
+            link.id = 'bn-pe-style';
+            link.rel = 'stylesheet';
+            link.href = chrome.runtime.getURL('content/paper-editor/editor.css');
+            document.head.appendChild(link);
+        }
+
+        if (!document.getElementById('bn-pe-katex-css')) {
+            try {
+                const cssUrl = chrome.runtime.getURL('content/libs/katex/katex.min.css');
+                const fontBase = chrome.runtime.getURL('content/libs/katex/fonts/');
+                const css = await fetch(cssUrl).then(r => r.ok ? r.text() : '');
+                if (css) {
+                    const style = document.createElement('style');
+                    style.id = 'bn-pe-katex-css';
+                    style.textContent = css.replace(/url\(fonts\//g, `url(${fontBase}`);
+                    document.head.appendChild(style);
+                }
+            } catch (error) {
+                console.warn('[BN-Paper-Editor] KaTeX CSS 注入失败:', error);
+            }
+        }
 
         if (document.getElementById('bn-pe-katex-fonts')) return;
         const base = chrome.runtime.getURL('content/libs/katex/fonts/');
@@ -75,8 +99,15 @@
     // ---- Markdown 公式保护 ----
     const protect = t => {
         _segs = [];
-        t = t.replace(/\$\$([\s\S]+?)\$\$/g, (_, f) => { const i = _segs.length; _segs.push({ k: `BNB_${i}_`, v: f.trim(), b: 1 }); return _segs[i].k; });
-        return t.replace(/\$([^\$\n]+?)\$/g, (_, f) => { const i = _segs.length; _segs.push({ k: `BNI_${i}_`, v: f.trim(), b: 0 }); return _segs[i].k; });
+        const stash = (formula, block) => {
+            const i = _segs.length;
+            _segs.push({ k: `BNMATH${i}END`, v: formula.trim(), b: block ? 1 : 0 });
+            return _segs[i].k;
+        };
+        t = t.replace(/\$\$([\s\S]+?)\$\$/g, (_, f) => stash(f, true));
+        t = t.replace(/\\\[([\s\S]+?)\\\]/g, (_, f) => stash(f, true));
+        t = t.replace(/\\\(([\s\S]+?)\\\)/g, (_, f) => stash(f, false));
+        return t.replace(/\$([^\$\n]+?)\$/g, (_, f) => stash(f, false));
     };
 
     const restore = h => {
@@ -219,22 +250,133 @@
         }, 50);
     });
 
-    async function capture(el) {
-        await waitHtml2Canvas();
+    const blobToDataUrl = blob => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error || new Error('读取字体失败'));
+        reader.readAsDataURL(blob);
+    });
+
+    const runtimeUrl = path => chrome.runtime.getURL(path);
+    const fontDataUrlCache = new Map();
+    let captureCssPromise = null;
+
+    async function getFontDataUrl(url) {
+        if (fontDataUrlCache.has(url)) return fontDataUrlCache.get(url);
+        const dataUrl = await fetch(url).then(response => {
+            if (!response.ok) throw new Error(`字体加载失败: ${response.status}`);
+            return response.blob();
+        }).then(blobToDataUrl);
+        fontDataUrlCache.set(url, dataUrl);
+        return dataUrl;
+    }
+
+    async function inlineCssFontUrls(css) {
+        const fontUrlRe = /url\((['"]?)(fonts\/[^'")]+)\1\)/g;
+        const urls = Array.from(new Set(Array.from(css.matchAll(fontUrlRe), match => match[2])));
+        const replacements = new Map();
+        await Promise.all(urls.map(async relativeUrl => {
+            const absoluteUrl = runtimeUrl(`content/libs/katex/${relativeUrl}`);
+            try {
+                replacements.set(relativeUrl, await getFontDataUrl(absoluteUrl));
+            } catch (error) {
+                console.warn('[BN-Paper] KaTeX 字体内联失败:', relativeUrl, error);
+            }
+        }));
+        return css.replace(fontUrlRe, (full, quote, relativeUrl) => {
+            const dataUrl = replacements.get(relativeUrl);
+            return dataUrl ? `url("${dataUrl}")` : full;
+        });
+    }
+
+    async function getCaptureCss() {
+        if (!captureCssPromise) {
+            captureCssPromise = Promise.all([
+                fetch(runtimeUrl('content/libs/katex/katex.min.css')).then(r => r.ok ? r.text() : ''),
+                fetch(runtimeUrl('content/paper-editor/editor.css')).then(r => r.ok ? r.text() : ''),
+            ]).then(async ([katexCss, editorCss]) => {
+                const inlinedKatexCss = await inlineCssFontUrls(katexCss || '');
+                return `${inlinedKatexCss}\n${editorCss || ''}\n#bn-paper-capture{position:static!important;left:auto!important;top:auto!important;z-index:auto!important;}`;
+            });
+        }
+        return captureCssPromise;
+    }
+
+    function createCaptureNode(el) {
         const node = el.cloneNode(true);
         node.id = 'bn-paper-capture';
-        node.style.width = Math.max(680, el.clientWidth || 680) + 'px';
+        Object.assign(node.style, {
+            width: Math.max(680, el.clientWidth || 680) + 'px',
+            boxSizing: 'border-box',
+            background: '#fff',
+            padding: '24px 28px',
+            overflow: 'visible',
+        });
+        node.querySelectorAll('.katex-mathml').forEach(mathml => mathml.remove());
+        return node;
+    }
+
+    async function captureWithHtml2Canvas(node, width, height) {
+        await waitHtml2Canvas();
+        const captureCss = await getCaptureCss();
+        const captureOptions = {
+            backgroundColor: '#fff',
+            scale: Math.min(2, devicePixelRatio || 1.5),
+            useCORS: true,
+            allowTaint: false,
+            logging: false,
+            windowWidth: width,
+            windowHeight: height,
+            onclone: (clonedDocument) => {
+                const style = clonedDocument.createElement('style');
+                style.textContent = captureCss;
+                clonedDocument.head.appendChild(style);
+                clonedDocument.querySelectorAll('.katex-mathml').forEach(mathml => mathml.remove());
+                const clonedNode = clonedDocument.getElementById('bn-paper-capture');
+                if (clonedNode) {
+                    Object.assign(clonedNode.style, {
+                        position: 'static',
+                        left: 'auto',
+                        top: 'auto',
+                        zIndex: 'auto',
+                        width: `${width}px`,
+                        minHeight: `${height}px`,
+                        background: '#fff',
+                        opacity: '1',
+                        visibility: 'visible',
+                    });
+                }
+            },
+        };
+        let canvas;
+        try {
+            canvas = await html2canvas(node, {...captureOptions, foreignObjectRendering: true});
+            if (!canvas.width || !canvas.height) throw new Error('foreignObject 截图尺寸为空');
+        } catch (error) {
+            console.warn('[BN-Paper] html2canvas foreignObject 失败，回退默认模式:', error);
+            canvas = await html2canvas(node, captureOptions);
+        }
+        if (!canvas.width || !canvas.height) throw new Error('截图尺寸为空');
+        return canvas.toDataURL('image/png');
+    }
+
+    async function capture(el) {
+        try {
+            await document.fonts?.ready;
+        } catch {}
+        const node = createCaptureNode(el);
+        Object.assign(node.style, {
+            position: 'fixed',
+            left: '-10000px',
+            top: '0',
+            zIndex: '-1',
+        });
         document.body.appendChild(node);
         try {
             await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-            const canvas = await html2canvas(node, {
-                backgroundColor: '#fff',
-                scale: Math.min(2, devicePixelRatio || 1.5),
-                useCORS: true, allowTaint: false, logging: false,
-                windowWidth: node.scrollWidth, windowHeight: node.scrollHeight
-            });
-            if (!canvas.width || !canvas.height) throw new Error('截图尺寸为空');
-            return canvas.toDataURL('image/png');
+            const width = Math.ceil(Math.max(680, node.scrollWidth || node.clientWidth || el.clientWidth || 680));
+            const height = Math.ceil(Math.max(1, node.scrollHeight || node.clientHeight || el.scrollHeight || 1));
+            return await captureWithHtml2Canvas(node, width, height);
         } catch (e) {
             console.error('[BN-Paper] 截屏失败:', e);
             alert('截屏失败: ' + e.message);
@@ -247,6 +389,67 @@
         const a = new Uint8Array(b.length);
         for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i);
         return new Blob([a], { type: m });
+    };
+
+    const getAnswerImageFileName = () => {
+        const matched = (location.pathname || '').match(/\/problem\/([^/?#]+)/);
+        const id = matched ? matched[1].replace(/[^\w.-]+/g, '-') : 'paper';
+        return `answer-${id}.png`;
+    };
+
+    const downloadDataUrl = (dataUrl, filename) => {
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = filename;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    };
+
+    const isSubmittedHomeworkHeader = el => {
+        if (!el || !el.matches?.('h4.ui.top.block.attached.header')) return false;
+        return (el.textContent || '').replace(/\s+/g, '').includes('已提交作业');
+    };
+
+    const getSubmittedHomeworkHeaderFor = el => {
+        let node = el;
+        while (node && node.nodeType === 1 && node !== document.body) {
+            if (isSubmittedHomeworkHeader(node)) return node;
+            if (isSubmittedHomeworkHeader(node.previousElementSibling)) return node.previousElementSibling;
+            node = node.parentElement;
+        }
+        return null;
+    };
+
+    const isSubmittedHomeworkBlock = el => {
+        if (!el) return false;
+        if (getSubmittedHomeworkHeaderFor(el)) return true;
+        if (!el.querySelectorAll) return false;
+        return Array.from(el.querySelectorAll('h4.ui.top.block.attached.header')).some(isSubmittedHomeworkHeader);
+    };
+
+    const findEditorInsertionTarget = (formEl, origField) => {
+        let directChild = origField;
+        while (directChild.parentElement && directChild.parentElement !== formEl) {
+            directChild = directChild.parentElement;
+        }
+        const submittedHeader = getSubmittedHomeworkHeaderFor(directChild);
+        if (submittedHeader && submittedHeader.parentElement) {
+            return { parent: submittedHeader.parentElement, anchor: submittedHeader };
+        }
+        if (directChild && directChild !== formEl && !isSubmittedHomeworkBlock(directChild)) {
+            return { parent: formEl, anchor: directChild };
+        }
+
+        const selectors = ['.ui.grid', '.fields', '.field', '.ui.segment'];
+        for (const selector of selectors) {
+            const candidate = origField.closest(selector);
+            if (candidate && candidate.parentElement && formEl.contains(candidate) && !isSubmittedHomeworkBlock(candidate)) {
+                return { parent: candidate.parentElement, anchor: candidate };
+            }
+        }
+        return { parent: formEl, anchor: formEl.firstChild };
     };
 
     // ---- 工具栏 ----
@@ -387,13 +590,28 @@
         sb.className = 'bn-pe-statusbar';
         const cc = document.createElement('span');
         cc.textContent = '0 字符';
-        sb.appendChild(cc);
+        const actionWrap = document.createElement('div');
+        actionWrap.className = 'bn-pe-actions';
+        const exportBtn = document.createElement('button');
+        exportBtn.type = 'button';
+        exportBtn.className = 'bn-pe-action bn-pe-export';
+        exportBtn.title = '导出预览图片到本地';
+        const exportIdleHtml = `${I.IMG}<span>导出图片</span>`;
+        exportBtn.innerHTML = exportIdleHtml;
+        const submitActionBtn = document.createElement('button');
+        submitActionBtn.type = 'button';
+        submitActionBtn.className = 'bn-pe-action bn-pe-submit';
+        submitActionBtn.title = '导出预览图片并提交答案';
+        const submitActionIdleHtml = `${I.TK}<span>导出图片并提交</span>`;
+        submitActionBtn.innerHTML = submitActionIdleHtml;
+        actionWrap.append(exportBtn, submitActionBtn);
+        sb.append(cc, actionWrap);
 
         container.append(toolbar, body, sb);
 
-        // 插入表单
-        const grid = formEl.querySelector('.ui.grid');
-        grid ? grid.insertBefore(container, grid.firstChild) : formEl.insertBefore(container, formEl.firstChild);
+        // 插入到原始上传框所在区域之前，避免命中“已提交作业”面板内的 grid。
+        const insertion = findEditorInsertionTarget(formEl, origField);
+        insertion.parent.insertBefore(container, insertion.anchor);
 
         // 替换为绑定好的工具栏
         toolbar.replaceWith(createToolbar(textarea));
@@ -430,8 +648,8 @@
             // 显示草稿恢复提示
             const hint = document.createElement('span');
             hint.textContent = '已恢复草稿';
-            hint.style.cssText = 'color:var(--bn-primary);font-size:11px;margin-left:auto;opacity:1;transition:opacity .6s ease 2s;';
-            sb.appendChild(hint);
+            hint.style.cssText = 'color:var(--bn-primary);font-size:11px;margin-left:8px;opacity:1;transition:opacity .6s ease 2s;';
+            sb.insertBefore(hint, actionWrap);
             setTimeout(() => { hint.style.opacity = '0'; setTimeout(() => hint.remove(), 700); }, 100);
         }
 
@@ -447,55 +665,114 @@
         });
 
         // 提交拦截
+        let submitting = false;
+        let exporting = false;
+        const setActionLoading = (btn, loading, text, idleHtml) => {
+            btn.disabled = loading;
+            btn.innerHTML = loading
+                ? '<i class="spinner loading icon"></i> ' + (text || '处理中...')
+                : idleHtml;
+        };
+        const setSubmitActionLoading = (loading, text) => {
+            setActionLoading(submitActionBtn, loading, text, submitActionIdleHtml);
+        };
+        const setExportLoading = (loading, text) => {
+            setActionLoading(exportBtn, loading, text, exportIdleHtml);
+            submitBtn.disabled = loading;
+            submitActionBtn.disabled = loading;
+        };
+        const setSubmitLoading = (loading, text) => {
+            setBtnLoading(submitBtn, loading, text);
+            setSubmitActionLoading(loading, text);
+            exportBtn.disabled = loading;
+        };
+        const renderAndCapturePreview = async () => {
+            if (!textarea.value.trim()) {
+                alert('请输入内容！');
+                return null;
+            }
+            render(previewEl, textarea.value.trim());
+            await new Promise(r => setTimeout(r, 300));
+            return capture(previewEl);
+        };
+
+        async function handleExport(e) {
+            e?.preventDefault();
+            e?.stopPropagation();
+            e?.stopImmediatePropagation?.();
+            if (exporting || submitting) return;
+            exporting = true;
+            setExportLoading(true, '导出中...');
+            try {
+                const dataUrl = await renderAndCapturePreview();
+                if (dataUrl) downloadDataUrl(dataUrl, getAnswerImageFileName());
+            } finally {
+                exporting = false;
+                setExportLoading(false);
+            }
+        }
+
         async function handleSubmit(e) {
             e?.preventDefault();
             e?.stopPropagation();
             e?.stopImmediatePropagation?.();
+            if (submitting) return;
+            submitting = true;
 
             // 如果已有文件，直接提交
             if (origField.files?.length) {
-                setBtnLoading(submitBtn, true, '提交中...');
+                setSubmitLoading(true, '提交中...');
                 try { HTMLFormElement.prototype.submit.call(formEl); }
-                catch (er) { alert(er.message); setBtnLoading(submitBtn, false); }
+                catch (er) {
+                    alert(er.message);
+                    submitting = false;
+                    setSubmitLoading(false);
+                }
                 return;
             }
 
-            if (!textarea.value.trim()) { alert('请输入内容！'); return; }
-
             const oldHtml = submitBtn.innerHTML;
-            setBtnLoading(submitBtn, true, '截屏中...');
+            setSubmitLoading(true, '截屏中...');
             try {
-                render(previewEl, textarea.value.trim());
-                await new Promise(r => setTimeout(r, 300));
-
-                const dataUrl = await capture(previewEl);
-                if (!dataUrl) { setBtnLoading(submitBtn, false, oldHtml); return; }
+                const dataUrl = await renderAndCapturePreview();
+                if (!dataUrl) {
+                    submitting = false;
+                    setSubmitLoading(false, oldHtml);
+                    return;
+                }
 
                 const dt = new DataTransfer();
-                dt.items.add(new File([dataURLtoBlob(dataUrl)], 'answer.png', { type: 'image/png' }));
+                dt.items.add(new File([dataURLtoBlob(dataUrl)], getAnswerImageFileName(), { type: 'image/png' }));
                 origField.files = dt.files;
 
-                setBtnLoading(submitBtn, true, '提交中...');
+                setSubmitLoading(true, '提交中...');
                 clearDraft(); // 提交成功，清除草稿
                 HTMLFormElement.prototype.submit.call(formEl);
             } catch (err) {
                 alert('提交失败: ' + err.message);
-                setBtnLoading(submitBtn, false, oldHtml);
+                submitting = false;
+                setSubmitLoading(false, oldHtml);
             }
         }
 
         formEl.addEventListener('submit', handleSubmit, true);
         submitBtn.addEventListener('click', handleSubmit, true);
+        exportBtn.addEventListener('click', handleExport, true);
+        submitActionBtn.addEventListener('click', handleSubmit, true);
 
         return { textarea, previewEl };
     }
 
     // ---- 入口 ----
     async function init() {
+        try {
+            if (typeof window.__GM_ready === 'function') await window.__GM_ready();
+        } catch {}
+        if (!isEnabled()) return;
         if (!isPaperPage()) return;
         console.log('[BN-Paper-Editor] 初始化...');
         if (!(await waitForDeps())) return;
-        injectAssets();
+        await injectAssets();
         await new Promise(r => setTimeout(r, 300));
 
         const formEl = document.querySelector('#submit_code');

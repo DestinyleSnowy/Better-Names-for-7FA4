@@ -15,6 +15,17 @@ import stat
 import urllib3
 from pathlib import Path
 from urllib.parse import urlparse
+
+for stream in (sys.stdout, sys.stderr):
+    try:
+        if hasattr(stream, "reconfigure"):
+            kwargs = {"errors": "replace"}
+            if not stream.isatty():
+                kwargs["encoding"] = "utf-8"
+            stream.reconfigure(**kwargs)
+    except Exception:
+        pass
+
 try:
     import requests
     from requests.adapters import HTTPAdapter
