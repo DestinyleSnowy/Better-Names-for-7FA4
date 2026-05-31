@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Better Names for 7FA4",
-  "version": "2026.9",
-  "version_name": "2026.09",
+  "version": "2026.8",
+  "version_name": "2026.08",
   "description": "强大的 7FA4 用户名与颜色映射插件",
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"

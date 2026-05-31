@@ -180,7 +180,7 @@
     const manifestVersionInfo = parseComparableVersion(manifestVersion);
     const WELCOME_SEEN_VERSION_KEY = 'bn.welcome.seenVersion';
     const WELCOME_BASE_VERSION = '2026.07';
-    const WELCOME_PATCH_TITLE = '新增版本 Better Names for 7FA4 2026.09';
+    const WELCOME_PATCH_TITLE = '新增版本 Better Names for 7FA4 2026.08';
     const WELCOME_CHANGELOG_CODE_NAME = '好久不见';
     const WELCOME_CHANGELOG_2026_07_ITEMS = [
         {
@@ -215,13 +215,14 @@
         {text: '优化个人计划日期导航样式，支持拖动调整位置。'},
         {text: '修复聊天室存在的部分问题'},
     ];
-    const WELCOME_CHANGELOG_2026_09_ITEMS = [
+    const WELCOME_CHANGELOG_2026_08_ITEMS = [
         {text: '新增纸面作业编辑器。'},
         {text: '移除纸面作业编辑器的“导出图片”和“导出图片并提交”额外按钮，保留原提交按钮生成图片并提交。'},
         {text: '修复提交后纸面题编辑器可能嵌入“已提交作业”展开面板的问题。'},
         {text: '修复纸面题编辑器生成含 LaTeX 内容的提交图片时 MathML 辅助层混入图片的问题。'},
         {text: '修复聊天室部分好友缺少 real_name 时不显示的问题。'},
         {text: '修复聊天室文本文件上传内容未转义导致预览结构异常的问题。'},
+        {text: '新增聊天室长消息折叠，降低超长文本撑开聊天窗口的影响。'},
         {text: '增强聊天室接口响应字段兼容性，并防止重复发送。'},
     ];
     const WELCOME_PATCH_CHANGELOGS = [
@@ -234,8 +235,8 @@
             items: WELCOME_CHANGELOG_2026_07_02_ITEMS,
         },
         {
-            version: '2026.09',
-            items: WELCOME_CHANGELOG_2026_09_ITEMS,
+            version: '2026.08',
+            items: WELCOME_CHANGELOG_2026_08_ITEMS,
         },
     ];
     const isSupportedHostname = (host) => {
@@ -958,6 +959,8 @@
     const CHAT_ACTIVITY_HYDRATE_BATCH_SIZE = 2;
     const CHAT_ACTIVITY_PROBE_TAKE = 3;
     const CHAT_UPLOAD_MAX_BYTES = 512 * 1024;
+    const CHAT_MESSAGE_COLLAPSE_TEXT_LIMIT = 1200;
+    const CHAT_MESSAGE_COLLAPSE_MAX_HEIGHT = 180;
     const CHAT_CACHE_KEY = 'bn.chat.messageCache.v1';
     const CHAT_CACHE_VERSION = 1;
     const CHAT_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -5690,6 +5693,44 @@
         };
     }
 
+    function chatFormatCollapsedMessageLength(length) {
+        const safeLength = Math.max(0, Math.floor(Number(length) || 0));
+        return safeLength >= 10000 ? `${Math.round(safeLength / 1000)}k` : String(safeLength);
+    }
+
+    function chatApplyLongMessageCollapse(row, contentEl, rawContent) {
+        if (!row || !contentEl) return;
+        const rawLength = String(rawContent || '').length;
+        const renderedTextLength = String(contentEl.textContent || '').length;
+        const visibleLength = Math.max(rawLength, renderedTextLength);
+        const tooLong = visibleLength > CHAT_MESSAGE_COLLAPSE_TEXT_LIMIT;
+        const tooTall = contentEl.scrollHeight > CHAT_MESSAGE_COLLAPSE_MAX_HEIGHT + 8;
+        if (!tooLong && !tooTall) return;
+
+        row.classList.add('is-collapsible', 'is-collapsed');
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'bn-chat-message-collapse-toggle';
+        toggle.dataset.collapsedLabel = `展开长消息（${chatFormatCollapsedMessageLength(visibleLength)} 字）`;
+        toggle.dataset.expandedLabel = '收起长消息';
+        toggle.setAttribute('aria-expanded', 'false');
+        toggle.textContent = toggle.dataset.collapsedLabel;
+        row.appendChild(toggle);
+    }
+
+    function chatToggleLongMessage(button) {
+        const row = button && typeof button.closest === 'function'
+            ? button.closest('.bn-chat-message.is-collapsible')
+            : null;
+        if (!row) return;
+        const willExpand = row.classList.contains('is-collapsed');
+        row.classList.toggle('is-collapsed', !willExpand);
+        button.setAttribute('aria-expanded', willExpand ? 'true' : 'false');
+        button.textContent = willExpand
+            ? (button.dataset.expandedLabel || '收起长消息')
+            : (button.dataset.collapsedLabel || '展开长消息');
+    }
+
     function chatDeserializeMessage(raw) {
         if (!raw || typeof raw !== 'object') return null;
         const content = String(raw.content || '');
@@ -5877,6 +5918,7 @@
             row.appendChild(meta);
             row.appendChild(content);
             chatMessageListEl.appendChild(row);
+            chatApplyLongMessageCollapse(row, content, message.content || '[空消息]');
         });
 
         if (typeof window.__BN_highlightCodeTheme === 'function') {
@@ -7308,6 +7350,15 @@
     let checkLoadDebounceTimer = null;
     let checkLoadWheelThrottleTimer = null;
     if (chatMessageListEl) {
+        chatMessageListEl.addEventListener('click', (event) => {
+            const toggle = event.target && typeof event.target.closest === 'function'
+                ? event.target.closest('.bn-chat-message-collapse-toggle')
+                : null;
+            if (!toggle || !chatMessageListEl.contains(toggle)) return;
+            event.preventDefault();
+            event.stopPropagation();
+            chatToggleLongMessage(toggle);
+        });
         chatMessageListEl.addEventListener('scroll', () => {
             if (checkLoadDebounceTimer) {
                 clearTimeout(checkLoadDebounceTimer);

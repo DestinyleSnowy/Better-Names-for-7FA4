@@ -2841,6 +2841,7 @@
 }
 
 .bn-chat-message {
+    --bn-chat-message-fade-bg: var(--bn-surface);
     max-width: 86%;
     border: 1px solid var(--bn-border-subtle);
     border-radius: 12px;
@@ -2851,6 +2852,7 @@
 }
 
 .bn-chat-message.is-self {
+    --bn-chat-message-fade-bg: #e7f1fc;
     align-self: flex-end;
     background: linear-gradient(140deg, rgba(30, 136, 229, 0.2), rgba(30, 136, 229, 0.08));
     border-color: rgba(30, 136, 229, 0.35);
@@ -2879,11 +2881,69 @@
 }
 
 .bn-chat-message-content {
+    position: relative;
+    max-width: 100%;
     font-size: 13px;
     color: var(--bn-text);
     line-height: 1.45;
     white-space: pre-wrap;
     word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.bn-chat-message-content pre,
+.bn-chat-message-content code {
+    max-width: 100%;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.bn-chat-message-content img {
+    max-width: 100%;
+    height: auto;
+}
+
+.bn-chat-message.is-collapsed .bn-chat-message-content {
+    max-height: 180px;
+    overflow: hidden;
+}
+
+.bn-chat-message.is-collapsed .bn-chat-message-content::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 42px;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0), var(--bn-chat-message-fade-bg) 78%);
+}
+
+.bn-chat-message-collapse-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 6px;
+    padding: 2px 0;
+    border: 0;
+    background: transparent;
+    color: var(--bn-theme-color, #1e88e5);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.4;
+    cursor: pointer;
+}
+
+.bn-chat-message-collapse-toggle:hover,
+.bn-chat-message-collapse-toggle:focus-visible {
+    color: var(--bn-theme-color-hover, #1565c0);
+    text-decoration: underline;
+    outline: none;
+}
+
+.bn-chat-message.is-self .bn-chat-message-collapse-toggle {
+    display: flex;
+    margin-left: auto;
 }
 
 .bn-chat-composer {
@@ -3172,7 +3232,12 @@
     background: rgba(255, 255, 255, 0.06);
 }
 
+#bn-container.bn-theme-dark .bn-chat-message {
+    --bn-chat-message-fade-bg: #111b2c;
+}
+
 #bn-container.bn-theme-dark .bn-chat-message.is-self {
+    --bn-chat-message-fade-bg: #182b48;
     background: linear-gradient(140deg, rgba(56, 141, 227, 0.32), rgba(56, 141, 227, 0.14));
     border-color: rgba(56, 141, 227, 0.5);
 }
