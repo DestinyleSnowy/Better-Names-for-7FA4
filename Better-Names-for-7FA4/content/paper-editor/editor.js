@@ -397,16 +397,6 @@
         return `answer-${id}.png`;
     };
 
-    const downloadDataUrl = (dataUrl, filename) => {
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = filename;
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-    };
-
     const isSubmittedHomeworkHeader = el => {
         if (!el || !el.matches?.('h4.ui.top.block.attached.header')) return false;
         return (el.textContent || '').replace(/\s+/g, '').includes('已提交作业');
@@ -590,22 +580,7 @@
         sb.className = 'bn-pe-statusbar';
         const cc = document.createElement('span');
         cc.textContent = '0 字符';
-        const actionWrap = document.createElement('div');
-        actionWrap.className = 'bn-pe-actions';
-        const exportBtn = document.createElement('button');
-        exportBtn.type = 'button';
-        exportBtn.className = 'bn-pe-action bn-pe-export';
-        exportBtn.title = '导出预览图片到本地';
-        const exportIdleHtml = `${I.IMG}<span>导出图片</span>`;
-        exportBtn.innerHTML = exportIdleHtml;
-        const submitActionBtn = document.createElement('button');
-        submitActionBtn.type = 'button';
-        submitActionBtn.className = 'bn-pe-action bn-pe-submit';
-        submitActionBtn.title = '导出预览图片并提交答案';
-        const submitActionIdleHtml = `${I.TK}<span>导出图片并提交</span>`;
-        submitActionBtn.innerHTML = submitActionIdleHtml;
-        actionWrap.append(exportBtn, submitActionBtn);
-        sb.append(cc, actionWrap);
+        sb.append(cc);
 
         container.append(toolbar, body, sb);
 
@@ -649,7 +624,7 @@
             const hint = document.createElement('span');
             hint.textContent = '已恢复草稿';
             hint.style.cssText = 'color:var(--bn-primary);font-size:11px;margin-left:8px;opacity:1;transition:opacity .6s ease 2s;';
-            sb.insertBefore(hint, actionWrap);
+            sb.appendChild(hint);
             setTimeout(() => { hint.style.opacity = '0'; setTimeout(() => hint.remove(), 700); }, 100);
         }
 
@@ -666,25 +641,8 @@
 
         // 提交拦截
         let submitting = false;
-        let exporting = false;
-        const setActionLoading = (btn, loading, text, idleHtml) => {
-            btn.disabled = loading;
-            btn.innerHTML = loading
-                ? '<i class="spinner loading icon"></i> ' + (text || '处理中...')
-                : idleHtml;
-        };
-        const setSubmitActionLoading = (loading, text) => {
-            setActionLoading(submitActionBtn, loading, text, submitActionIdleHtml);
-        };
-        const setExportLoading = (loading, text) => {
-            setActionLoading(exportBtn, loading, text, exportIdleHtml);
-            submitBtn.disabled = loading;
-            submitActionBtn.disabled = loading;
-        };
         const setSubmitLoading = (loading, text) => {
             setBtnLoading(submitBtn, loading, text);
-            setSubmitActionLoading(loading, text);
-            exportBtn.disabled = loading;
         };
         const renderAndCapturePreview = async () => {
             if (!textarea.value.trim()) {
@@ -695,22 +653,6 @@
             await new Promise(r => setTimeout(r, 300));
             return capture(previewEl);
         };
-
-        async function handleExport(e) {
-            e?.preventDefault();
-            e?.stopPropagation();
-            e?.stopImmediatePropagation?.();
-            if (exporting || submitting) return;
-            exporting = true;
-            setExportLoading(true, '导出中...');
-            try {
-                const dataUrl = await renderAndCapturePreview();
-                if (dataUrl) downloadDataUrl(dataUrl, getAnswerImageFileName());
-            } finally {
-                exporting = false;
-                setExportLoading(false);
-            }
-        }
 
         async function handleSubmit(e) {
             e?.preventDefault();
@@ -757,8 +699,6 @@
 
         formEl.addEventListener('submit', handleSubmit, true);
         submitBtn.addEventListener('click', handleSubmit, true);
-        exportBtn.addEventListener('click', handleExport, true);
-        submitActionBtn.addEventListener('click', handleSubmit, true);
 
         return { textarea, previewEl };
     }
