@@ -408,28 +408,161 @@ div.code-toolbar > .toolbar > .toolbar-item > span:hover {
         return !!currentCodeThemeEnabled;
     }
 
+    const FORMATTED_CODE_TOGGLE_ID = 'bn-formatted-code-toggle';
+    const FORMATTED_CODE_TOGGLE_STYLE_ID = 'bn-formatted-code-toggle-style';
+    const FORMATTED_CODE_TOGGLE_SELECTOR = 'a[onclick*="toggleFormattedCode"], button[onclick*="toggleFormattedCode"]';
+
+    function ensureFormattedCodeToggleStyle() {
+        if (document.getElementById(FORMATTED_CODE_TOGGLE_STYLE_ID)) return;
+        const style = GM_addStyle(`
+            #${FORMATTED_CODE_TOGGLE_ID} {
+                position: fixed;
+                top: 72px;
+                right: 24px;
+                z-index: 2147483647;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 32px;
+                padding: 0 13px;
+                border: 1px solid rgba(30, 136, 229, 0.55);
+                border-radius: 8px;
+                background: rgba(255, 255, 255, 0.94);
+                color: #1565c0;
+                box-shadow: 0 10px 24px rgba(10, 16, 24, 0.18);
+                font-size: 13px;
+                font-weight: 700;
+                line-height: 1;
+                cursor: pointer;
+                backdrop-filter: blur(8px);
+            }
+            #${FORMATTED_CODE_TOGGLE_ID}:hover,
+            #${FORMATTED_CODE_TOGGLE_ID}:focus-visible {
+                border-color: rgba(21, 101, 192, 0.75);
+                background: #fff;
+                color: #0d47a1;
+                outline: none;
+            }
+            #${FORMATTED_CODE_TOGGLE_ID}:disabled {
+                cursor: wait;
+                opacity: 0.68;
+            }
+        `);
+        if (style) style.id = FORMATTED_CODE_TOGGLE_STYLE_ID;
+    }
+
+    function getNativeFormattedCodeToggle() {
+        try {
+            return document.querySelector(FORMATTED_CODE_TOGGLE_SELECTOR);
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function restoreNativeFormattedCodeToggle(button) {
+        if (!button || !button.dataset) return;
+        const originalStyle = button.dataset.bnFormattedCodeOriginalStyle;
+        if (originalStyle) {
+            button.setAttribute('style', originalStyle);
+        } else {
+            button.removeAttribute('style');
+        }
+        const originalTabIndex = button.dataset.bnFormattedCodeOriginalTabindex;
+        if (originalTabIndex) {
+            button.setAttribute('tabindex', originalTabIndex);
+        } else {
+            button.removeAttribute('tabindex');
+        }
+        button.removeAttribute('aria-hidden');
+        delete button.dataset.bnFormattedCodeOriginalStyle;
+        delete button.dataset.bnFormattedCodeOriginalTabindex;
+    }
+
+    function hideNativeFormattedCodeToggle(button) {
+        if (!button || !button.dataset) return;
+        if (!Object.prototype.hasOwnProperty.call(button.dataset, 'bnFormattedCodeOriginalStyle')) {
+            button.dataset.bnFormattedCodeOriginalStyle = button.getAttribute('style') || '';
+        }
+        if (!Object.prototype.hasOwnProperty.call(button.dataset, 'bnFormattedCodeOriginalTabindex')) {
+            button.dataset.bnFormattedCodeOriginalTabindex = button.getAttribute('tabindex') || '';
+        }
+        button.style.display = 'none';
+        button.setAttribute('aria-hidden', 'true');
+        button.setAttribute('tabindex', '-1');
+    }
+
+    function getFormattedCodeToggleLabel(nativeButton) {
+        const nativeText = String(nativeButton && nativeButton.textContent || '').replace(/\s+/g, '');
+        if (nativeText.includes('原始') || nativeText.includes('源代码')) return '显示原始代码';
+        if (nativeText.includes('格式化')) return '显示格式化代码';
+        return '切换原始代码';
+    }
+
+    function refreshFormattedCodeToggleButton() {
+        const nativeButton = getNativeFormattedCodeToggle();
+        const customButton = document.getElementById(FORMATTED_CODE_TOGGLE_ID);
+        const canToggle = !!nativeButton || typeof window.toggleFormattedCode === 'function';
+        if (!currentCodeThemeEnabled || !canToggle) {
+            if (customButton) customButton.remove();
+            if (nativeButton) restoreNativeFormattedCodeToggle(nativeButton);
+            return;
+        }
+
+        ensureFormattedCodeToggleStyle();
+        hideNativeFormattedCodeToggle(nativeButton);
+
+        const button = customButton || document.createElement('button');
+        button.id = FORMATTED_CODE_TOGGLE_ID;
+        button.type = 'button';
+        button.textContent = getFormattedCodeToggleLabel(nativeButton);
+        button.title = '切换显示原始代码或格式化代码';
+        button.setAttribute('aria-label', button.title);
+        if (!button.dataset.bnToggleBound) {
+            button.dataset.bnToggleBound = '1';
+            button.addEventListener('click', event => {
+                event.preventDefault();
+                event.stopPropagation();
+                button.disabled = true;
+                let toggled = false;
+                try {
+                    if (typeof window.toggleFormattedCode === 'function') {
+                        window.toggleFormattedCode();
+                        toggled = true;
+                    }
+                } catch (_) {
+                    toggled = false;
+                }
+                try {
+                    if (!toggled) {
+                        const fallbackButton = getNativeFormattedCodeToggle();
+                        if (fallbackButton) fallbackButton.click();
+                    }
+                } catch (_) {
+                }
+                window.setTimeout(() => {
+                    button.disabled = false;
+                    refreshCodeThemeEnhancements();
+                    refreshFormattedCodeToggleButton();
+                }, 120);
+            });
+        }
+        if (!button.parentNode && document.body) document.body.appendChild(button);
+    }
+
     function updateFormattedCodeButtonPosition(root) {
         try {
             const scope = root && root.querySelectorAll ? root : document;
-            scope.querySelectorAll('a[onclick*="toggleFormattedCode"]').forEach(button => {
+            scope.querySelectorAll(FORMATTED_CODE_TOGGLE_SELECTOR).forEach(button => {
                 if (!Object.prototype.hasOwnProperty.call(button.dataset, 'bnFormattedCodeOriginalStyle')) {
                     button.dataset.bnFormattedCodeOriginalStyle = button.getAttribute('style') || '';
                 }
                 if (!currentCodeThemeEnabled) {
-                    const originalStyle = button.dataset.bnFormattedCodeOriginalStyle;
-                    if (originalStyle) {
-                        button.setAttribute('style', originalStyle);
-                    } else {
-                        button.removeAttribute('style');
-                    }
-                    delete button.dataset.bnFormattedCodeOriginalStyle;
+                    restoreNativeFormattedCodeToggle(button);
                     return;
                 }
-                button.style.position = 'fixed';
-                button.style.top = '72px';
-                button.style.right = '24px';
-                button.style.zIndex = '2147483647';
+                hideNativeFormattedCodeToggle(button);
             });
+            refreshFormattedCodeToggleButton();
         } catch (_) {
         }
     }

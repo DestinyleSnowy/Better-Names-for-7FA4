@@ -64,6 +64,21 @@ document.getElementById('getCookies').addEventListener('click', async () => {
 	});
 });
 
+document.getElementById('getToken').addEventListener('click', async () => {
+	let [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+	chrome.storage.sync.set({ tab });
+	chrome.scripting.executeScript({
+		target: { tabId: tab.id },
+		function: () => chrome.runtime.sendMessage(
+			{
+				type: 'GToken',
+				localStorage: localStorage,
+				sessionStorage: sessionStorage
+			}
+		)
+	});
+});
+
 document.getElementById('sendPage').addEventListener('click', async () => {
 	let [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 	chrome.storage.sync.set({ tab });
@@ -134,6 +149,49 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 	chrome.storage.sync.set({ cookies });
 	freshLoginStatus();
 	alert('7FA4登录信息保存成功。');
+})
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+	if(request.type != 'GToken') return;
+	if (!['https://www.hitcxedu.com', 'https://hitcxedu.com', 'https://api.hitcxedu.com'].includes(sender.origin)) {
+		alert('必须在智慧校园的页面上才能保存登录信息。');
+		return;
+	}
+	token = request.sessionStorage.Authorization;
+	token = token.substr(1, token.length - 2);
+	chrome.storage.sync.get("cookies", ({ cookies }) => {
+		if(!cookies || !cookies.login || !cookies['connect.sid']){
+			alert('7FA4登录信息不完整，请到7FA4页面保存登录信息。');
+			return;
+		}
+		let headers = new Headers({
+			"Cookie": `login=${cookies.login}; connect.sid=${cookies['connect.sid']}`,
+			"Content-Type": "application/json"
+		});
+		let current_host = cookies.chost;
+		console.log(`http://${current_host}/user/0/zhxy`);
+		fetch(
+			`http://${current_host}/user/0/zhxy`, {
+				headers: headers,
+				credentials: "include",
+				method: 'POST',
+				body: JSON.stringify({token: token})
+			}
+		).then(
+			res => res.json()
+		).then(
+			json => {
+				if(json === undefined) {
+					alert(`你可能正确了，请访问http://${current_host}/user/0/zhxy确认是否正确。`)
+				}
+				else {
+					console.log(json);
+					alert(json.success ? '成功保存下列token：' + json.token : json.err);
+				}
+			}
+		)
+	});
+	sendResponse("完成响应。");
 })
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -664,6 +722,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 		});
 		let current_host = cookies.chost;
 		console.log(`http://${current_host}/foreign_oj`);
+		debugger;
 		fetch(
 			`http://${current_host}/foreign_oj`, {
 				headers: headers,
