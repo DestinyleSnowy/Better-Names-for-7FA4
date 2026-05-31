@@ -5387,13 +5387,29 @@
         chatState.lastActivitySecByKey.set(key, activitySec);
     }
 
+    function chatBuildMessageListSignature(messages) {
+        return (Array.isArray(messages) ? messages : []).map((item) => {
+            if (!item || typeof item !== 'object') return '';
+            const sec = chatNormalizeTimestampToSec(item.sec);
+            return [
+                String(item.id || ''),
+                Number.isFinite(sec) ? String(sec) : '',
+                String(item.direction || ''),
+                item.isSelf ? '1' : '0',
+                String(item.content || ''),
+            ].join('\x1f');
+        }).join('\x1e');
+    }
+
     function chatRememberConversationMessages(conversation, incomingMessages, {
         trackUnread = false, notify = false, rerenderList = false, updateOldest = true,
     } = {}) {
-        if (!conversation) return {merged: [], newIncoming: [], hadBaseline: false};
+        if (!conversation) return {merged: [], newIncoming: [], hadBaseline: false, changed: false, unreadChanged: false};
         const key = conversation.key;
         const existing = (chatState.messagesByKey.get(key) || [])
             .filter((item) => chatMessageBelongsToConversation(item, conversation, item && item.direction));
+        const beforeSignature = chatBuildMessageListSignature(existing);
+        const previousUnreadCount = chatGetUnreadCount(key);
         const hadBaseline = chatState.trackedConversationKeys.has(key);
         const pendingActivityBaselineSec = chatNormalizeTimestampToSec(chatState.activityAlertBaselineSecByKey.get(key));
         const activityBaselineSec = Number.isFinite(pendingActivityBaselineSec) ? pendingActivityBaselineSec : chatGetConversationLastActivitySec(key);
@@ -5440,12 +5456,14 @@
             chatState.unreadCountByKey.delete(key);
         }
 
-        if (rerenderList) chatUpdateUnreadUi({rerenderList: true}); else {
+        const changed = beforeSignature !== chatBuildMessageListSignature(merged);
+        const unreadChanged = previousUnreadCount !== chatGetUnreadCount(key);
+        if (rerenderList && (changed || unreadChanged)) chatUpdateUnreadUi({rerenderList: true}); else {
             chatResortConversationState();
             chatUpdateTriggerUnreadUi();
         }
-        chatScheduleMessageCacheSave();
-        return {merged, newIncoming, hadBaseline};
+        if (changed || unreadChanged || newIncoming.length) chatScheduleMessageCacheSave();
+        return {merged, newIncoming, hadBaseline, changed, unreadChanged};
     }
 
     function chatRenderConversationList() {
@@ -6114,11 +6132,15 @@
         try {
             const latestMessages = await chatFetchConversationMessages(conversation);
             if (seq !== chatState.requestSeq) return;
-            const {merged} = chatRememberConversationMessages(conversation, latestMessages, {
+            const {merged, changed, unreadChanged} = chatRememberConversationMessages(conversation, latestMessages, {
                 trackUnread: true, notify: silent, rerenderList: true,
             });
-            chatRenderMessages({preserveScroll, forceScrollBottom: !silent});
-            if (!silent) chatSetStatus(`消息已更新（${merged.length} 条）`, 'success');
+            if (!silent || changed || unreadChanged) {
+                chatRenderMessages({preserveScroll, forceScrollBottom: !silent});
+            }
+            if (!silent) {
+                chatSetStatus(changed ? `消息已更新（${merged.length} 条）` : `消息无变化（${merged.length} 条）`, 'success');
+            }
         } catch (error) {
             if (seq !== chatState.requestSeq) return;
             chatSetStatus(`刷新消息失败：${error && error.message ? error.message : '未知错误'}`, 'error');
