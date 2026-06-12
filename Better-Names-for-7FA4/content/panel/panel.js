@@ -822,6 +822,8 @@
     }
     document.body.appendChild(container);
     bringContainerToFront();
+    window.__BN_PANEL_READY__ = true;
+    window.dispatchEvent(new CustomEvent('bn-panel-ready', {detail: {containerId: container.id}}));
 
     const panel = document.getElementById('bn-panel');
     const pinBtn = document.getElementById('bn-pin');
@@ -909,6 +911,8 @@
     const chatInputPreviewEl = container.querySelector('#bn-chat-preview');
     const chatInputPreviewToggleEl = container.querySelector('#bn-chat-preview-enabled');
     const chatEditorRowEl = container.querySelector('.bn-chat-editor-row');
+    const BN_NEW_CHAT_FRONTEND = true;
+    window.__BN_NEW_CHAT_FRONTEND__ = BN_NEW_CHAT_FRONTEND;
 
     const chatState = {
         initialized: false,
@@ -2208,6 +2212,7 @@
         event.preventDefault();
         wakeController.toggleFromTrigger();
     });
+    if (!BN_NEW_CHAT_FRONTEND) {
     if (chatTrigger) {
         const onChatTrigger = (event) => {
             if (isDragging || container.classList.contains('bn-dragging')) return;
@@ -2287,6 +2292,7 @@
     });
     chatUpdateFullscreenButton();
     chatSetGroupOpsVisible(false);
+    }
     container.addEventListener('focusin', wakeController.onFocusIn);
     container.addEventListener('focusout', wakeController.onFocusOut);
 
@@ -7077,13 +7083,15 @@
     if (!JOIN_PLAN_STATUS_BLOCKED_PATH_RE.test(location.pathname || '')) {
         refreshJoinPlanStatus();
     }
-    chatSetWindowVisible(false);
-    chatScheduleBackgroundMonitorSync(1500);
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') chatScheduleBackgroundMonitorSync(100);
-    });
-    window.addEventListener('focus', () => chatScheduleBackgroundMonitorSync(100));
-    window.addEventListener('pageshow', () => chatScheduleBackgroundMonitorSync(100));
+    if (!BN_NEW_CHAT_FRONTEND) {
+        chatSetWindowVisible(false);
+        chatScheduleBackgroundMonitorSync(1500);
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') chatScheduleBackgroundMonitorSync(100);
+        });
+        window.addEventListener('focus', () => chatScheduleBackgroundMonitorSync(100));
+        window.addEventListener('pageshow', () => chatScheduleBackgroundMonitorSync(100));
+    }
     // 初次遍历
     document.querySelectorAll(USER_LINK_SELECTOR).forEach(processUserLink);
     document.querySelectorAll('#vueAppFuckSafari > tbody > tr > td:nth-child(2) > a > span').forEach(processProblemTitle)
@@ -7303,7 +7311,7 @@
         }
     }
 
-    if (chatInputEl) {
+    if (!BN_NEW_CHAT_FRONTEND && chatInputEl) {
         chatInputEl.addEventListener('dragover', (e) => {
             e.preventDefault();
             checkCursorToMouse(e);
@@ -7350,7 +7358,7 @@
 
     let checkLoadDebounceTimer = null;
     let checkLoadWheelThrottleTimer = null;
-    if (chatMessageListEl) {
+    if (!BN_NEW_CHAT_FRONTEND && chatMessageListEl) {
         chatMessageListEl.addEventListener('click', (event) => {
             const toggle = event.target && typeof event.target.closest === 'function'
                 ? event.target.closest('.bn-chat-message-collapse-toggle')

@@ -56,6 +56,7 @@
       ],
       "css": [
         "content/panel/panel.css",
+        "content/panel/chat.css",
         "content/libs/katex/katex.min.css",
         "content/paper-editor/editor.css"
       ],
@@ -68,6 +69,7 @@
         "content/paper-editor/html2canvas.min.js",
         "content/base.js",
         "content/panel/panel.js",
+        "content/panel/chat.js",
         "content/paper-editor/editor.js",
         "content/main.js"
       ],
