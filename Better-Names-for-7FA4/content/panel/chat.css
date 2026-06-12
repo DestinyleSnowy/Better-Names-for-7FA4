@@ -562,8 +562,17 @@
     position: relative;
     min-height: 112px;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(220px, 36%);
-    gap: 10px;
+    grid-template-columns: minmax(0, 1fr) 8px minmax(220px, var(--bn-chat2-preview-width, 36%));
+    gap: 6px;
+}
+
+.bn-chat2-editor.is-preview-off {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.bn-chat2-editor.is-resizing {
+    cursor: col-resize;
+    user-select: none;
 }
 
 .bn-chat2-input,
@@ -583,6 +592,38 @@
 
 .bn-chat2-input {
     resize: vertical;
+}
+
+.bn-chat2-preview-divider {
+    min-width: 8px;
+    min-height: 112px;
+    border-radius: 999px;
+    cursor: col-resize;
+    background: transparent;
+    position: relative;
+}
+
+.bn-chat2-preview-divider::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    bottom: 8px;
+    left: 3px;
+    width: 2px;
+    border-radius: 999px;
+    background: var(--bn-border);
+    transition: background .15s ease, width .15s ease, left .15s ease;
+}
+
+.bn-chat2-preview-divider:hover::before,
+.bn-chat2-editor.is-resizing .bn-chat2-preview-divider::before {
+    left: 2px;
+    width: 4px;
+    background: var(--bn-theme-color);
+}
+
+.bn-chat2-preview-divider[hidden] {
+    display: none;
 }
 
 .bn-chat2-input:focus {
@@ -605,12 +646,13 @@
 }
 
 .bn-chat2-mention-panel {
-    position: absolute;
-    left: 10px;
-    top: 10px;
-    z-index: 7;
-    width: min(320px, calc(100% - 12px));
-    max-height: 188px;
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 2147483647;
+    width: min(340px, calc(100vw - 16px));
+    max-height: min(260px, calc(100vh - 16px));
+    overscroll-behavior: contain;
     overflow: auto;
     padding: 6px;
     border: 1px solid var(--bn-border);

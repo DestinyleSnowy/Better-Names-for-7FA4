@@ -1318,18 +1318,17 @@
     }
 
     function positionMentionList() {
-        if (!els.mentionPanel || !els.input || !els.editor) return;
+        if (!els.mentionPanel || !els.input) return;
         const inputRect = els.input.getBoundingClientRect();
-        const editorRect = els.editor.getBoundingClientRect();
         const caret = textareaCaretCoordinates(els.input, state.mention.end);
         const panelWidth = els.mentionPanel.offsetWidth || 260;
         const panelHeight = els.mentionPanel.offsetHeight || 160;
-        const maxLeft = Math.max(6, editorRect.width - panelWidth - 6);
-        const maxTop = Math.max(6, editorRect.height - panelHeight - 6);
-        const rawLeft = inputRect.left - editorRect.left + caret.left;
-        const rawTop = inputRect.top - editorRect.top + caret.top + 6;
-        els.mentionPanel.style.left = `${Math.max(6, Math.min(maxLeft, rawLeft))}px`;
-        els.mentionPanel.style.top = `${Math.max(6, Math.min(maxTop, rawTop))}px`;
+        const maxLeft = Math.max(8, window.innerWidth - panelWidth - 8);
+        const maxTop = Math.max(8, window.innerHeight - panelHeight - 8);
+        const rawLeft = inputRect.left + caret.left;
+        const rawTop = inputRect.top + caret.top + 6;
+        els.mentionPanel.style.left = `${Math.max(8, Math.min(maxLeft, rawLeft))}px`;
+        els.mentionPanel.style.top = `${Math.max(8, Math.min(maxTop, rawTop))}px`;
     }
 
     function renderMentionList() {
@@ -1805,15 +1804,50 @@
 
     function renderPreview() {
         if (!els.preview || !els.previewToggle || !els.input) return;
-        els.preview.hidden = !els.previewToggle.checked;
+        const enabled = !!els.previewToggle.checked;
+        els.preview.hidden = !enabled;
+        if (els.previewDivider) els.previewDivider.hidden = !enabled;
+        if (els.editor) els.editor.classList.toggle('is-preview-off', !enabled);
         clearNode(els.preview);
-        if (!els.previewToggle.checked) return;
+        if (!enabled) {
+            hideMentionList();
+            return;
+        }
         const value = els.input.value || '';
         if (!value.trim()) {
             els.preview.appendChild(createElement('span', {className: 'bn-chat2-preview-placeholder', text: '预览'}));
             return;
         }
         renderMarkdownInto(els.preview, value);
+    }
+
+    function beginComposerSplitResize(event) {
+        if (!els.editor || !els.preview || !els.previewToggle || !els.previewToggle.checked) return;
+        if (event.button != null && event.button !== 0) return;
+        event.preventDefault();
+        const editorRect = els.editor.getBoundingClientRect();
+        const previewRect = els.preview.getBoundingClientRect();
+        const startX = event.clientX;
+        const startPreviewWidth = previewRect.width || 260;
+        const minInputWidth = 260;
+        const minPreviewWidth = 220;
+        const maxPreviewWidth = Math.max(minPreviewWidth, editorRect.width - minInputWidth - 8);
+        const onMove = (moveEvent) => {
+            const deltaX = moveEvent.clientX - startX;
+            const nextWidth = Math.max(minPreviewWidth, Math.min(maxPreviewWidth, startPreviewWidth - deltaX));
+            els.editor.style.setProperty('--bn-chat2-preview-width', `${Math.round(nextWidth)}px`);
+            if (state.mention.active) positionMentionList();
+        };
+        const cleanup = () => {
+            els.editor.classList.remove('is-resizing');
+            window.removeEventListener('pointermove', onMove, true);
+            window.removeEventListener('pointerup', cleanup, true);
+            window.removeEventListener('pointercancel', cleanup, true);
+        };
+        els.editor.classList.add('is-resizing');
+        window.addEventListener('pointermove', onMove, true);
+        window.addEventListener('pointerup', cleanup, true);
+        window.addEventListener('pointercancel', cleanup, true);
     }
 
     async function sendCurrentMessage() {
@@ -2528,14 +2562,21 @@
             placeholder: '输入消息，Enter 发送，Shift+Enter 换行',
         });
         els.preview = createElement('div', {className: 'bn-chat2-preview'});
+        els.previewDivider = createElement('div', {
+            className: 'bn-chat2-preview-divider',
+            role: 'separator',
+            'aria-orientation': 'vertical',
+            title: '拖动调整输入和预览宽度',
+        });
         els.mentionPanel = createElement('div', {
             className: 'bn-chat2-mention-panel',
             role: 'listbox',
             hidden: true,
         });
         editor.appendChild(els.input);
+        editor.appendChild(els.previewDivider);
         editor.appendChild(els.preview);
-        editor.appendChild(els.mentionPanel);
+        document.body.appendChild(els.mentionPanel);
         const footer = createElement('div', {className: 'bn-chat2-composer-footer'});
         els.counter = createElement('div', {className: 'bn-chat2-counter', text: '0 / --'});
         els.send = button('bn-chat2-send', '发送');
@@ -2682,6 +2723,16 @@
         els.input.addEventListener('blur', () => {
             window.setTimeout(hideMentionList, 120);
         });
+        if (els.previewDivider) {
+            els.previewDivider.addEventListener('pointerdown', beginComposerSplitResize);
+        }
+        if (els.mentionPanel) {
+            els.mentionPanel.addEventListener('wheel', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                els.mentionPanel.scrollTop += event.deltaY;
+            }, {passive: false});
+        }
         els.input.addEventListener('paste', (event) => {
             const files = Array.from(event.clipboardData ? event.clipboardData.files : []);
             if (!files.length) return;
