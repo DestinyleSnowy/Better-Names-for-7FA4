@@ -237,6 +237,32 @@
 #bn-paper-preview .katex-display,
 #bn-paper-capture .katex-display { margin: 1em 0; overflow-x: auto; }
 
+#bn-paper-capture .katex-display {
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    scrollbar-width: none;
+}
+#bn-paper-capture .katex-display::-webkit-scrollbar { display: none; }
+#bn-paper-capture .katex-display > .katex {
+    display: inline-block;
+    max-width: none;
+}
+#bn-paper-capture .katex .frac-line,
+#bn-paper-capture .katex .overline-line,
+#bn-paper-capture .katex .underline-line,
+#bn-paper-capture .katex .hline {
+    border-bottom-style: solid !important;
+    border-bottom-color: currentColor !important;
+}
+#bn-paper-capture .katex .hdashline { border-bottom-color: currentColor !important; }
+#bn-paper-capture pre {
+    overflow: visible;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+#bn-paper-capture code { white-space: pre-wrap; }
+
 #bn-paper-preview .katex-mathml,
 #bn-paper-capture .katex-mathml {
     position: absolute !important;

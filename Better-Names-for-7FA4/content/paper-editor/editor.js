@@ -5,6 +5,29 @@
     const path = location.pathname || '';
     if (!/^\/problem\/7\d{3,}/.test(path)) return;
 
+    const KATEX_FONTS = [
+        ['KaTeX_AMS','KaTeX_AMS-Regular.woff2'],
+        ['KaTeX_Caligraphic','KaTeX_Caligraphic-Regular.woff2'],
+        ['KaTeX_Caligraphic','KaTeX_Caligraphic-Bold.woff2','bold'],
+        ['KaTeX_Fraktur','KaTeX_Fraktur-Regular.woff2'],
+        ['KaTeX_Fraktur','KaTeX_Fraktur-Bold.woff2','bold'],
+        ['KaTeX_Main','KaTeX_Main-Regular.woff2'],
+        ['KaTeX_Main','KaTeX_Main-Italic.woff2','normal','italic'],
+        ['KaTeX_Main','KaTeX_Main-Bold.woff2','bold'],
+        ['KaTeX_Main','KaTeX_Main-BoldItalic.woff2','bold','italic'],
+        ['KaTeX_Math','KaTeX_Math-Italic.woff2','normal','italic'],
+        ['KaTeX_Math','KaTeX_Math-BoldItalic.woff2','bold','italic'],
+        ['KaTeX_SansSerif','KaTeX_SansSerif-Regular.woff2'],
+        ['KaTeX_SansSerif','KaTeX_SansSerif-Italic.woff2','normal','italic'],
+        ['KaTeX_SansSerif','KaTeX_SansSerif-Bold.woff2','bold'],
+        ['KaTeX_Script','KaTeX_Script-Regular.woff2'],
+        ['KaTeX_Size1','KaTeX_Size1-Regular.woff2'],
+        ['KaTeX_Size2','KaTeX_Size2-Regular.woff2'],
+        ['KaTeX_Size3','KaTeX_Size3-Regular.woff2'],
+        ['KaTeX_Size4','KaTeX_Size4-Regular.woff2'],
+        ['KaTeX_Typewriter','KaTeX_Typewriter-Regular.woff2']
+    ];
+
     const isEnabled = () => {
         try {
             if (typeof GM_getValue === 'function') return GM_getValue('enablePaperEditor', true) !== false;
@@ -16,7 +39,7 @@
 
     const waitForDeps = () => new Promise(resolve => {
         const iv = setInterval(() => {
-            if (typeof marked !== 'undefined' && typeof renderMathInElement === 'function' && document.querySelector('#submit_code'))
+            if (typeof marked !== 'undefined' && typeof renderMathInElement === 'function' && typeof snapdom === 'function' && document.querySelector('#submit_code'))
                 { clearInterval(iv); resolve(true); }
         }, 200);
         setTimeout(() => { clearInterval(iv); resolve(false); }, 15000);
@@ -50,31 +73,9 @@
 
         if (document.getElementById('bn-pe-katex-fonts')) return;
         const base = chrome.runtime.getURL('content/libs/katex/fonts/');
-        const fonts = [
-            ['KaTeX_AMS','KaTeX_AMS-Regular.woff2'],
-            ['KaTeX_Caligraphic','KaTeX_Caligraphic-Regular.woff2'],
-            ['KaTeX_Caligraphic','KaTeX_Caligraphic-Bold.woff2','bold'],
-            ['KaTeX_Fraktur','KaTeX_Fraktur-Regular.woff2'],
-            ['KaTeX_Fraktur','KaTeX_Fraktur-Bold.woff2','bold'],
-            ['KaTeX_Main','KaTeX_Main-Regular.woff2'],
-            ['KaTeX_Main','KaTeX_Main-Italic.woff2','normal','italic'],
-            ['KaTeX_Main','KaTeX_Main-Bold.woff2','bold'],
-            ['KaTeX_Main','KaTeX_Main-BoldItalic.woff2','bold','italic'],
-            ['KaTeX_Math','KaTeX_Math-Italic.woff2','normal','italic'],
-            ['KaTeX_Math','KaTeX_Math-BoldItalic.woff2','bold','italic'],
-            ['KaTeX_SansSerif','KaTeX_SansSerif-Regular.woff2'],
-            ['KaTeX_SansSerif','KaTeX_SansSerif-Italic.woff2','normal','italic'],
-            ['KaTeX_SansSerif','KaTeX_SansSerif-Bold.woff2','bold'],
-            ['KaTeX_Script','KaTeX_Script-Regular.woff2'],
-            ['KaTeX_Size1','KaTeX_Size1-Regular.woff2'],
-            ['KaTeX_Size2','KaTeX_Size2-Regular.woff2'],
-            ['KaTeX_Size3','KaTeX_Size3-Regular.woff2'],
-            ['KaTeX_Size4','KaTeX_Size4-Regular.woff2'],
-            ['KaTeX_Typewriter','KaTeX_Typewriter-Regular.woff2']
-        ];
         const style = document.createElement('style');
         style.id = 'bn-pe-katex-fonts';
-        style.textContent = fonts.map(([name, file, w = 'normal', st = 'normal']) =>
+        style.textContent = KATEX_FONTS.map(([name, file, w = 'normal', st = 'normal']) =>
             `@font-face{font-family:'${name}';src:url('${base}${file}') format('woff2');font-weight:${w};font-style:${st};font-display:swap;}`
         ).join('');
         document.head.appendChild(style);
@@ -82,6 +83,11 @@
 
     // ---- 常量 ----
     const CID = 'bn-paper-container', EID = 'bn-paper-editor', PID = 'bn-paper-preview';
+    const CAPTURE_MIN_WIDTH = 760;
+    const CAPTURE_MAX_WIDTH = 1440;
+    const CAPTURE_TARGET_SCALE = 2.25;
+    const CAPTURE_MAX_SIDE = 16000;
+    const CAPTURE_MAX_PIXELS = 90000000;
     let _segs = [];
 
     // ---- localStorage 持久化 ----
@@ -91,9 +97,6 @@
     };
     const loadDraft = () => {
         try { return localStorage.getItem(STORAGE_KEY) || ''; } catch { return ''; }
-    };
-    const clearDraft = () => {
-        try { localStorage.removeItem(STORAGE_KEY); } catch {}
     };
 
     // ---- Markdown 公式保护 ----
@@ -240,13 +243,13 @@
         }
     };
 
-    // ---- 截屏 ----
-    const waitHtml2Canvas = () => new Promise((resolve, reject) => {
-        if (typeof html2canvas === 'function') return resolve();
+    // ---- 生成提交图片 ----
+    const waitSnapdom = () => new Promise((resolve, reject) => {
+        if (typeof snapdom === 'function') return resolve();
         let n = 0;
         const iv = setInterval(() => {
-            if (typeof html2canvas === 'function') { clearInterval(iv); resolve(); }
-            else if (++n > 80) { clearInterval(iv); reject(new Error('html2canvas 未加载')); }
+            if (typeof snapdom === 'function') { clearInterval(iv); resolve(); }
+            else if (++n > 80) { clearInterval(iv); reject(new Error('SnapDOM 未加载')); }
         }, 50);
     });
 
@@ -259,7 +262,7 @@
 
     const runtimeUrl = path => chrome.runtime.getURL(path);
     const fontDataUrlCache = new Map();
-    let captureCssPromise = null;
+    let katexLocalFontsPromise = null;
 
     async function getFontDataUrl(url) {
         if (fontDataUrlCache.has(url)) return fontDataUrlCache.get(url);
@@ -271,42 +274,171 @@
         return dataUrl;
     }
 
-    async function inlineCssFontUrls(css) {
-        const fontUrlRe = /url\((['"]?)(fonts\/[^'")]+)\1\)/g;
-        const urls = Array.from(new Set(Array.from(css.matchAll(fontUrlRe), match => match[2])));
-        const replacements = new Map();
-        await Promise.all(urls.map(async relativeUrl => {
-            const absoluteUrl = runtimeUrl(`content/libs/katex/${relativeUrl}`);
-            try {
-                replacements.set(relativeUrl, await getFontDataUrl(absoluteUrl));
-            } catch (error) {
-                console.warn('[BN-Paper] KaTeX 字体内联失败:', relativeUrl, error);
-            }
-        }));
-        return css.replace(fontUrlRe, (full, quote, relativeUrl) => {
-            const dataUrl = replacements.get(relativeUrl);
-            return dataUrl ? `url("${dataUrl}")` : full;
+    async function getKatexLocalFonts() {
+        if (!katexLocalFontsPromise) {
+            katexLocalFontsPromise = Promise.all(KATEX_FONTS.map(async ([family, file, weight = 'normal', style = 'normal']) => {
+                try {
+                    return {
+                        family,
+                        src: await getFontDataUrl(runtimeUrl(`content/libs/katex/fonts/${file}`)),
+                        weight,
+                        style,
+                    };
+                } catch (error) {
+                    console.warn('[BN-Paper] KaTeX 字体内联失败:', file, error);
+                    return null;
+                }
+            })).then(fonts => fonts.filter(Boolean));
+        }
+        return katexLocalFontsPromise;
+    }
+
+    const canvasHasInk = canvas => {
+        const sample = document.createElement('canvas');
+        sample.width = Math.min(320, canvas.width);
+        sample.height = Math.min(320, canvas.height);
+        const ctx = sample.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return true;
+        if (!sample.width || !sample.height) return false;
+        ctx.drawImage(canvas, 0, 0, sample.width, sample.height);
+        const data = ctx.getImageData(0, 0, sample.width, sample.height).data;
+        for (let i = 0; i < data.length; i += 4) {
+            const a = data[i + 3];
+            if (a && (data[i] < 245 || data[i + 1] < 245 || data[i + 2] < 245)) return true;
+        }
+        return false;
+    };
+
+    async function pngBlobFromCanvas(canvas) {
+        return new Promise((resolve, reject) => {
+            canvas.toBlob(blob => {
+                if (blob) resolve(blob);
+                else reject(new Error('PNG 编码失败'));
+            }, 'image/png');
         });
     }
 
-    async function getCaptureCss() {
-        if (!captureCssPromise) {
-            captureCssPromise = Promise.all([
-                fetch(runtimeUrl('content/libs/katex/katex.min.css')).then(r => r.ok ? r.text() : ''),
-                fetch(runtimeUrl('content/paper-editor/editor.css')).then(r => r.ok ? r.text() : ''),
-            ]).then(async ([katexCss, editorCss]) => {
-                const inlinedKatexCss = await inlineCssFontUrls(katexCss || '');
-                return `${inlinedKatexCss}\n${editorCss || ''}\n#bn-paper-capture{position:static!important;left:auto!important;top:auto!important;z-index:auto!important;}`;
+    const getHorizontalPadding = el => {
+        const style = getComputedStyle(el);
+        return (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
+    };
+
+    const getCaptureContentWidth = node => Math.max(1, node.clientWidth - getHorizontalPadding(node));
+
+    function getElementNaturalWidth(el) {
+        const rect = el.getBoundingClientRect();
+        return Math.ceil(Math.max(el.scrollWidth || 0, el.offsetWidth || 0, rect.width || 0));
+    }
+
+    function chooseCaptureWidth(node) {
+        const paddingX = getHorizontalPadding(node);
+        const currentWidth = Math.max(CAPTURE_MIN_WIDTH, node.clientWidth || 0);
+        let desiredContentWidth = Math.max(1, currentWidth - paddingX);
+        node.querySelectorAll('.katex-display > .katex, table, pre').forEach(el => {
+            desiredContentWidth = Math.max(desiredContentWidth, getElementNaturalWidth(el));
+        });
+        return Math.ceil(Math.min(CAPTURE_MAX_WIDTH, Math.max(CAPTURE_MIN_WIDTH, desiredContentWidth + paddingX)));
+    }
+
+    function fitOversizedMath(node) {
+        const contentWidth = getCaptureContentWidth(node);
+        node.querySelectorAll('.katex-display').forEach(display => {
+            const katexEl = display.querySelector(':scope > .katex') || display.querySelector('.katex');
+            if (!katexEl) return;
+
+            display.scrollLeft = 0;
+            Object.assign(display.style, {
+                overflow: 'visible',
+                overflowX: 'visible',
+                overflowY: 'visible',
+                width: '100%',
             });
-        }
-        return captureCssPromise;
+            Object.assign(katexEl.style, {
+                display: 'inline-block',
+                maxWidth: 'none',
+                transform: '',
+                transformOrigin: 'top left',
+                marginLeft: '',
+            });
+
+            const rect = katexEl.getBoundingClientRect();
+            const naturalWidth = Math.ceil(Math.max(katexEl.scrollWidth || 0, rect.width || 0));
+            const naturalHeight = Math.ceil(Math.max(katexEl.scrollHeight || 0, rect.height || 0));
+            if (!naturalWidth || naturalWidth <= contentWidth) {
+                display.style.height = '';
+                return;
+            }
+
+            const scale = contentWidth / naturalWidth;
+            katexEl.style.transform = `scale(${scale})`;
+            katexEl.style.marginLeft = '0';
+            display.style.height = Math.ceil(naturalHeight * scale) + 'px';
+        });
+    }
+
+    function strengthenKatexRuleLines(node) {
+        node.querySelectorAll('.katex .frac-line, .katex .overline-line, .katex .underline-line, .katex .hline').forEach(line => {
+            Object.assign(line.style, {
+                borderBottomStyle: 'solid',
+                borderBottomColor: 'currentColor',
+            });
+        });
+        node.querySelectorAll('.katex .hdashline').forEach(line => {
+            Object.assign(line.style, {
+                borderBottomColor: 'currentColor',
+            });
+        });
+    }
+
+    function collectKatexRuleLines(node) {
+        const nodeRect = node.getBoundingClientRect();
+        return Array.from(node.querySelectorAll('.katex .frac-line, .katex .overline-line, .katex .underline-line, .katex .hline'))
+            .map(line => {
+                const rect = line.getBoundingClientRect();
+                const style = getComputedStyle(line);
+                const borderWidth = parseFloat(style.borderBottomWidth) || 1;
+                return {
+                    x: rect.left - nodeRect.left,
+                    y: rect.bottom - nodeRect.top - borderWidth,
+                    width: rect.width,
+                    thickness: borderWidth,
+                    color: style.color || getComputedStyle(node).color || '#1a1a2e',
+                };
+            })
+            .filter(line => line.width > 0 && line.thickness > 0);
+    }
+
+    function drawKatexRuleLines(canvas, ruleLines, width, height) {
+        if (!ruleLines.length) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const scaleX = canvas.width / Math.max(1, width);
+        const scaleY = canvas.height / Math.max(1, height);
+        ctx.save();
+        ctx.globalAlpha = 0.9;
+        ruleLines.forEach(line => {
+            ctx.fillStyle = line.color;
+            ctx.fillRect(
+                line.x * scaleX,
+                line.y * scaleY,
+                Math.max(1, line.width * scaleX),
+                Math.max(1, line.thickness * scaleY)
+            );
+        });
+        ctx.restore();
+    }
+
+    function getCaptureScale(width, height) {
+        const sideLimit = Math.min(CAPTURE_MAX_SIDE / Math.max(1, width), CAPTURE_MAX_SIDE / Math.max(1, height));
+        const areaLimit = Math.sqrt(CAPTURE_MAX_PIXELS / Math.max(1, width * height));
+        return Math.max(0.75, Math.min(CAPTURE_TARGET_SCALE, sideLimit, areaLimit));
     }
 
     function createCaptureNode(el) {
         const node = el.cloneNode(true);
         node.id = 'bn-paper-capture';
         Object.assign(node.style, {
-            width: Math.max(680, el.clientWidth || 680) + 'px',
+            width: Math.max(CAPTURE_MIN_WIDTH, el.clientWidth || CAPTURE_MIN_WIDTH) + 'px',
             boxSizing: 'border-box',
             background: '#fff',
             padding: '24px 28px',
@@ -316,48 +448,35 @@
         return node;
     }
 
-    async function captureWithHtml2Canvas(node, width, height) {
-        await waitHtml2Canvas();
-        const captureCss = await getCaptureCss();
-        const captureOptions = {
+    async function captureWithSnapdom(node, width, height) {
+        await waitSnapdom();
+        const scale = getCaptureScale(width, height);
+        const options = {
+            type: 'png',
+            format: 'png',
+            width,
+            height,
+            scale,
+            dpr: 1,
             backgroundColor: '#fff',
-            scale: Math.min(2, devicePixelRatio || 1.5),
-            useCORS: true,
-            allowTaint: false,
-            logging: false,
-            windowWidth: width,
-            windowHeight: height,
-            onclone: (clonedDocument) => {
-                const style = clonedDocument.createElement('style');
-                style.textContent = captureCss;
-                clonedDocument.head.appendChild(style);
-                clonedDocument.querySelectorAll('.katex-mathml').forEach(mathml => mathml.remove());
-                const clonedNode = clonedDocument.getElementById('bn-paper-capture');
-                if (clonedNode) {
-                    Object.assign(clonedNode.style, {
-                        position: 'static',
-                        left: 'auto',
-                        top: 'auto',
-                        zIndex: 'auto',
-                        width: `${width}px`,
-                        minHeight: `${height}px`,
-                        background: '#fff',
-                        opacity: '1',
-                        visibility: 'visible',
-                    });
-                }
-            },
+            embedFonts: true,
+            localFonts: await getKatexLocalFonts(),
+            cache: 'disabled',
+            outerTransforms: false,
+            outerShadows: false,
+            fast: false,
+            debug: false,
         };
-        let canvas;
-        try {
-            canvas = await html2canvas(node, {...captureOptions, foreignObjectRendering: true});
-            if (!canvas.width || !canvas.height) throw new Error('foreignObject 截图尺寸为空');
-        } catch (error) {
-            console.warn('[BN-Paper] html2canvas foreignObject 失败，回退默认模式:', error);
-            canvas = await html2canvas(node, captureOptions);
+        const ruleLines = collectKatexRuleLines(node);
+        const canvas = await snapdom.toCanvas(node, options);
+        if (!canvas.width || !canvas.height) throw new Error('生成图片尺寸为空');
+        drawKatexRuleLines(canvas, ruleLines, width, height);
+        if (!canvasHasInk(canvas)) {
+            throw new Error('生成图片为空白，请检查内容或图片资源');
         }
-        if (!canvas.width || !canvas.height) throw new Error('截图尺寸为空');
-        return canvas.toDataURL('image/png');
+        const blob = await pngBlobFromCanvas(canvas);
+        if (!blob.size) throw new Error('生成图片为空');
+        return blob;
     }
 
     async function capture(el) {
@@ -374,22 +493,23 @@
         document.body.appendChild(node);
         try {
             await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-            const width = Math.ceil(Math.max(680, node.scrollWidth || node.clientWidth || el.clientWidth || 680));
+            const captureWidth = chooseCaptureWidth(node);
+            if (captureWidth !== node.clientWidth) {
+                node.style.width = captureWidth + 'px';
+                await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+            }
+            fitOversizedMath(node);
+            strengthenKatexRuleLines(node);
+            await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+            const width = Math.ceil(Math.max(CAPTURE_MIN_WIDTH, node.clientWidth || el.clientWidth || CAPTURE_MIN_WIDTH));
             const height = Math.ceil(Math.max(1, node.scrollHeight || node.clientHeight || el.scrollHeight || 1));
-            return await captureWithHtml2Canvas(node, width, height);
+            return await captureWithSnapdom(node, width, height);
         } catch (e) {
-            console.error('[BN-Paper] 截屏失败:', e);
-            alert('截屏失败: ' + e.message);
+            console.error('[BN-Paper] 生成提交图片失败:', e);
+            alert('生成提交图片失败: ' + e.message);
             return null;
         } finally { node.remove(); }
     }
-
-    const dataURLtoBlob = u => {
-        const [m, b] = [u.match(/:(.*?);/)[1], atob(u.split(',')[1])];
-        const a = new Uint8Array(b.length);
-        for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i);
-        return new Blob([a], { type: m });
-    };
 
     const getAnswerImageFileName = () => {
         const matched = (location.pathname || '').match(/\/problem\/([^/?#]+)/);
@@ -674,21 +794,20 @@
             }
 
             const oldHtml = submitBtn.innerHTML;
-            setSubmitLoading(true, '截屏中...');
+            setSubmitLoading(true, '生成图片中...');
             try {
-                const dataUrl = await renderAndCapturePreview();
-                if (!dataUrl) {
+                const imageBlob = await renderAndCapturePreview();
+                if (!imageBlob) {
                     submitting = false;
                     setSubmitLoading(false, oldHtml);
                     return;
                 }
 
                 const dt = new DataTransfer();
-                dt.items.add(new File([dataURLtoBlob(dataUrl)], getAnswerImageFileName(), { type: 'image/png' }));
+                dt.items.add(new File([imageBlob], getAnswerImageFileName(), { type: 'image/png' }));
                 origField.files = dt.files;
 
                 setSubmitLoading(true, '提交中...');
-                clearDraft(); // 提交成功，清除草稿
                 HTMLFormElement.prototype.submit.call(formEl);
             } catch (err) {
                 alert('提交失败: ' + err.message);
