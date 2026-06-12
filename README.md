@@ -1,7 +1,7 @@
 # Better Names for 7FA4
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-2026.08-green.svg)
+![Version](https://img.shields.io/badge/version-2026.08.01-green.svg)
 ![Manifest](https://img.shields.io/badge/manifest-v3-brightgreen.svg)
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-orange.svg)
 

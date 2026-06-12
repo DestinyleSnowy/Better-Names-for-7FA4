@@ -180,8 +180,8 @@
     const manifestVersionInfo = parseComparableVersion(manifestVersion);
     const WELCOME_SEEN_VERSION_KEY = 'bn.welcome.seenVersion';
     const WELCOME_BASE_VERSION = '2026.07';
-    const WELCOME_PATCH_TITLE = '新增版本 Better Names for 7FA4 2026.08';
-    const WELCOME_CHANGELOG_CODE_NAME = '好久不见';
+    const WELCOME_PATCH_TITLE = '新增版本 Better Names for 7FA4 2026.08.01';
+    const WELCOME_CHANGELOG_CODE_NAME = 'Justin';
     const WELCOME_CHANGELOG_2026_07_ITEMS = [
         {
             text: '添加并修复聊天室功能。',
@@ -224,7 +224,12 @@
         {text: '新增提交记录页原始代码/格式化代码悬浮切换按钮，启用自定义代码高亮主题时也可快速切换。'},
         {text: '增强聊天室接口响应字段兼容性，并防止重复发送。'},
         {text: '更新 submitter'},
-        {text: '我也忘记改了些啥了大哥大姐们，谁可以贡献块饼干，谁可以贡献点钞票！'}
+        {text: '我也忘记改了些啥了大哥大姐们，谁可以贡献块饼干，谁可以贡献点钞票！'},
+    ];
+    const WELCOME_CHANGELOG_2026_08_01_ITEMS = [
+        {text: '修复纸面作业编辑器提交图片异常。'},
+        {text: '完全重构聊天室（In progress）。'},
+        {text: '修复存在的部分问题。'},
     ];
     const WELCOME_PATCH_CHANGELOGS = [
         {
@@ -238,6 +243,10 @@
         {
             version: '2026.08',
             items: WELCOME_CHANGELOG_2026_08_ITEMS,
+        },
+        {
+            version: '2026.08.01',
+            items: WELCOME_CHANGELOG_2026_08_01_ITEMS,
         },
     ];
     const isSupportedHostname = (host) => {
