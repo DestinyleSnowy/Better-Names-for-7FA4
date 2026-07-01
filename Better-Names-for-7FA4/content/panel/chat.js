@@ -17,7 +17,7 @@
     const CHAT_FILE_INSERT_LIMIT_BYTES = 8 * 1024 * 1024;
     const CHAT_LONG_TEXT_LIMIT = 1200;
     const CHAT_LONG_HEIGHT_LIMIT = 220;
-    const CHAT_RENDER_MAX_CHARS = 60000;
+    const CHAT_RENDER_MAX_CHARS = 2000000;
     const CHAT_RENDER_DATA_URL_MAX_CHARS = 240000;
     const CHAT_MESSAGE_STORE_MAX_CHARS = 120000;
     const CHAT_CLIPBOARD_BLOB_MAX_BYTES = 12 * 1024 * 1024;
@@ -576,6 +576,8 @@
             const id = extractFriendId(friend);
             if (!Number.isFinite(id) || id <= 0) return;
             if (Number.isFinite(state.selfId) && id === state.selfId) return;
+            const realName = friend.real_name || (friend.user && friend.user.real_name);
+            if (!realName) return; // 没有 real_name 视为单项好友，跳过
             const key = conversationKey('user', id);
             const name = displayNameForUser(id, friend);
             const activitySec = conversationActivitySec(friend);
@@ -1054,6 +1056,18 @@
             els.conversations.appendChild(row);
         });
         if (els.conversationEmpty) els.conversationEmpty.hidden = list.length > 0;
+        if (state.activeKey && els.conversations) {
+            const activeItem = els.conversations.querySelector(`.bn-chat2-conversation[data-key="${state.activeKey}"]`);
+            if (activeItem) {
+                // 使用 scrollIntoView 在容器内滚动到该元素，不影响页面滚动
+                activeItem.scrollIntoView({behavior: 'instant' });
+                // 或者使用更精确的 scrollTop 计算：
+                // const container = els.conversations;
+                // const itemRect = activeItem.getBoundingClientRect();
+                // const containerRect = container.getBoundingClientRect();
+                // container.scrollTop += itemRect.top - containerRect.top;
+            }
+        }
     }
 
     function conversationPreview(conversation) {
@@ -1157,7 +1171,7 @@
     function isSafeMediaUrl(url) {
         const raw = String(url || '').trim();
         if (!raw) return false;
-        if (/^data:image\/(?:png|gif|jpe?g|webp|bmp);/i.test(raw)) return raw.length <= CHAT_RENDER_DATA_URL_MAX_CHARS;
+        if (/^data:image\/(?:png|gif|jpe?g|webp|bmp);/i.test(raw)) return true;
         if (/^blob:/i.test(raw)) return true;
         try {
             const parsed = new URL(raw, location.href);
@@ -2818,4 +2832,5 @@
     }
 
     init();
+    console.log(Prism);
 })();
