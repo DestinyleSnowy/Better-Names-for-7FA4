@@ -55,7 +55,7 @@
         [CORNER_KEY]: 'br',
         useCustomColors: false,
         userPalette: {},
-        codeThemeEnabled: false,
+        codeThemeEnabled: true,
         codeThemeSource: 'builtin',
         customThemeCss: '',
         customThemeCssName: '',
