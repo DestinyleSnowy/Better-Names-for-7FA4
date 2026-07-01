@@ -17,7 +17,7 @@
     const CHAT_FILE_INSERT_LIMIT_BYTES = 8 * 1024 * 1024;
     const CHAT_LONG_TEXT_LIMIT = 1200;
     const CHAT_LONG_HEIGHT_LIMIT = 220;
-    const CHAT_RENDER_MAX_CHARS = 60000;
+    const CHAT_RENDER_MAX_CHARS = 200000;
     const CHAT_RENDER_DATA_URL_MAX_CHARS = 240000;
     const CHAT_MESSAGE_STORE_MAX_CHARS = 120000;
     const CHAT_CLIPBOARD_BLOB_MAX_BYTES = 12 * 1024 * 1024;
@@ -28,20 +28,8 @@
     const CHAT_WINDOW_MIN_WIDTH = 720;
     const CHAT_WINDOW_MIN_HEIGHT = 500;
 
-    const GROUP_OPERATIONS = {
-        setup: {label: '新建群聊', title: true},
-        leave: {label: '离开群聊', group: true, destructive: true},
-        set_title: {label: '修改群名', group: true, title: true},
-        add_member: {label: '添加成员', group: true, target: true},
-        del_member: {label: '移除成员', group: true, target: true, destructive: true},
-        add_administrator: {label: '设为管理员', group: true, target: true},
-        del_administrator: {label: '取消管理员', group: true, target: true, destructive: true},
-        mute_member: {label: '禁言成员', group: true, target: true, mute: true},
-        mute_group: {label: '全体禁言', group: true, mute: true, destructive: true},
-        give_owner: {label: '转让群主', group: true, target: true, destructive: true},
-    };
-
     const state = {
+        groupRefreshTimer: null,
         initialized: false,
         visible: false,
         loadingInfo: false,
@@ -576,6 +564,8 @@
             const id = extractFriendId(friend);
             if (!Number.isFinite(id) || id <= 0) return;
             if (Number.isFinite(state.selfId) && id === state.selfId) return;
+            const realName = friend.real_name || (friend.user && friend.user.real_name);
+            if (!realName) return; // 没有 real_name 视为单项好友，跳过
             const key = conversationKey('user', id);
             const name = displayNameForUser(id, friend);
             const activitySec = conversationActivitySec(friend);
@@ -904,14 +894,6 @@
         els.status.textContent = String(text || '');
     }
 
-    function setGroupStatus(text, level = 'info') {
-        if (!els.groupStatus) return;
-        els.groupStatus.classList.remove('is-error', 'is-success');
-        if (level === 'error') els.groupStatus.classList.add('is-error');
-        if (level === 'success') els.groupStatus.classList.add('is-success');
-        els.groupStatus.textContent = String(text || '');
-    }
-
     async function loadInfo(options = {}) {
         if (state.loadingInfo) return;
         state.loadingInfo = true;
@@ -1054,6 +1036,18 @@
             els.conversations.appendChild(row);
         });
         if (els.conversationEmpty) els.conversationEmpty.hidden = list.length > 0;
+        if (state.activeKey && els.conversations) {
+            const activeItem = els.conversations.querySelector(`.bn-chat2-conversation[data-key="${state.activeKey}"]`);
+            if (activeItem) {
+                // 使用 scrollIntoView 在容器内滚动到该元素，不影响页面滚动
+                activeItem.scrollIntoView({behavior: 'instant' });
+                // 或者使用更精确的 scrollTop 计算：
+                // const container = els.conversations;
+                // const itemRect = activeItem.getBoundingClientRect();
+                // const containerRect = container.getBoundingClientRect();
+                // container.scrollTop += itemRect.top - containerRect.top;
+            }
+        }
     }
 
     function conversationPreview(conversation) {
@@ -1157,7 +1151,7 @@
     function isSafeMediaUrl(url) {
         const raw = String(url || '').trim();
         if (!raw) return false;
-        if (/^data:image\/(?:png|gif|jpe?g|webp|bmp);/i.test(raw)) return raw.length <= CHAT_RENDER_DATA_URL_MAX_CHARS;
+        if (/^data:image\/(?:png|gif|jpe?g|webp|bmp);/i.test(raw)) return  raw.length <= CHAT_RENDER_DATA_URL_MAX_CHARS;
         if (/^blob:/i.test(raw)) return true;
         try {
             const parsed = new URL(raw, location.href);
@@ -1772,6 +1766,9 @@
 
     function selectConversation(key, options = {}) {
         if (!key || !state.conversationByKey.has(key)) return;
+        if (els.groupPanel && !els.groupPanel.hidden) {
+            toggleGroupPanel(false);
+        }
         const oldKey = state.activeKey;
         if (els.input && oldKey) saveDraft(oldKey, els.input.value);
         hideMentionList();
@@ -2234,89 +2231,116 @@
     function toggleGroupPanel(visible = null) {
         if (!els.groupPanel || !els.groupToggle) return;
         const next = visible == null ? els.groupPanel.hidden : !!visible;
+
+        // 控制面板显示
         els.groupPanel.hidden = !next;
+        if (next) {
+            els.groupPanel.style.display = 'flex';
+            els.window.style.setProperty('--bn-chat2-panel-width', '280px');
+        } else {
+            els.groupPanel.style.display = 'none';
+            els.window.style.setProperty('--bn-chat2-panel-width', '0px');
+            closeMemberMenu();
+            if (state.groupRefreshTimer) {
+                clearInterval(state.groupRefreshTimer);
+                state.groupRefreshTimer = null;
+            }
+        }
         els.groupToggle.setAttribute('aria-expanded', next ? 'true' : 'false');
         els.window.classList.toggle('bn-chat2-group-open', next);
-        if (next) updateGroupOperationFields();
+
+        if (next) {
+            const conversation = getConversation();
+            if (conversation && conversation.type === 'group') {
+                renderGroupMembers(conversation);
+                // 启动定时刷新
+                if (state.groupRefreshTimer) clearInterval(state.groupRefreshTimer);
+                state.groupRefreshTimer = setInterval(() => {
+                    if (!els.groupPanel || els.groupPanel.hidden) {
+                        clearInterval(state.groupRefreshTimer);
+                        state.groupRefreshTimer = null;
+                        return;
+                    }
+                    loadInfo({ silent: true, refreshActive: false }).then(() => {
+                        const updated = getConversation();
+                        if (updated && updated.type === 'group') {
+                            renderGroupMembers(updated);
+                        }
+                    });
+                }, 30000);
+            } else {
+                setStatus('请先选择一个群聊', 'error');
+                els.groupPanel.hidden = true;
+                els.groupPanel.style.display = 'none';
+                els.window.style.setProperty('--bn-chat2-panel-width', '0px');
+                els.window.classList.remove('bn-chat2-group-open');
+            }
+        } else {
+            closeMemberMenu();
+            if (state.groupRefreshTimer) {
+                clearInterval(state.groupRefreshTimer);
+                state.groupRefreshTimer = null;
+            }
+        }
     }
 
-    function updateGroupOperationFields() {
-        const type = els.groupType ? els.groupType.value : 'setup';
-        const rule = GROUP_OPERATIONS[type] || GROUP_OPERATIONS.setup;
-        toggleField(els.groupIdInput, !!rule.group);
-        toggleField(els.groupTargetInput, !!rule.target);
-        toggleField(els.groupTitleInput, !!rule.title);
-        toggleField(els.groupMuteInput, !!rule.mute);
+    // runGroupAction 增加 setup 支持
+    async function runGroupAction(type, extra = {}, options = {}) {
+        const silent = options.silent || false;
         const conversation = getConversation();
-        if (conversation && conversation.type === 'group' && els.groupIdInput && !els.groupIdInput.value) {
-            els.groupIdInput.value = String(conversation.id);
+
+        // 处理新建群聊
+        if (type === 'setup') {
+            const title = extra.title ? String(extra.title).trim() : '';
+            if (!title) {
+                setStatus('请输入群名称', 'error');
+                return;
+            }
+            try {
+                setStatus('正在创建群聊...');
+                await apiRequest('POST', '/chat/group', { data: { type: 'setup', title } });
+                setStatus('群聊创建成功', 'success');
+                await loadInfo({ silent: true, refreshActive: false });
+                // 自动选择新群
+                const newGroup = state.conversations.find(c => c.type === 'group' && c.name === title);
+                if (newGroup) {
+                    selectConversation(newGroup.key, { refresh: true });
+                    toggleGroupPanel(true);
+                }
+                return;
+            } catch (error) {
+                setStatus(`创建失败: ${error.message || error}`, 'error');
+                return;
+            }
         }
-    }
 
-    function toggleField(input, visible) {
-        if (!input) return;
-        const field = input.closest ? input.closest('.bn-chat2-group-field') : input;
-        if (field) field.hidden = !visible;
-        input.disabled = !visible;
-    }
-
-    function readRequiredNumber(input, name) {
-        const parsed = toInteger(input ? input.value : '');
-        if (!Number.isFinite(parsed) || parsed <= 0) throw new Error(`请填写 ${name}`);
-        return parsed;
-    }
-
-    async function runGroupOperation() {
-        if (state.runningGroupOp || !els.groupType) return;
-        const type = els.groupType.value;
-        const rule = GROUP_OPERATIONS[type];
-        if (!rule) {
-            setGroupStatus('不支持的群操作', 'error');
+        // 原有群操作逻辑（需 group_id）
+        if (!conversation || conversation.type !== 'group') {
+            setStatus('请先选择一个群聊', 'error');
             return;
         }
-        let payload;
+
+        const payload = { type };
+        payload.group_id = conversation.id;
+        Object.assign(payload, extra);
+
+        if (extra.mute !== undefined) {
+            payload.mute = Math.floor(Date.now() / 1000) + extra.mute;
+        }
+
+
         try {
-            payload = {type};
-            if (rule.group) payload.group_id = readRequiredNumber(els.groupIdInput, 'group_id');
-            if (rule.target) payload.target_id = readRequiredNumber(els.groupTargetInput, 'target_id');
-            if (rule.title) {
-                const title = els.groupTitleInput ? els.groupTitleInput.value.trim() : '';
-                if (!title) throw new Error('请填写 title');
-                payload.title = title;
-            }
-            if (rule.mute) {
-                const mute = toInteger(els.groupMuteInput ? els.groupMuteInput.value : '');
-                if (!Number.isFinite(mute) || mute < 0) throw new Error('请填写 mute 时间');
-                payload.mute = mute;
+            if (!silent) setStatus(`正在执行...`);
+            await apiRequest('POST', '/chat/group', { data: payload });
+            if (!silent) {
+                setStatus(`${type} 操作成功`, 'success');
+                await loadInfo({ silent: true, refreshActive: false });
+                const updated = getConversation();
+                if (updated) renderGroupMembers(updated);
             }
         } catch (error) {
-            setGroupStatus(error.message, 'error');
-            return;
-        }
-        if (rule.destructive && !window.confirm(`确认执行“${rule.label}”吗？`)) {
-            setGroupStatus('已取消');
-            return;
-        }
-        state.runningGroupOp = true;
-        if (els.groupRun) els.groupRun.disabled = true;
-        setGroupStatus('正在执行...');
-        try {
-            const result = await apiRequest('POST', '/chat/group', {data: payload});
-            setGroupStatus(`${rule.label}成功`, 'success');
-            await loadInfo({silent: true, refreshActive: false});
-            const group = payloadRoot(result).group;
-            const groupId = pickInteger(group || {}, ['id', 'group_id', 'groupId']);
-            if (Number.isFinite(groupId) && state.conversationByKey.has(conversationKey('group', groupId))) {
-                selectConversation(conversationKey('group', groupId), {refresh: true});
-            } else if (state.activeKey && !state.conversationByKey.has(state.activeKey)) {
-                state.activeKey = state.conversations[0] ? state.conversations[0].key : '';
-                renderAll();
-            }
-        } catch (error) {
-            setGroupStatus(`操作失败: ${error.message || error}`, 'error');
-        } finally {
-            state.runningGroupOp = false;
-            if (els.groupRun) els.groupRun.disabled = false;
+            if (!silent) setStatus(`操作失败: ${error.message || error}`, 'error');
+            else console.warn('群操作失败:', error);
         }
     }
 
@@ -2463,10 +2487,11 @@
         const actions = createElement('div', {className: 'bn-chat-window-actions'});
         els.refresh = button('bn-chat-window-action', '刷新', '刷新当前会话');
         els.tokenButton = button('bn-chat-window-action', 'Token', '查询 Token');
-        els.groupToggle = button('bn-chat-window-action', '群设置', '打开群组管理');
+        els.groupToggle = button('bn-chat-window-action', '群成员', '查看群成员');
+        els.setupGroup = button("bn-chat-window-action", "新建群", "新建一个空群");
         els.fullscreen = button('bn-chat-window-action', '全屏', '全屏');
         els.close = button('bn-chat-window-close', '×', '关闭聊天室');
-        [els.refresh, els.tokenButton, els.groupToggle, els.fullscreen, els.close].forEach((item) => actions.appendChild(item));
+        [els.refresh, els.tokenButton, els.groupToggle, els.setupGroup, els.fullscreen, els.close].forEach((item) => actions.appendChild(item));
         header.appendChild(titleWrap);
         header.appendChild(actions);
 
@@ -2475,10 +2500,15 @@
         shell.appendChild(buildSidebar());
         shell.appendChild(buildMain());
         body.appendChild(shell);
-        body.appendChild(buildGroupPanel());
 
         els.window.appendChild(header);
         els.window.appendChild(body);
+        els.groupPanel = buildGroupPanel();
+        els.setupGroup.addEventListener("click", () => {
+            const title = prompt("请输入群名", "[Empty Group Name]");
+            runGroupAction("setup", {title});
+        })
+        body.appendChild(els.groupPanel);
         els.resizeHandles = ['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'].map((dir) => {
             const handle = createElement('div', {
                 className: `bn-chat2-resize-handle is-${dir}`,
@@ -2591,53 +2621,329 @@
         return main;
     }
 
-    function buildGroupPanel() {
-        els.groupPanel = createElement('aside', {className: 'bn-chat2-group-panel', hidden: true});
-        const header = createElement('div', {className: 'bn-chat2-group-header'});
-        header.appendChild(createElement('strong', {text: '群组管理'}));
-        els.groupClose = button('bn-chat-window-close', '×', '关闭群组管理');
-        header.appendChild(els.groupClose);
-        const form = createElement('div', {className: 'bn-chat2-group-form'});
-        const opField = createElement('label', {className: 'bn-chat2-group-field is-wide'});
-        opField.appendChild(createElement('span', {text: '操作'}));
-        els.groupType = createElement('select', {'aria-label': '群组操作'});
-        Object.entries(GROUP_OPERATIONS).forEach(([type, config]) => {
-            els.groupType.appendChild(createElement('option', {value: type, text: `${type} - ${config.label}`}));
-        });
-        opField.appendChild(els.groupType);
-        els.groupIdInput = groupInput('group_id', '群号');
-        els.groupTargetInput = groupInput('target_id', '目标用户 ID');
-        els.groupTitleInput = groupInput('title', '名称');
-        els.groupMuteInput = groupInput('mute', '禁言秒数', 'number');
-        els.groupRun = button('bn-chat2-group-run', '执行');
-        els.groupStatus = createElement('div', {className: 'bn-chat2-group-status', role: 'status', 'aria-live': 'polite'});
-        form.appendChild(opField);
-        form.appendChild(els.groupIdInput.closest('.bn-chat2-group-field'));
-        form.appendChild(els.groupTargetInput.closest('.bn-chat2-group-field'));
-        form.appendChild(els.groupTitleInput.closest('.bn-chat2-group-field'));
-        form.appendChild(els.groupMuteInput.closest('.bn-chat2-group-field'));
-        form.appendChild(els.groupRun);
-        form.appendChild(els.groupStatus);
-        els.groupPanel.appendChild(header);
-        els.groupPanel.appendChild(createElement('div', {
-            className: 'bn-chat2-group-hint',
-            text: '官方 API 会立即执行群操作，请先确认 ID。'
-        }));
-        els.groupPanel.appendChild(form);
-        return els.groupPanel;
+    async function destroyGroup(conversation) {
+        const members = conversation.members || [];
+        const selfId = state.selfId;
+        const others = members.filter(m => m.user_id !== selfId);
+        if (!others.length) {
+            // 如果只有自己，直接离开
+            await runGroupAction('leave');
+            return;
+        }
+        setStatus(`正在解散群，移除 ${others.length} 名成员...`);
+        // 分批移除（每次 3 个并发）
+        const batchSize = 3;
+        for (let i = 0; i < others.length; i += batchSize) {
+            const batch = others.slice(i, i + batchSize);
+            await Promise.all(batch.map(member =>
+                runGroupAction('del_member', { target_id: member.user_id })
+            ));
+            setStatus(`已移除 ${Math.min(i + batchSize, others.length)}/${others.length} 名成员`);
+        }
+        // 最后离开群
+        await runGroupAction('leave');
+        setStatus('群已解散', 'success');
+        // 刷新会话列表（已经由 runGroupAction 触发 loadInfo，但可能需要额外刷新）
+        await loadInfo({ silent: true, refreshActive: false });
+        // 如果当前选中的是该群，切换到第一个会话
+        if (state.activeKey === conversation.key) {
+            const first = state.conversations[0];
+            if (first) selectConversation(first.key, { refresh: true });
+            else {
+                state.activeKey = '';
+                renderAll();
+            }
+        }
     }
 
-    function groupInput(name, label, type = 'text') {
-        const field = createElement('label', {className: 'bn-chat2-group-field'});
-        field.appendChild(createElement('span', {text: label}));
-        const input = createElement('input', {
-            type,
-            placeholder: name,
-            min: type === 'number' ? '0' : null,
-            step: type === 'number' ? '1' : null,
+    function buildGroupPanel() {
+        const panel = createElement('div', { className: 'bn-chat2-group-panel', hidden: true });
+
+        // ---------- 头部 ----------
+        const header = createElement('div', { className: 'bn-chat2-group-header' });
+        const titleWrap = createElement('div', { className: 'bn-chat2-group-header-title' });
+        const nameEl = createElement('strong', { text: '群聊' });
+        const idEl = createElement('span', { className: 'bn-chat2-group-id-text', text: '' });
+        titleWrap.appendChild(nameEl);
+        titleWrap.appendChild(idEl);
+        header.appendChild(titleWrap);
+        const closeBtn = button('bn-chat-window-close', '×', '关闭群管理');
+        closeBtn.addEventListener('click', () => toggleGroupPanel(false));
+        header.appendChild(closeBtn);
+        panel.appendChild(header);
+        // 保存引用到 els，以便其他地方使用
+        els.groupClose = closeBtn;
+
+        // ---------- 成员列表 ----------
+        const memberList = createElement('div', { className: 'bn-chat2-member-list' });
+        panel.appendChild(memberList);
+        panel._memberList = memberList;
+
+        // ---------- 底部操作栏 ----------
+        const actions = createElement('div', { className: 'bn-chat2-group-actions' });
+        const addBtn = button('bn-chat2-action-btn', '添加成员');
+        const renameBtn = button('bn-chat2-action-btn', '修改群名');
+        const muteAllBtn = button('bn-chat2-action-btn', '全体禁言');
+        const leaveBtn = button('bn-chat2-action-btn', '退出群聊');
+        actions.appendChild(addBtn);
+        actions.appendChild(renameBtn);
+        actions.appendChild(muteAllBtn);
+        actions.appendChild(leaveBtn);
+        const destroyBtn = button('bn-chat2-action-btn', '解散群');
+        destroyBtn.style.color = '#c24141';
+        destroyBtn.addEventListener('click', () => {
+            const conversation = getConversation();
+            if (!conversation || conversation.type !== 'group') return;
+            // 检查当前用户是否为群主
+            const selfId = state.selfId;
+            const currentUser = (conversation.members || []).find(u => u.user_id === selfId);
+            if (!currentUser || currentUser.type !== 'Owner') {
+                setStatus('只有群主可以解散群', 'error');
+                return;
+            }
+            if (!confirm(`确定要解散群 "${conversation.name}" 吗？\n此操作不可撤销，所有成员将被移除。`)) return;
+            destroyGroup(conversation);
         });
-        field.appendChild(input);
-        return input;
+        actions.appendChild(destroyBtn);
+        panel.appendChild(actions);
+
+        // ---------- 保存引用 ----------
+        panel._headerName = nameEl;
+        panel._headerId = idEl;
+        panel._memberList = memberList;
+
+        // ---------- 绑定事件 ----------
+        addBtn.addEventListener('click', () => {
+            const target = prompt('输入要添加的用户 ID:');
+            if (target && /^\d+$/.test(target)) {
+                runGroupAction('add_member', { target_id: Number(target) });
+            }
+        });
+        renameBtn.addEventListener('click', () => {
+            const title = prompt('输入新的群名称:');
+            if (title && title.trim()) {
+                runGroupAction('set_title', { title: title.trim() });
+            }
+        });
+        muteAllBtn.addEventListener('click', () => {
+            const seconds = prompt('输入禁言秒数（0 解除全体禁言）:');
+            if (seconds !== null && /^\d+$/.test(seconds)) {
+                runGroupAction('mute_group', { mute: Number(seconds) });
+            }
+        });
+        leaveBtn.addEventListener('click', () => {
+            if (confirm('确定要退出该群聊吗？')) {
+                runGroupAction('leave');
+            }
+        });
+
+        return panel;
+    }
+
+    function renderGroupMembers(conversation) {
+        if (!conversation || conversation.type !== 'group') return;
+        const panel = els.groupPanel;
+        if (!panel) return;
+        const memberList = panel._memberList;
+        if (!memberList) return;
+
+        clearNode(memberList);
+
+        const members = conversation.members || [];
+        if (!members.length) {
+            memberList.appendChild(createElement('div', { className: 'bn-chat2-empty-list', text: '暂无成员' }));
+            return;
+        }
+
+        // 更新头部信息
+        panel._headerName.textContent = conversation.name + `· ${members.length}人`;
+        panel._headerId.textContent = `  ID: ${conversation.id}`;
+
+        // 排序：Owner > Administrator > Member
+        const roleOrder = { Owner: 0, Administrator: 1, Member: 2 };
+        const sorted = [...members].sort((a, b) => {
+            const aRole = a.type || 'Member';
+            const bRole = b.type || 'Member';
+            return (roleOrder[aRole] || 3) - (roleOrder[bRole] || 3);
+        });
+
+        sorted.forEach(member => {
+            const uid = member.user_id || member.id || member.uid;
+            if (!uid) return;
+
+            // 获取显示名（如果 userNameById 有缓存，否则 fallback）
+            const name = state.userNameById.get(uid) || `用户 ${uid}`;
+            const role = member.type || 'Member';
+
+            const row = createElement('div', { className: 'bn-chat2-member-row', dataset: { uid } });
+            // 头像（首字母）
+            const avatar = createElement('span', { className: 'bn-chat2-member-avatar', text: name.charAt(0) || '?' });
+            // 昵称 + 角色标签
+            const info = createElement('span', { className: 'bn-chat2-member-info' });
+            info.appendChild(createElement('span', { className: 'bn-chat2-member-name', text: name }));
+            if (role === 'Owner') {
+                info.appendChild(createElement('span', { className: 'bn-chat2-member-role owner', text: '群主' }));
+            } else if (role === 'Administrator') {
+                info.appendChild(createElement('span', { className: 'bn-chat2-member-role admin', text: '管理员' }));
+            }
+            row.appendChild(avatar);
+            row.appendChild(info);
+
+            // 如果不是自己，点击弹出操作菜单
+            row.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                showMemberMenu(e, uid, name, role, conversation);
+            });
+            memberList.appendChild(row);
+        });
+    }
+
+    function showMemberMenu(event, uid, name, role, conversation) {
+        // 关闭已有菜单
+        closeMemberMenu();
+
+        const menu = createElement('div', { className: 'bn-chat2-member-menu', role: 'menu' });
+
+        // 构建菜单项（根据权限）
+        const items = [];
+        // 判断当前用户是否有管理权限（群主或管理员）
+        const selfId = state.selfId;
+        // 获取当前群信息，判断登录用户的身份（需要从 conversation 中获取）
+        // 由于 conversation.raw.users 包含所有成员，我们可以查找自己的身份
+        const currentUser = (conversation.members || []).find(u => u.user_id === selfId);
+        const currentRole = currentUser ? currentUser.type : null;
+
+        // 如果当前用户是群主或管理员，显示管理操作
+        if (currentRole === "Owner") {
+            items.push({
+                label: '禁言',
+                action: () => {
+                    const seconds = prompt('输入禁言秒数（0 解除禁言）:');
+                    if (seconds !== null && /^\d+$/.test(seconds)) {
+                        runGroupAction('mute_member', {target_id: uid, mute: Number(seconds)})
+                    }
+                }
+            });
+            // 如果已经是管理员，显示取消管理员；否则显示设为管理员
+            if (role === 'Administrator') {
+                items.push({
+                    label: '取消管理员',
+                    action: () => runGroupAction('del_administrator', { target_id: uid })
+                });
+            } else {
+                items.push({
+                    label: '设为管理员',
+                    action: () => runGroupAction('add_administrator', { target_id: uid })
+                });
+            }
+            items.push({
+                label: '移除成员',
+                action: () => {
+                    if (confirm(`确定移除 ${name} 吗？`)) {
+                        runGroupAction('del_member', { target_id: uid });
+                    }
+                }
+            });
+            items.push({
+                label: '转让群主',
+                action: () => {
+                    if (confirm(`确定转让群主给 ${name} 吗？`)) {
+                        runGroupAction('give_owner', { target_id: uid });
+                    }
+                }
+            });
+        }
+        if (currentRole === "Administrator"){
+            if (role === "Member"){
+                items.push({
+                    label: '禁言',
+                    action: () => {
+                        const seconds = prompt('输入禁言秒数（0 解除禁言）:');
+                        if (seconds !== null && /^\d+$/.test(seconds)) {
+                            runGroupAction('mute_member', {target_id: uid, mute: Number(seconds)})
+                        }
+                    }
+                });
+                items.push({
+                    label: '移除成员',
+                    action: () => {
+                        if (confirm(`确定移除 ${name} 吗？`)) {
+                            runGroupAction('del_member', { target_id: uid });
+                        }
+                    }
+                });
+            }
+        }
+
+        items.push({
+            label: '打开私聊',
+            action: () => {
+                const key = conversationKey('user', uid);
+                selectConversation(key, { refresh: true });
+                toggleGroupPanel(false);
+            }
+        });
+
+        if (items.length === 0) {
+            // 如果没有任何操作项（比如自己看自己），不显示菜单
+            return;
+        }
+
+        items.forEach(item => {
+            const btn = button('bn-chat2-menu-item', item.label);
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                closeMemberMenu();
+                item.action();
+            });
+            menu.appendChild(btn);
+        });
+
+        menu.addEventListener('click', (e) => e.stopPropagation());
+
+        // 定位菜单
+        const x = event.clientX || 0;
+        const y = event.clientY || 0;
+        // 先附加到 body 以获取尺寸
+        document.body.appendChild(menu);
+        menu.style.zIndex = '2147483647';
+        // 获取菜单尺寸
+        const rect = menu.getBoundingClientRect();
+        const menuWidth = rect.width || 150;
+        const menuHeight = rect.height || 100;
+        // 计算位置，不超出视口
+        let left = Math.min(x, window.innerWidth - menuWidth - 10);
+        let top = Math.min(y, window.innerHeight - menuHeight - 10);
+        left = Math.max(10, left);
+        top = Math.max(10, top);
+        menu.style.left = left + 'px';
+        menu.style.top = top + 'px';
+        // 全局点击监听：点击菜单外关闭
+        const closeHandler = (e) => {
+            if (!menu.contains(e.target)) {
+                closeMemberMenu();
+                document.removeEventListener('click', closeHandler);
+            }
+        };
+        // 延迟注册，避免当前点击事件触发关闭
+        setTimeout(() => {
+            document.addEventListener('click', closeHandler);
+        }, 0);
+        // 确保显示
+        menu.style.display = 'block';
+        els._memberMenu = menu;
+        menu._closeHandler = closeHandler;
+    }
+
+    function closeMemberMenu() {
+        if (els._memberMenu) {
+            if (els._memberMenu._closeHandler) {
+                document.removeEventListener('click', els._memberMenu._closeHandler);
+            }
+            els._memberMenu.remove();
+            els._memberMenu = null;
+        }
     }
 
     function bindEvents() {
@@ -2754,8 +3060,6 @@
         els.messages.addEventListener('scroll', () => {
             if (els.messages.scrollTop <= CHAT_LOAD_OLDER_EDGE_PX) loadOlderMessages();
         }, {passive: true});
-        els.groupType.addEventListener('change', updateGroupOperationFields);
-        els.groupRun.addEventListener('click', runGroupOperation);
         window.addEventListener('resize', () => {
             if (state.visible && !isFullscreen() && els.window && els.window.style.left) {
                 applyWindowRect(captureWindowRect(), {clamp: true});
@@ -2814,7 +3118,6 @@
         if (!buildChatWindow()) return;
         bindEvents();
         renderAll();
-        updateGroupOperationFields();
     }
 
     init();
