@@ -2284,17 +2284,44 @@
         }
     }
 
-    async function runGroupAction(type, extra = {}) {
+    // runGroupAction 增加 setup 支持
+    async function runGroupAction(type, extra = {}, options = {}) {
+        const silent = options.silent || false;
         const conversation = getConversation();
+
+        // 处理新建群聊
+        if (type === 'setup') {
+            const title = extra.title ? String(extra.title).trim() : '';
+            if (!title) {
+                setStatus('请输入群名称', 'error');
+                return;
+            }
+            try {
+                setStatus('正在创建群聊...');
+                await apiRequest('POST', '/chat/group', { data: { type: 'setup', title } });
+                setStatus('群聊创建成功', 'success');
+                await loadInfo({ silent: true, refreshActive: false });
+                // 自动选择新群
+                const newGroup = state.conversations.find(c => c.type === 'group' && c.name === title);
+                if (newGroup) {
+                    selectConversation(newGroup.key, { refresh: true });
+                    toggleGroupPanel(true);
+                }
+                return;
+            } catch (error) {
+                setStatus(`创建失败: ${error.message || error}`, 'error');
+                return;
+            }
+        }
+
+        // 原有群操作逻辑（需 group_id）
         if (!conversation || conversation.type !== 'group') {
             setStatus('请先选择一个群聊', 'error');
             return;
         }
 
         const payload = { type };
-        // 对于需要 group_id 的操作，统一添加
         payload.group_id = conversation.id;
-        // 合并额外参数
         Object.assign(payload, extra);
 
         if (extra.mute !== undefined) {
@@ -2303,16 +2330,17 @@
 
 
         try {
-            setStatus(`正在执行...`);
+            if (!silent) setStatus(`正在执行...`);
             await apiRequest('POST', '/chat/group', { data: payload });
-            setStatus(`${type} 操作成功`, 'success');
-            // 刷新群信息
-            await loadInfo({ silent: true, refreshActive: false });
-            // 重新渲染成员列表
-            const updated = getConversation();
-            if (updated) renderGroupMembers(updated);
+            if (!silent) {
+                setStatus(`${type} 操作成功`, 'success');
+                await loadInfo({ silent: true, refreshActive: false });
+                const updated = getConversation();
+                if (updated) renderGroupMembers(updated);
+            }
         } catch (error) {
-            setStatus(`操作失败: ${error.message || error}`, 'error');
+            if (!silent) setStatus(`操作失败: ${error.message || error}`, 'error');
+            else console.warn('群操作失败:', error);
         }
     }
 
@@ -2478,8 +2506,7 @@
         els.groupPanel = buildGroupPanel();
         els.setupGroup.addEventListener("click", () => {
             const title = prompt("请输入群名", "[Empty Group Name]");
-            apiRequest('POST', '/chat/group', { data: { type: "setup", title } });
-            setStatus("setup 成功", "success");
+            runGroupAction("setup", {title});
         })
         body.appendChild(els.groupPanel);
         els.resizeHandles = ['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'].map((dir) => {
@@ -2784,7 +2811,7 @@
         const selfId = state.selfId;
         // 获取当前群信息，判断登录用户的身份（需要从 conversation 中获取）
         // 由于 conversation.raw.users 包含所有成员，我们可以查找自己的身份
-        const currentUser = conversation.raw.users.find(u => u.user_id === selfId);
+        const currentUser = (conversation.members || []).find(u => u.user_id === selfId);
         const currentRole = currentUser ? currentUser.type : null;
 
         // 如果当前用户是群主或管理员，显示管理操作
