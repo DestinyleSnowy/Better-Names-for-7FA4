@@ -1093,3 +1093,153 @@
         display: none;
     }
 }
+.bn-chat2-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--bn-chat2-panel-width, 0px);
+    padding: 0;
+    overflow: hidden;
+    transition: grid-template-columns 0.22s ease;
+}
+.bn-chat2-group-panel {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+    border-left: 1px solid var(--bn-border-subtle);
+    background: var(--bn-surface-2);
+    overflow-y: auto;
+}
+/* 面板头部 */
+.bn-chat2-group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e5e7eb;
+    flex-shrink: 0;
+}
+
+/* 成员列表区域 */
+.bn-chat2-member-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+    margin: 8px 0;
+    min-height: 0;
+}
+
+/* 每个成员行 */
+.bn-chat2-member-row {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 6px;
+    transition: background 0.15s;
+    cursor: pointer;
+    background: #ffffff;
+    color: #1f2937;
+}
+.bn-chat2-member-row:hover {
+    background: #f3f4f6;
+}
+
+/* 成员头像 */
+.bn-chat2-member-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #d1d5db;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: #1f2937;
+    margin-right: 10px;
+    flex-shrink: 0;
+    font-size: 14px;
+}
+
+/* 成员信息区 */
+.bn-chat2-member-info {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+}
+.bn-chat2-member-name {
+    font-weight: 500;
+    font-size: 14px;
+    color: #1f2937;
+}
+.bn-chat2-member-role {
+    font-size: 11px;
+    margin-left: 6px;
+    padding: 0 8px;
+    border-radius: 10px;
+    background: #e5e7eb;
+    color: #4b5563;
+    display: inline-block;
+}
+.bn-chat2-member-role.owner {
+    background: #fef3c7;
+    color: #92400e;
+}
+.bn-chat2-member-role.admin {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+/* 底部操作按钮区域 */
+.bn-chat2-group-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-top: 12px;
+    border-top: 1px solid #e5e7eb;
+    flex-shrink: 0;
+}
+.bn-chat2-action-btn {
+    flex: 1;
+    min-width: 60px;
+    padding: 6px 10px;
+    background: #f3f4f6;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s;
+    color: #1f2937;
+}
+.bn-chat2-action-btn:hover {
+    background: #e5e7eb;
+}
+
+.bn-chat2-member-menu {
+    position: fixed !important;
+    z-index: 10000;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    padding: 6px 0;
+    min-width: 140px;
+    display: none; /* 初始隐藏，由 JS 控制显示 */
+}
+.bn-chat2-menu-item {
+    display: block;
+    width: 100%;
+    padding: 8px 16px;
+    background: none;
+    border: none;
+    text-align: left;
+    font-size: 14px;
+    color: #1f2937;
+    cursor: pointer;
+}
+.bn-chat2-menu-item:hover {
+    background: #f3f4f6;
+}
