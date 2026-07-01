@@ -17,7 +17,7 @@
     const CHAT_FILE_INSERT_LIMIT_BYTES = 8 * 1024 * 1024;
     const CHAT_LONG_TEXT_LIMIT = 1200;
     const CHAT_LONG_HEIGHT_LIMIT = 220;
-    const CHAT_RENDER_MAX_CHARS = 2000000;
+    const CHAT_RENDER_MAX_CHARS = 200000;
     const CHAT_RENDER_DATA_URL_MAX_CHARS = 240000;
     const CHAT_MESSAGE_STORE_MAX_CHARS = 120000;
     const CHAT_CLIPBOARD_BLOB_MAX_BYTES = 12 * 1024 * 1024;
@@ -1151,7 +1151,7 @@
     function isSafeMediaUrl(url) {
         const raw = String(url || '').trim();
         if (!raw) return false;
-        if (/^data:image\/(?:png|gif|jpe?g|webp|bmp);/i.test(raw)) return true;
+        if (/^data:image\/(?:png|gif|jpe?g|webp|bmp);/i.test(raw)) return  raw.length <= CHAT_RENDER_DATA_URL_MAX_CHARS;
         if (/^blob:/i.test(raw)) return true;
         try {
             const parsed = new URL(raw, location.href);
@@ -2293,9 +2293,7 @@
 
         const payload = { type };
         // 对于需要 group_id 的操作，统一添加
-        if (type !== 'setup') {
-            payload.group_id = conversation.id;
-        }
+        payload.group_id = conversation.id;
         // 合并额外参数
         Object.assign(payload, extra);
 
@@ -2480,7 +2478,8 @@
         els.groupPanel = buildGroupPanel();
         els.setupGroup.addEventListener("click", () => {
             const title = prompt("请输入群名", "[Empty Group Name]");
-            runGroupAction("setup", {title});
+            apiRequest('POST', '/chat/group', { data: { type: "setup", title } });
+            setStatus("setup 成功", "success");
         })
         body.appendChild(els.groupPanel);
         els.resizeHandles = ['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'].map((dir) => {
@@ -2795,7 +2794,7 @@
                 action: () => {
                     const seconds = prompt('输入禁言秒数（0 解除禁言）:');
                     if (seconds !== null && /^\d+$/.test(seconds)) {
-                        runGroupAction('mute_member', {target_id: uid, mute: 60})
+                        runGroupAction('mute_member', {target_id: uid, mute: Number(seconds)})
                     }
                 }
             });
@@ -2835,7 +2834,7 @@
                     action: () => {
                         const seconds = prompt('输入禁言秒数（0 解除禁言）:');
                         if (seconds !== null && /^\d+$/.test(seconds)) {
-                            runGroupAction('mute_member', {target_id: uid, mute: 60})
+                            runGroupAction('mute_member', {target_id: uid, mute: Number(seconds)})
                         }
                     }
                 });
