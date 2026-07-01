@@ -2696,7 +2696,7 @@
             if (!conversation || conversation.type !== 'group') return;
             // 检查当前用户是否为群主
             const selfId = state.selfId;
-            const currentUser = conversation.raw.users.find(u => u.user_id === selfId);
+            const currentUser = (conversation.members || []).find(u => u.user_id === selfId);
             if (!currentUser || currentUser.type !== 'Owner') {
                 setStatus('只有群主可以解散群', 'error');
                 return;
