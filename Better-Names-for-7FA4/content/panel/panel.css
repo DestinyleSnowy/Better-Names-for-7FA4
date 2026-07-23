@@ -291,16 +291,29 @@
 }
 
 #bn-fireworks {
-    right: 36px;
-    top: 8px;
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
-    border: 0;
+    right: 38px;
+    top: 6px;
+    z-index: 2;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 10px;
     background: transparent;
     box-shadow: none;
+    appearance: none;
+    font: inherit;
+    line-height: 0;
     touch-action: manipulation;
-    transition: background .18s ease;
+    transition: color .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
+}
+
+#bn-fireworks[hidden] {
+    display: none !important;
+}
+
+#bn-fireworks:disabled {
+    cursor: default;
 }
 
 #bn-pin svg {
@@ -310,11 +323,41 @@
 }
 
 #bn-fireworks svg {
-    width: 20px;
-    height: 20px;
+    width: 19px;
+    height: 19px;
     display: block;
+    overflow: visible;
     pointer-events: none;
     transition: transform .18s ease;
+}
+
+#bn-fireworks .bn-icon-birthday > :not(.bn-birthday-icon-flame):not(.bn-birthday-icon-outline) {
+    display: none;
+}
+
+.bn-birthday-icon-outline {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.55;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.bn-birthday-icon-flame {
+    fill: currentColor;
+    stroke: none;
+    transform-box: fill-box;
+    transform-origin: center bottom;
+}
+
+#bn-container.bn-theme-dark #bn-fireworks .bn-birthday-icon-outline {
+    fill: none !important;
+    stroke: currentColor;
+}
+
+#bn-container.bn-theme-dark #bn-fireworks .bn-birthday-icon-flame {
+    fill: currentColor !important;
+    stroke: none;
 }
 
 #bn-pin:hover {
@@ -322,8 +365,46 @@
     transform: scale(1.2);
 }
 
-#bn-fireworks:hover {
-    background: rgba(139, 92, 246, 0.1);
+#bn-fireworks.bn-birthday-ready {
+    border-color: rgba(221, 107, 32, 0.16);
+    background: rgba(221, 107, 32, 0.08);
+    color: #d96a22;
+}
+
+#bn-fireworks.bn-birthday-ready:hover {
+    border-color: rgba(221, 107, 32, 0.28);
+    background: rgba(221, 107, 32, 0.14);
+    box-shadow: 0 4px 12px rgba(164, 76, 24, 0.12);
+}
+
+#bn-container.bn-theme-dark #bn-fireworks.bn-birthday-ready {
+    border-color: rgba(255, 173, 102, 0.2);
+    background: rgba(255, 153, 73, 0.1);
+    color: #ffad66;
+}
+
+#bn-container.bn-theme-dark #bn-fireworks.bn-birthday-ready:hover {
+    border-color: rgba(255, 173, 102, 0.32);
+    background: rgba(255, 153, 73, 0.16);
+}
+
+.bn-birthday-count {
+    position: absolute;
+    right: -5px;
+    top: -5px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border: 2px solid var(--bn-bg);
+    border-radius: 999px;
+    background: #ec4899;
+    color: #fff;
+    font-size: 9px;
+    font-weight: 800;
+    line-height: 12px;
+    text-align: center;
+    pointer-events: none;
+    box-sizing: border-box;
 }
 
 #bn-pin.bn-pinned {
@@ -332,19 +413,41 @@
 }
 
 #bn-fireworks.bn-active {
-    background: rgba(249, 115, 22, 0.12);
+    background: rgba(221, 107, 32, 0.18);
 }
 
 #bn-fireworks:hover svg {
-    transform: scale(1.08);
+    transform: scale(1.06);
 }
 
 #bn-fireworks.bn-active svg {
-    transform: scale(1.12);
+    transform: scale(0.92);
 }
 
 #bn-fireworks:focus-visible {
-    outline: none;
+    outline: 2px solid var(--bn-theme-color, #1e88e5);
+    outline-offset: 2px;
+}
+
+#bn-fireworks.bn-birthday-ready .bn-birthday-icon-flame {
+    animation: bn-birthday-icon-flame 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes bn-birthday-icon-flame {
+    from {
+        opacity: .78;
+        transform: scale(.92);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1.05);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #bn-fireworks.bn-birthday-ready .bn-birthday-icon-flame {
+        animation: none;
+    }
 }
 
 #bn-fireworks-canvas {
@@ -384,6 +487,18 @@
 #bn-birthday-wish.bn-show {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
+}
+
+#bn-birthday-wish.bn-birthday-multiple {
+    width: min(680px, calc(100vw - 32px));
+}
+
+#bn-birthday-wish.bn-birthday-self {
+    background:
+            radial-gradient(circle at 16% 16%, rgba(96, 165, 250, 0.24), transparent 29%),
+            radial-gradient(circle at 84% 12%, rgba(251, 191, 36, 0.24), transparent 30%),
+            radial-gradient(circle at 52% 98%, rgba(167, 139, 250, 0.2), transparent 38%),
+            linear-gradient(135deg, rgba(239, 246, 255, 0.97), rgba(255, 251, 235, 0.95));
 }
 
 #bn-birthday-wish::before,
@@ -449,6 +564,61 @@
     color: #6b7280;
     font-size: 13px;
     font-weight: 600;
+}
+
+.bn-birthday-wish-brand {
+    margin-top: 8px;
+    color: #9ca3af;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .02em;
+}
+
+.bn-birthday-people {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.bn-birthday-person {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 7px 11px;
+    border: 1px solid rgba(249, 115, 22, 0.2);
+    border-radius: 999px;
+    background: rgba(255, 247, 237, 0.88);
+    color: #9a3412;
+    font-size: 13px;
+    font-weight: 750;
+}
+
+.bn-birthday-person-name {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.bn-birthday-person.is-self {
+    border-color: rgba(37, 99, 235, 0.28);
+    background: rgba(219, 234, 254, 0.92);
+    color: #1d4ed8;
+}
+
+.bn-birthday-self-badge {
+    flex: 0 0 auto;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: #2563eb;
+    color: #fff;
+    font-size: 9px;
+    line-height: 1.25;
+}
+
+#bn-birthday-wish.bn-birthday-many .bn-birthday-person {
+    padding: 6px 9px;
+    font-size: 12px;
 }
 
 #bn-birthday-wish {
@@ -588,6 +758,22 @@
     color: #dbeafe;
 }
 
+#bn-container.bn-theme-dark ~ #bn-birthday-wish .bn-birthday-wish-brand {
+    color: #bfdbfe;
+}
+
+#bn-container.bn-theme-dark ~ #bn-birthday-wish .bn-birthday-person {
+    border-color: rgba(253, 186, 116, 0.25);
+    background: rgba(124, 45, 18, 0.28);
+    color: #ffedd5;
+}
+
+#bn-container.bn-theme-dark ~ #bn-birthday-wish .bn-birthday-person.is-self {
+    border-color: rgba(147, 197, 253, 0.34);
+    background: rgba(30, 64, 175, 0.34);
+    color: #dbeafe;
+}
+
 @media (max-width: 560px) {
     #bn-birthday-wish {
         width: min(420px, calc(100vw - 24px));
@@ -601,6 +787,10 @@
 
     .bn-birthday-copy {
         text-align: center;
+    }
+
+    .bn-birthday-people {
+        justify-content: center;
     }
 
     .bn-birthday-wish-title {

@@ -1045,21 +1045,14 @@
     let fireworksEngine = null;
     let fireworksActiveTimer = null;
     let birthdayWishTimer = null;
-    const BIRTHDAY_PERSON = '@鱼oe不缺氧';
-    const BIRTHDAY_DATE_TEXT = '5月5日';
+    let birthdayState = {status: 'loading', people: [], dateText: '今天'};
     const BIRTHDAY_BUTTON_LABEL = '生日快乐';
-    const BIRTHDAY_ICON_SVG = `
-      <svg class="bn-icon bn-icon-birthday" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path d="M12 2.2c.85.86 1.5 1.73 1.5 2.55A1.5 1.5 0 0 1 12 6.25a1.5 1.5 0 0 1-1.5-1.5c0-.82.65-1.69 1.5-2.55Z" fill="#ffb020"/>
-        <path d="M11.15 6.1h1.7v3.2h-1.7z" fill="#3b82f6"/>
-        <path d="M6.25 9.1h11.5A2.25 2.25 0 0 1 20 11.35v1.28c0 .69-.56 1.25-1.25 1.25-.46 0-.88-.25-1.1-.65l-.16-.28-.2.25a2.18 2.18 0 0 1-3.42 0l-.2-.25-.2.25a2.18 2.18 0 0 1-3.42 0l-.2-.25-.2.25c-.22.4-.64.65-1.1.65A1.25 1.25 0 0 1 7.3 12.63v-1.28A2.25 2.25 0 0 1 9.55 9.1h-3.3Z" fill="#f973a6"/>
-        <path d="M5 13.35c.43.31.96.49 1.55.49.83 0 1.55-.34 2.05-.93.51.59 1.23.93 2.05.93.83 0 1.55-.34 2.06-.93.5.59 1.22.93 2.05.93.82 0 1.54-.34 2.05-.93.5.59 1.22.93 2.05.93.43 0 .84-.1 1.2-.28v4.19A2.25 2.25 0 0 1 17.8 20H6.2A2.25 2.25 0 0 1 4 17.75v-4.4Z" fill="#8b5cf6"/>
-        <path d="M5.9 16.5h12.2v1.45c0 .42-.33.75-.75.75H6.65a.75.75 0 0 1-.75-.75V16.5Z" fill="#6d28d9"/>
-        <circle cx="8" cy="15.25" r=".65" fill="#fff3a3"/>
-        <circle cx="12" cy="15.25" r=".65" fill="#bbf7d0"/>
-        <circle cx="16" cy="15.25" r=".65" fill="#bfdbfe"/>
-      </svg>
-  `;
+    const BIRTHDAY_CACHE_KEY = 'bn.birthday.today.v1';
+    const BIRTHDAY_PREVIEW_KEY = 'bn.birthday.preview.v1';
+    const BIRTHDAY_PREVIEW_MODES = new Set(['self', 'other', 'multiple']);
+    const BIRTHDAY_TODAY_LABELS = new Set(['今天', '今日', '0天后']);
+    const BIRTHDAY_MASK_CHARS = new Set(['?', '？', '*', '＊', '·', '•', '□', '◇', '〇', '○']);
+    const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
     const FIREWORKS_ICON_SVG = `
       <svg class="bn-icon bn-icon-fireworks" viewBox="0 0 1088 1024" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <path d="M528.991209 435.636191c-0.50423-4.117882-0.840384-7.563457-1.176537-11.345185s-0.50423-7.39538-0.672308-11.177108v-22.102101a379.853598 379.853598 0 0 1 4.117882-44.540355 279.763855 279.763855 0 0 1 10.504801-44.288241 249.341952 249.341952 0 0 1 77.987641-118.494153 285.730582 285.730582 0 0 1 85.130906-48.574199h0.672307a42.523434 42.523434 0 0 1 29.58152 79.752448 44.120163 44.120163 0 0 1-7.899611 2.184998 208.247171 208.247171 0 0 0-67.987071 22.774409 185.724878 185.724878 0 0 0-29.833634 20.673448A195.809487 195.809487 0 0 0 603.617314 287.224365a221.777355 221.777355 0 0 0-21.177678 32.18671 272.284437 272.284437 0 0 0-16.219413 36.304591A304.219032 304.219032 0 0 0 554.791 394.457372c-1.428653 6.723073-2.773267 13.278068-3.781728 20.169217-0.50423 3.445575-1.008461 6.723073-1.260576 10.168647s-0.672307 6.891149-0.840384 9.832494v0.50423a9.916532 9.916532 0 0 1-10.924993 9.328264 10.168647 10.168647 0 0 1-9.328263-8.824033z" fill="#FFC229"></path>
@@ -1075,28 +1068,409 @@
       </svg>
   `;
 
+    function createBirthdaySvgElement(tagName, attributes) {
+        const element = document.createElementNS(SVG_NAMESPACE, tagName);
+        Object.entries(attributes || {}).forEach(([name, value]) => {
+            element.setAttribute(name, String(value));
+        });
+        return element;
+    }
+
+    function createBirthdayIcon() {
+        const svg = createBirthdaySvgElement('svg', {
+            class: 'bn-icon bn-icon-birthday',
+            viewBox: '0 0 24 24',
+            'aria-hidden': 'true',
+        });
+        svg.appendChild(createBirthdaySvgElement('path', {
+            class: 'bn-birthday-icon-flame',
+            d: 'M12 2.5c1.18 1.24 1.9 2.28 1.9 3.25A1.9 1.9 0 0 1 12 7.65a1.9 1.9 0 0 1-1.9-1.9c0-.97.72-2.01 1.9-3.25Z',
+        }));
+        svg.appendChild(createBirthdaySvgElement('path', {
+            class: 'bn-birthday-icon-outline',
+            d: 'M12 7.9v2.6M5.5 10.5h13v7a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2v-7ZM5.5 13.25c1.08 1.03 2.17 1.03 3.25 0 1.08 1.03 2.17 1.03 3.25 0 1.08 1.03 2.17 1.03 3.25 0 1.08 1.03 2.17 1.03 3.25 0M4 20.5h16',
+        }));
+        return svg;
+    }
+
     function applyBirthdayButton(button) {
         if (!button) return;
         button.setAttribute('title', BIRTHDAY_BUTTON_LABEL);
         button.setAttribute('aria-label', BIRTHDAY_BUTTON_LABEL);
-        button.innerHTML = BIRTHDAY_ICON_SVG;
+        button.setAttribute('aria-disabled', 'true');
+        button.setAttribute('tabindex', '-1');
+        button.dataset.bnBirthdayState = 'loading';
+        if ('disabled' in button) button.disabled = true;
+        button.hidden = true;
+        button.replaceChildren(createBirthdayIcon());
     }
 
     function createFireworksButton(pinElement) {
         if (!pinElement || !pinElement.parentElement) return null;
-        const button = document.createElement('div');
+        const button = document.createElement('button');
+        button.type = 'button';
         button.id = 'bn-fireworks';
-        button.setAttribute('role', 'button');
-        button.setAttribute('tabindex', '0');
         applyBirthdayButton(button);
         pinElement.insertAdjacentElement('beforebegin', button);
         return button;
     }
 
+    if (fireworksBtn && fireworksBtn.tagName !== 'BUTTON') {
+        const upgradedButton = document.createElement('button');
+        upgradedButton.type = 'button';
+        upgradedButton.id = 'bn-fireworks';
+        fireworksBtn.replaceWith(upgradedButton);
+        fireworksBtn = upgradedButton;
+    }
     if (!fireworksBtn) {
         fireworksBtn = createFireworksButton(pinBtn);
     } else {
         applyBirthdayButton(fireworksBtn);
+    }
+
+    function normalizeBirthdayText(value) {
+        return String(value == null ? '' : value)
+            .replace(/\u00a0/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function normalizeBirthdayName(value) {
+        return normalizeBirthdayText(value).replace(/^@+/, '').trim();
+    }
+
+    function splitBirthdayNames(value) {
+        const ignored = new Set(['', '无', '暂无', '没有', '无寿星']);
+        const seen = new Set();
+        const names = [];
+        normalizeBirthdayText(value).split(/[、,，;；]+/).forEach(part => {
+            const name = normalizeBirthdayName(part);
+            if (ignored.has(name) || seen.has(name)) return;
+            seen.add(name);
+            names.push(name);
+        });
+        return names;
+    }
+
+    function findBirthdaySection(root) {
+        if (!root || typeof root.querySelectorAll !== 'function') return null;
+        const headings = root.querySelectorAll('h1, h2, h3, h4, h5, h6');
+        for (const heading of headings) {
+            const title = normalizeBirthdayText(heading.textContent);
+            const hasBirthdayIcon = !!heading.querySelector('i.birthday.cake.icon');
+            if (title === BIRTHDAY_BUTTON_LABEL && (hasBirthdayIcon || heading.tagName === 'H4')) {
+                return heading.nextElementSibling;
+            }
+        }
+        return null;
+    }
+
+    function readTodayBirthdayNames(root) {
+        const section = findBirthdaySection(root);
+        if (!section) return [];
+        const names = [];
+        const seen = new Set();
+        section.querySelectorAll('tr').forEach(row => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length < 2) return;
+            const label = normalizeBirthdayText(cells[0].textContent)
+                .replace(/\s/g, '')
+                .replace(/[：:]$/, '');
+            if (!BIRTHDAY_TODAY_LABELS.has(label)) return;
+            splitBirthdayNames(cells[cells.length - 1].textContent).forEach(name => {
+                if (seen.has(name)) return;
+                seen.add(name);
+                names.push(name);
+            });
+        });
+        return names;
+    }
+
+    function localBirthdayDateParts() {
+        const clock = document.querySelector('.server.clock');
+        const clockText = normalizeBirthdayText(clock?.textContent);
+        const match = clockText.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+        if (match) {
+            return {
+                key: `${match[1]}-${String(match[2]).padStart(2, '0')}-${String(match[3]).padStart(2, '0')}`,
+                text: `${Number(match[2])}月${Number(match[3])}日`,
+            };
+        }
+        const now = new Date();
+        return {
+            key: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`,
+            text: `${now.getMonth() + 1}月${now.getDate()}日`,
+        };
+    }
+
+    function readBirthdayCache(dateKey) {
+        try {
+            const raw = sessionStorage.getItem(BIRTHDAY_CACHE_KEY);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            if (!parsed || parsed.dateKey !== dateKey || !Array.isArray(parsed.names)) return null;
+            return parsed.names
+                .slice(0, 32)
+                .map(normalizeBirthdayName)
+                .filter(name => name && name.length <= 80);
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function writeBirthdayCache(dateKey, names) {
+        try {
+            sessionStorage.setItem(BIRTHDAY_CACHE_KEY, JSON.stringify({
+                dateKey,
+                names: Array.isArray(names) ? names.slice(0, 32) : [],
+            }));
+        } catch (_) { /* ignore */
+        }
+    }
+
+    function readBirthdayPreviewMode() {
+        try {
+            const mode = String(sessionStorage.getItem(BIRTHDAY_PREVIEW_KEY) || '').trim().toLowerCase();
+            return BIRTHDAY_PREVIEW_MODES.has(mode) ? mode : '';
+        } catch (_) {
+            return '';
+        }
+    }
+
+    function waitForBirthdayDocument() {
+        if (document.readyState !== 'loading') return Promise.resolve();
+        return new Promise(resolve => {
+            document.addEventListener('DOMContentLoaded', resolve, {once: true});
+        });
+    }
+
+    async function loadTodayBirthdayNames(dateKey) {
+        if (location.pathname === '/' || location.pathname === '') {
+            await waitForBirthdayDocument();
+            const names = readTodayBirthdayNames(document);
+            writeBirthdayCache(dateKey, names);
+            return names;
+        }
+
+        const cached = readBirthdayCache(dateKey);
+        if (cached) return cached;
+
+        const homeUrl = new URL('/', location.href).href;
+        const response = await fetch(homeUrl, {
+            method: 'GET',
+            credentials: 'same-origin',
+            cache: 'no-store',
+        });
+        if (!response.ok) throw new Error(`Birthday page request failed: ${response.status}`);
+        const html = await response.text();
+        const parsed = new DOMParser().parseFromString(html, 'text/html');
+        const names = readTodayBirthdayNames(parsed);
+        writeBirthdayCache(dateKey, names);
+        return names;
+    }
+
+    function directTextOfElement(element) {
+        if (!element) return '';
+        let text = '';
+        element.childNodes.forEach(node => {
+            if (node.nodeType === Node.TEXT_NODE) text += ` ${node.textContent || ''}`;
+        });
+        return normalizeBirthdayText(text);
+    }
+
+    function currentBirthdayUserIdentity(usersMap) {
+        let uid = '';
+        try {
+            if (typeof window.getCurrentUserId === 'function') {
+                const value = Number(window.getCurrentUserId());
+                if (Number.isFinite(value) && value > 0) uid = String(value);
+            }
+        } catch (_) { /* ignore */
+        }
+        const dropdown = document.querySelector('#user-dropdown');
+        if (!uid && dropdown) {
+            const raw = dropdown.dataset?.user_id
+                || dropdown.dataset?.userId
+                || dropdown.getAttribute('data-user_id')
+                || dropdown.getAttribute('data-user-id');
+            if (raw && /^\d+$/.test(String(raw))) uid = String(raw);
+        }
+        const profileLink = dropdown?.querySelector('a[href^="/user/"]') || null;
+        if (!uid && profileLink) {
+            const match = (profileLink.getAttribute('href') || '').match(/\/user\/(\d+)/);
+            if (match) uid = match[1];
+        }
+        const nickname = directTextOfElement(profileLink);
+        const realName = (uid && usersMap && usersMap[uid] && typeof usersMap[uid].name === 'string')
+            ? normalizeBirthdayName(usersMap[uid].name)
+            : '';
+        return {uid, nickname, realName};
+    }
+
+    function maskedBirthdayNameMatches(maskedName, realName) {
+        const maskedChars = Array.from(normalizeBirthdayName(maskedName));
+        const realChars = Array.from(normalizeBirthdayName(realName));
+        if (!maskedChars.length || maskedChars.length !== realChars.length) return false;
+        return maskedChars.every((char, index) => BIRTHDAY_MASK_CHARS.has(char) || char === realChars[index]);
+    }
+
+    function birthdayUserCandidates(maskedName, usersMap) {
+        if (!usersMap || typeof usersMap !== 'object') return [];
+        const matches = [];
+        Object.entries(usersMap).forEach(([uid, info]) => {
+            const realName = (info && typeof info.name === 'string') ? info.name : '';
+            if (!realName || !maskedBirthdayNameMatches(maskedName, realName)) return;
+            matches.push({uid: String(uid), realName: normalizeBirthdayName(realName)});
+        });
+        return matches;
+    }
+
+    function visibleNicknameForBirthdayUser(uid, realName) {
+        if (!uid || !/^\d+$/.test(String(uid))) return '';
+        const selector = `a[href="/user/${uid}"]`;
+        const links = document.querySelectorAll(selector);
+        for (const link of links) {
+            if (link.closest('#bn-container')) continue;
+            const preservedNickname = normalizeBirthdayName(link.dataset?.bnOriginalNickname);
+            if (preservedNickname) return preservedNickname;
+            const nickname = directTextOfElement(link);
+            if (!nickname || nickname === realName || /^\/?user\/\d+$/i.test(nickname)) continue;
+            const extractedNickname = normalizeBirthdayName(extractOriginalNickname(nickname));
+            if (extractedNickname && extractedNickname !== realName) return extractedNickname;
+            const mappedPrefix = `${realName}（`;
+            if (nickname.startsWith(mappedPrefix) && nickname.endsWith('）')) {
+                const originalNickname = normalizeBirthdayName(nickname.slice(mappedPrefix.length, -1));
+                if (originalNickname) return originalNickname;
+            }
+            return nickname;
+        }
+        return '';
+    }
+
+    function mentionBirthdayName(value) {
+        const name = normalizeBirthdayName(value);
+        return name ? `@${name}` : '@寿星';
+    }
+
+    function resolveBirthdayPeople(names, usersMap) {
+        const identity = currentBirthdayUserIdentity(usersMap);
+        return names.map(sourceName => {
+            const candidates = birthdayUserCandidates(sourceName, usersMap);
+            const candidate = candidates.length === 1 ? candidates[0] : null;
+            const isSelf = !!(candidate && identity.uid && candidate.uid === identity.uid);
+            let displayName = sourceName;
+            if (isSelf && identity.nickname) {
+                displayName = identity.nickname;
+            } else if (candidate) {
+                displayName = visibleNicknameForBirthdayUser(candidate.uid, candidate.realName) || sourceName;
+            }
+            return {
+                sourceName,
+                displayName,
+                mention: mentionBirthdayName(displayName),
+                uid: candidate?.uid || '',
+                isSelf,
+            };
+        });
+    }
+
+    function createBirthdayPreviewPeople(mode, usersMap) {
+        const identity = currentBirthdayUserIdentity(usersMap);
+        const selfName = identity.nickname || '你';
+        const self = {
+            sourceName: identity.realName || selfName,
+            displayName: selfName,
+            mention: mentionBirthdayName(selfName),
+            uid: identity.uid,
+            isSelf: true,
+        };
+        const firstOther = {
+            sourceName: '测试寿星',
+            displayName: '星河漫游者',
+            mention: '@星河漫游者',
+            uid: '',
+            isSelf: false,
+        };
+        const secondOther = {
+            sourceName: '测试寿星二号',
+            displayName: '云朵收藏家',
+            mention: '@云朵收藏家',
+            uid: '',
+            isSelf: false,
+        };
+        if (mode === 'self') return [self];
+        if (mode === 'multiple') return [firstOther, self, secondOther];
+        return [firstOther];
+    }
+
+    function syncBirthdayButton() {
+        if (!fireworksBtn) return;
+        fireworksBtn.querySelectorAll('.bn-birthday-count').forEach(element => element.remove());
+        fireworksBtn.classList.remove('bn-birthday-ready');
+        fireworksBtn.removeAttribute('data-bn-birthday-count');
+
+        const people = Array.isArray(birthdayState.people) ? birthdayState.people : [];
+        const ready = birthdayState.status === 'ready' && people.length > 0;
+        fireworksBtn.dataset.bnBirthdayState = ready ? 'ready' : birthdayState.status;
+        fireworksBtn.hidden = !ready;
+        if ('disabled' in fireworksBtn) fireworksBtn.disabled = !ready;
+        fireworksBtn.setAttribute('aria-disabled', ready ? 'false' : 'true');
+        fireworksBtn.setAttribute('tabindex', ready ? '0' : '-1');
+        if (!ready) {
+            fireworksBtn.setAttribute('title', birthdayState.status === 'error' ? '暂时无法获取今日生日信息' : '今天没有寿星');
+            fireworksBtn.setAttribute('aria-label', fireworksBtn.getAttribute('title'));
+            return;
+        }
+
+        const includesSelf = people.some(person => person.isSelf);
+        let label;
+        if (people.length === 1 && includesSelf) {
+            label = '今天是你的生日';
+        } else if (people.length === 1) {
+            label = `祝 ${people[0].mention} 生日快乐`;
+        } else {
+            label = `今天有 ${people.length} 位寿星${includesSelf ? '，包括你' : ''}`;
+        }
+        if (birthdayState.previewMode) label = `[预览] ${label}`;
+        fireworksBtn.classList.add('bn-birthday-ready');
+        fireworksBtn.setAttribute('title', label);
+        fireworksBtn.setAttribute('aria-label', label);
+        fireworksBtn.dataset.bnBirthdayCount = String(people.length);
+        if (people.length > 1) {
+            const count = document.createElement('span');
+            count.className = 'bn-birthday-count';
+            count.setAttribute('aria-hidden', 'true');
+            count.textContent = String(people.length);
+            fireworksBtn.appendChild(count);
+        }
+    }
+
+    async function initializeBirthdayFeature(usersMap) {
+        await waitForBirthdayDocument();
+        const date = localBirthdayDateParts();
+        const previewMode = readBirthdayPreviewMode();
+        if (previewMode) {
+            birthdayState = {
+                status: 'ready',
+                people: createBirthdayPreviewPeople(previewMode, usersMap),
+                dateText: `${date.text} · 预览`,
+                previewMode,
+            };
+            syncBirthdayButton();
+            return;
+        }
+        try {
+            const names = await loadTodayBirthdayNames(date.key);
+            birthdayState = {
+                status: 'ready',
+                people: resolveBirthdayPeople(names, usersMap),
+                dateText: date.text,
+            };
+        } catch (error) {
+            debugLog('Birthday information load failed', error);
+            birthdayState = {status: 'error', people: [], dateText: date.text};
+        }
+        syncBirthdayButton();
     }
 
     function createFireworksEngine() {
@@ -1534,8 +1908,32 @@
         }, 0);
     }
 
+    function createBirthdayElement(tagName, className, text) {
+        const element = document.createElement(tagName);
+        if (className) element.className = className;
+        if (text != null) element.textContent = String(text);
+        return element;
+    }
+
+    function createBirthdayCake() {
+        const cake = createBirthdayElement('div', 'bn-birthday-cake');
+        cake.setAttribute('aria-hidden', 'true');
+        ['1', '2', '3'].forEach(index => {
+            const candle = createBirthdayElement('div', `bn-birthday-candle bn-birthday-candle-${index}`);
+            candle.appendChild(document.createElement('span'));
+            cake.appendChild(candle);
+        });
+        cake.appendChild(createBirthdayElement('div', 'bn-birthday-cake-top'));
+        cake.appendChild(createBirthdayElement('div', 'bn-birthday-cake-layer bn-birthday-cake-layer-1'));
+        cake.appendChild(createBirthdayElement('div', 'bn-birthday-cake-layer bn-birthday-cake-layer-2'));
+        cake.appendChild(createBirthdayElement('div', 'bn-birthday-cake-base'));
+        cake.appendChild(createBirthdayElement('div', 'bn-birthday-cake-shadow'));
+        return cake;
+    }
+
     function showBirthdayWish() {
-        if (!document.body) return;
+        const people = Array.isArray(birthdayState.people) ? birthdayState.people : [];
+        if (!document.body || !people.length) return;
         let wish = document.getElementById('bn-birthday-wish');
         if (!wish) {
             wish = document.createElement('div');
@@ -1547,25 +1945,69 @@
         if (wish.parentElement && wish.parentElement.lastElementChild !== wish) {
             wish.parentElement.appendChild(wish);
         }
-        wish.innerHTML = `
-            <div class="bn-birthday-card">
-                <div class="bn-birthday-copy">
-                    <div class="bn-birthday-wish-date">${BIRTHDAY_DATE_TEXT}</div>
-                    <div class="bn-birthday-wish-title"><span>生日快乐</span><span>${BIRTHDAY_PERSON}</span></div>
-                    <div class="bn-birthday-wish-subtitle">Better Names for 7FA4</div>
-                </div>
-                <div class="bn-birthday-cake" aria-hidden="true">
-                    <div class="bn-birthday-candle bn-birthday-candle-1"><span></span></div>
-                    <div class="bn-birthday-candle bn-birthday-candle-2"><span></span></div>
-                    <div class="bn-birthday-candle bn-birthday-candle-3"><span></span></div>
-                    <div class="bn-birthday-cake-top"></div>
-                    <div class="bn-birthday-cake-layer bn-birthday-cake-layer-1"></div>
-                    <div class="bn-birthday-cake-layer bn-birthday-cake-layer-2"></div>
-                    <div class="bn-birthday-cake-base"></div>
-                    <div class="bn-birthday-cake-shadow"></div>
-                </div>
-            </div>
-        `;
+        const includesSelf = people.some(person => person.isSelf);
+        const isMultiple = people.length > 1;
+        wish.classList.toggle('bn-birthday-self', includesSelf);
+        wish.classList.toggle('bn-birthday-multiple', isMultiple);
+        wish.classList.toggle('bn-birthday-many', people.length > 5);
+        wish.classList.toggle('bn-birthday-preview', !!birthdayState.previewMode);
+        wish.setAttribute('aria-label', `${birthdayState.previewMode ? '预览，' : ''}生日快乐，${people.map(person => person.mention).join('，')}`);
+        wish.replaceChildren();
+
+        const card = createBirthdayElement('div', 'bn-birthday-card');
+        if (includesSelf) card.classList.add('is-self');
+        if (isMultiple) card.classList.add('is-multiple');
+        const copy = createBirthdayElement('div', 'bn-birthday-copy');
+
+        let dateLine = `${birthdayState.dateText} · 今天`;
+        if (people.length === 1 && includesSelf) {
+            dateLine = `${birthdayState.dateText} · 今天轮到你发光`;
+        } else if (isMultiple) {
+            dateLine = `${birthdayState.dateText} · ${people.length} 位寿星`;
+        }
+        copy.appendChild(createBirthdayElement('div', 'bn-birthday-wish-date', dateLine));
+
+        const title = createBirthdayElement('div', 'bn-birthday-wish-title');
+        if (isMultiple) {
+            title.appendChild(createBirthdayElement('span', '', '祝大家生日快乐'));
+        } else {
+            title.appendChild(createBirthdayElement('span', '', '生日快乐'));
+            title.appendChild(createBirthdayElement('span', '', people[0].mention));
+        }
+        copy.appendChild(title);
+
+        if (isMultiple) {
+            const list = createBirthdayElement('div', 'bn-birthday-people');
+            people.forEach(person => {
+                const item = createBirthdayElement('div', 'bn-birthday-person');
+                if (person.isSelf) item.classList.add('is-self');
+                item.appendChild(createBirthdayElement('span', 'bn-birthday-person-name', person.mention));
+                if (person.isSelf) {
+                    item.appendChild(createBirthdayElement('span', 'bn-birthday-self-badge', '是你'));
+                }
+                list.appendChild(item);
+            });
+            copy.appendChild(list);
+        }
+
+        let subtitle = '把今天的烟花和好心情送给你';
+        if (people.length === 1 && includesSelf) {
+            subtitle = '愿新的一岁，所有热爱都有回响';
+        } else if (isMultiple && includesSelf) {
+            subtitle = '今天也有你的一份祝福，和大家一起许个愿吧';
+        } else if (isMultiple) {
+            subtitle = '愿每一位寿星的新一岁都闪闪发光';
+        }
+        copy.appendChild(createBirthdayElement('div', 'bn-birthday-wish-subtitle', subtitle));
+        copy.appendChild(createBirthdayElement(
+            'div',
+            'bn-birthday-wish-brand',
+            `Better Names for 7FA4${birthdayState.previewMode ? ' · 预览模式' : ''}`,
+        ));
+
+        card.appendChild(copy);
+        card.appendChild(createBirthdayCake());
+        wish.appendChild(card);
         wish.classList.remove('bn-show');
         void wish.offsetWidth;
         wish.classList.add('bn-show');
@@ -1573,10 +2015,11 @@
         birthdayWishTimer = setTimeout(() => {
             wish.classList.remove('bn-show');
             birthdayWishTimer = null;
-        }, 3600);
+        }, isMultiple ? 4800 : 4000);
     }
 
     function triggerFireworks() {
+        if (!birthdayState.people.length) return;
         const engine = ensureFireworksEngine();
         if (engine) engine.launch();
         showBirthdayWish();
@@ -2648,6 +3091,8 @@
     });
     if (fireworksBtn) {
         const launchFromFireworksButton = (event) => {
+            const canLaunch = birthdayState.status === 'ready' && birthdayState.people.length > 0;
+            if (!canLaunch) return;
             if (event) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -2655,10 +3100,6 @@
             triggerFireworks();
         };
         fireworksBtn.addEventListener('click', launchFromFireworksButton);
-        fireworksBtn.addEventListener('keydown', (event) => {
-            if (event.key !== 'Enter' && event.key !== ' ') return;
-            launchFromFireworksButton(event);
-        });
     }
     window.addEventListener('pagehide', () => {
         if (fireworksEngine) {
@@ -3480,6 +3921,7 @@
 
     let [users, specialRules] = await Promise.all([loadUsersData(), loadSpecialRules(),]);
     applySpecialRules(users, specialRules);
+    void initializeBirthdayFeature(users);
 
     function firstVisibleCharOfTitle() {
         const h1 = document.querySelector('body > div:nth-child(2) > div > div.ui.center.aligned.grid > div > h1');
@@ -4005,6 +4447,7 @@
         const defaultSource = baseText || (a.textContent || '').trim();
         if (isLikelyUrlLabel(defaultSource, rawHref)) return;
         const originalNickname = (showUserNickname && info) ? extractOriginalNickname(baseText) : '';
+        if (originalNickname) a.dataset.bnOriginalNickname = originalNickname;
 
         const img = a.querySelector('img');
         if (img && hideAvatar) img.remove();
