@@ -1,6 +1,13 @@
-const host_list = [
-	'oj.7fa4.cn', 'jx.7fa4.cn:8888', 'jx.7fa4.cn:5283', 'in.7fa4.cn:8888', 'in.7fa4.cn:5283', '10.210.57.10:8888', '10.210.57.10:5283', '211.137.101.118:8888', '211.137.101.118:5283'
-];
+const host_list = {
+	'7fa4': [
+		'oj.7fa4.cn', 'jx.7fa4.cn:8888', 'jx.7fa4.cn:5283',
+		'in.7fa4.cn:8888', 'in.7fa4.cn:5283', '10.210.57.10:8888',
+		'10.210.57.10:5283', '211.137.101.118:8888', '211.137.101.118:5283'
+	],
+	zhxy: [
+		'hitcxedu.com'
+	]
+};
 const key_cookies = [
 	'login', 'connect.sid'
 ];
@@ -58,20 +65,7 @@ document.getElementById('getCookies').addEventListener('click', async () => {
 		function: () => chrome.runtime.sendMessage(
 			{
 				type: 'GCookies',
-				cookies: document.cookie
-			}
-		)
-	});
-});
-
-document.getElementById('getToken').addEventListener('click', async () => {
-	let [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-	chrome.storage.sync.set({ tab });
-	chrome.scripting.executeScript({
-		target: { tabId: tab.id },
-		function: () => chrome.runtime.sendMessage(
-			{
-				type: 'GToken',
+				cookies: document.cookie,
 				localStorage: localStorage,
 				sessionStorage: sessionStorage
 			}
@@ -114,84 +108,88 @@ document.getElementById('sendVjPage').addEventListener('click', async () => {
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-	if(request.type != 'GCookies') return;
-	let window_host = sender.origin;
 	let host;
-	let cookie = request.cookies;
-	function check_host() {
-		for (let re of host_list)
-			if (window_host.search(re) != -1){
-				host = re;
-				return true;
-			}
-		return false;
+	let check_host = (url, list) => {
+		for (let re of list)
+			if (url.search(re) != -1)
+				return re;
+		return null;
 	}
-	// 不同host的cookies不能通用，所以干脆只能使用一个host
-	if (!check_host()) {
-		alert('必须在7FA4的页面上才能保存登录信息。');
-		return;
-	}
-	let cookies = {};
-	cookies.chost = host;
-	let inp = cookie.split(' ');
-	for (let inpi of inp)
-		for (let name of key_cookies)
-			if(inpi.startsWith(name + '=')){
-				if(inpi[inpi.length - 1] == ';')
-					inpi = inpi.substring(0, inpi.length - 1);
-				cookies[name] = inpi.substring(name.length + 1);
+	let deal = {
+		'7fa4': () => {
+			let cookie = request.cookies;
+			let cookies = {};
+			cookies.chost = host;
+			let inp = cookie.split(' ');
+			for (let inpi of inp)
+				for (let name of key_cookies)
+					if(inpi.startsWith(name + '=')){
+						if(inpi[inpi.length - 1] == ';')
+							inpi = inpi.substring(0, inpi.length - 1);
+						cookies[name] = inpi.substring(name.length + 1);
+					}
+			for (let name of key_cookies)
+				if (!cookies[name]) {
+					alert('没有登录7FA4，请先登录。');
+					return;
+				}
+			chrome.storage.sync.set({ cookies });
+			freshLoginStatus();
+			alert('7FA4登录信息保存成功。');
+		},
+		zhxy: () => {
+			token = request.sessionStorage.Authorization;
+			if(!token){
+				alert('请扫码登录后获取token。');
+				return;
 			}
-	for (let name of key_cookies)
-		if (!cookies[name]) {
-			alert('没有登录7FA4，请先登录。');
+			token = token.substr(1, token.length - 2);
+			chrome.storage.sync.get("cookies", ({ cookies }) => {
+				if(!cookies || !cookies.login || !cookies['connect.sid']){
+					alert('7FA4登录信息不完整，请到7FA4页面保存登录信息。');
+					return;
+				}
+				let headers = new Headers({
+					"Cookie": `login=${cookies.login}; connect.sid=${cookies['connect.sid']}`,
+					"Content-Type": "application/json"
+				});
+				let current_host = cookies.chost;
+				console.log(`http://${current_host}/user/0/zhxy`);
+				fetch(
+					`http://${current_host}/user/0/zhxy`, {
+						headers: headers,
+						credentials: "include",
+						method: 'POST',
+						body: JSON.stringify({token: token})
+					}
+				).then(
+					res => res.json()
+				).then(
+					json => {
+						if(json === undefined) {
+							alert(`你可能正确了，请访问http://${current_host}/user/0/zhxy确认是否正确。`)
+						}
+						else {
+							console.log(json);
+							alert(json.success ? '成功保存下列token：' + json.token : json.err);
+						}
+					}
+				)
+			});
+			sendResponse("完成响应。");
+		}
+	};
+	if(request.type != 'GCookies') return;
+	for(let key in host_list)
+		if(host = check_host(sender.origin, host_list[key])){
+			try{
+				deal[key]();
+			}catch(e){
+				alert('发生错误：' + e);
+			}
 			return;
 		}
-	chrome.storage.sync.set({ cookies });
-	freshLoginStatus();
-	alert('7FA4登录信息保存成功。');
-})
-
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-	if(request.type != 'GToken') return;
-	if (!['https://www.hitcxedu.com', 'https://hitcxedu.com', 'https://api.hitcxedu.com'].includes(sender.origin)) {
-		alert('必须在智慧校园的页面上才能保存登录信息。');
-		return;
-	}
-	token = request.sessionStorage.Authorization;
-	token = token.substr(1, token.length - 2);
-	chrome.storage.sync.get("cookies", ({ cookies }) => {
-		if(!cookies || !cookies.login || !cookies['connect.sid']){
-			alert('7FA4登录信息不完整，请到7FA4页面保存登录信息。');
-			return;
-		}
-		let headers = new Headers({
-			"Cookie": `login=${cookies.login}; connect.sid=${cookies['connect.sid']}`,
-			"Content-Type": "application/json"
-		});
-		let current_host = cookies.chost;
-		console.log(`http://${current_host}/user/0/zhxy`);
-		fetch(
-			`http://${current_host}/user/0/zhxy`, {
-				headers: headers,
-				credentials: "include",
-				method: 'POST',
-				body: JSON.stringify({token: token})
-			}
-		).then(
-			res => res.json()
-		).then(
-			json => {
-				if(json === undefined) {
-					alert(`你可能正确了，请访问http://${current_host}/user/0/zhxy确认是否正确。`)
-				}
-				else {
-					console.log(json);
-					alert(json.success ? '成功保存下列token：' + json.token : json.err);
-				}
-			}
-		)
-	});
-	sendResponse("完成响应。");
+	alert('必须在7FA4或智慧校园的页面上才能保存登录信息。');
 })
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -202,7 +200,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 		luogu: /https:\/\/(?:www\.)?luogu\.com\.cn\/record\/(\d+)/,
 		uoj: /https:\/\/(?:www\.)?uoj\.ac\/submission\/(\d+)/,
 		qoj: /https:\/\/(?:www\.)?qoj\.ac\/submission\/(\d+)/,
-		cf: /https:\/\/(?:www\.)?codeforces\.com\/contest\/\d+\/submission\/(\d+)/,
+		cf: /https:\/\/(?:www\.)?codeforces\.com\/(?:contest\/\d+\/submission|problemset\/submission\/\d+)\/(\d+)/,
 		cfgym: /https:\/\/(?:www\.)?codeforces\.com\/gym\/\d+\/submission\/(\d+)/,
 		atc: /https:\/\/(?:www\.)?atcoder\.jp\/contests\/.+\/submissions\/(\d+)/,
 		vj: /https:\/\/(?:www\.)?vjudge\.net\/solution\/(\d+)/,
