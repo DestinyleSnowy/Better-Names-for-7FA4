@@ -125,22 +125,39 @@
     };
 
     // ---- 编辑器操作 ----
+    const replaceText = (ta, start, end, text, caret) => {
+        ta.focus({ preventScroll: true });
+        ta.setSelectionRange(start, end);
+
+        // Chromium 会把 execCommand('insertText') 记入 textarea 的原生撤销栈。
+        // setRangeText 仅作为不支持该命令时的兼容回退。
+        let recordedByBrowser = false;
+        try {
+            recordedByBrowser = ta.ownerDocument.execCommand('insertText', false, text);
+        } catch {}
+        if (!recordedByBrowser) {
+            ta.setRangeText(text, start, end, 'end');
+            ta.dispatchEvent(new InputEvent('input', {
+                bubbles: true,
+                inputType: 'insertText',
+                data: text,
+            }));
+        }
+
+        ta.setSelectionRange(caret, caret);
+        ta.focus({ preventScroll: true });
+    };
+
     const wrapSel = (ta, a, b) => {
         const s = ta.selectionStart, e = ta.selectionEnd;
         const sel = ta.value.substring(s, e);
-        ta.value = ta.value.substring(0, s) + a + sel + b + ta.value.substring(e);
         const pos = s + a.length + sel.length;
-        ta.setSelectionRange(pos, pos);
-        ta.focus();
-        ta.dispatchEvent(new Event('input', { bubbles: true }));
+        replaceText(ta, s, e, a + sel + b, pos);
     };
 
     const ins = (ta, txt) => {
-        const s = ta.selectionStart;
-        ta.value = ta.value.substring(0, s) + txt + ta.value.substring(ta.selectionEnd);
-        ta.setSelectionRange(s + txt.length, s + txt.length);
-        ta.focus();
-        ta.dispatchEvent(new Event('input', { bubbles: true }));
+        const s = ta.selectionStart, e = ta.selectionEnd;
+        replaceText(ta, s, e, txt, s + txt.length);
     };
 
     // ---- Lucide 风格图标（stroke 线条） ----
@@ -582,6 +599,7 @@
             btn.title = title;
             btn.innerHTML = svg;
             btn.className = 'bn-pe-btn';
+            btn.addEventListener('mousedown', e => e.preventDefault());
             btn.addEventListener('click', e => { e.preventDefault(); fn(); });
             tb.appendChild(btn);
         });
