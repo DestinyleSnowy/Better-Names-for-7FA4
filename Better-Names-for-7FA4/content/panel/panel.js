@@ -47,6 +47,7 @@
         enableQuickSkip: undefined,
         enableUserPlanDateNavigator: true,
         enablePaperEditor: true,
+        enableChatroom: true,
         'quickSkip.migrated.v1': false,
         enableTitleOptimization: true,
         debug: false,
@@ -298,6 +299,7 @@
     if (enableQuickSkip === undefined) enableQuickSkip = true;
     const enableUserPlanDateNavigator = readConfigValue('enableUserPlanDateNavigator') !== false;
     const enablePaperEditor = readConfigValue('enablePaperEditor') !== false;
+    const enableChatroom = readConfigValue('enableChatroom') !== false;
     const enableTitleOptimization = readConfigValue('enableTitleOptimization');
     const widthMode = readConfigValue(WIDTH_MODE_KEY);
     // Centralized configuration groups for easier export/reset flows.
@@ -335,6 +337,7 @@
         enableQuickSkip,
         enableUserPlanDateNavigator,
         enablePaperEditor,
+        enableChatroom,
         enableTitleOptimization,
     };
     const rankingConfig = {
@@ -839,6 +842,11 @@
     let fireworksBtn = document.getElementById('bn-fireworks');
     const chatTrigger = document.getElementById('bn-chat-trigger');
     const chatTriggerBadge = document.getElementById('bn-chat-trigger-badge');
+    if (chatTrigger && !enableChatroom) {
+        chatTrigger.hidden = true;
+        chatTrigger.setAttribute('aria-hidden', 'true');
+        chatTrigger.setAttribute('aria-expanded', 'false');
+    }
     const trigger = document.getElementById('bn-trigger');
     const themeColorInput = document.getElementById('bn-theme-color');
     const themeColorHexInput = document.getElementById('bn-theme-color-hex');
@@ -2145,6 +2153,7 @@
     const chkQuickSkip = document.getElementById('bn-enable-quick-skip');
     const chkUserPlanDateNavigator = document.getElementById('bn-enable-user-plan-date-navigator');
     const chkPaperEditor = document.getElementById('bn-enable-paper-editor');
+    const chkChatroom = document.getElementById('bn-enable-chatroom');
     const chkTitleOpt = document.getElementById('bn-enable-title-optimization');
 
     if (!chkTemplateBulkAdd) {
@@ -2193,6 +2202,7 @@
     chkQuickSkip.checked = enableQuickSkip;
     if (chkUserPlanDateNavigator) chkUserPlanDateNavigator.checked = enableUserPlanDateNavigator;
     if (chkPaperEditor) chkPaperEditor.checked = enablePaperEditor;
+    if (chkChatroom) chkChatroom.checked = enableChatroom;
     chkTitleOpt.checked = enableTitleOptimization;
     if (bgOpacityValueSpan) bgOpacityValueSpan.textContent = formatOpacityText(normalizedBgOpacity);
     if (bgOpacityInput) bgOpacityInput.value = normalizedBgOpacity;
@@ -2282,6 +2292,7 @@
         enableQuickSkip,
         enableUserPlanDateNavigator,
         enablePaperEditor,
+        enableChatroom,
         enableTitleOptimization,
         widthMode,
         bgEnabled: storedBgEnabled,
@@ -2978,7 +2989,7 @@
         const currentBtEnabled = getHiToiletEnabledState();
         const templateBulkAddChk = document.getElementById('bn-enable-template-bulk-add');
 
-        const changed = (document.getElementById('bn-enable-title-truncate').checked !== originalConfig.titleTruncate) || (document.getElementById('bn-enable-user-truncate').checked !== originalConfig.userTruncate) || (document.getElementById('bn-enable-title-truncate').checked && ti !== originalConfig.maxTitleUnits) || (document.getElementById('bn-enable-user-truncate').checked && ui !== originalConfig.maxUserUnits) || (document.getElementById('bn-hide-avatar').checked !== originalConfig.hideAvatar) || (document.getElementById('bn-enable-copy').checked !== originalConfig.enableCopy) || (document.getElementById('bn-enable-desc-copy').checked !== originalConfig.enableDescCopy) || (document.getElementById('bn-hide-orig').checked !== originalConfig.hideOrig) || (document.getElementById('bn-enable-contest-download').checked !== originalConfig.enableContestDownloadButtons) || (document.getElementById('bn-enable-contest-review').checked !== originalConfig.enableContestReviewButtons) || (document.getElementById('bn-show-user-nickname').checked !== originalConfig.showUserNickname) || ((document.getElementById('bn-default-hide-submitted-homework')?.checked ?? originalConfig.defaultHideSubmittedHomework) !== originalConfig.defaultHideSubmittedHomework) || (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) || ((templateBulkAddChk ? templateBulkAddChk.checked : originalConfig.enableTemplateBulkAdd) !== originalConfig.enableTemplateBulkAdd) || (document.getElementById('bn-enable-renew').checked !== originalConfig.enableAutoRenew) || (document.getElementById('bn-enable-ranking-filter').checked !== originalConfig.enableRankingFilter) || (document.getElementById('bn-enable-column-switch').checked !== originalConfig.columnSwitchEnabled) || (document.getElementById('bn-enable-merge-assistant').checked !== originalConfig.mergeAssistantEnabled) || (document.getElementById('bn-enable-vj').checked !== originalConfig.enableVjLink) || (document.getElementById('bn-hide-done-skip').checked !== originalConfig.hideDoneSkip) || (document.getElementById('bn-enable-quick-skip').checked !== originalConfig.enableQuickSkip) || ((document.getElementById('bn-enable-user-plan-date-navigator')?.checked ?? originalConfig.enableUserPlanDateNavigator) !== originalConfig.enableUserPlanDateNavigator) || ((document.getElementById('bn-enable-paper-editor')?.checked ?? originalConfig.enablePaperEditor) !== originalConfig.enablePaperEditor) || (document.getElementById('bn-enable-title-optimization').checked !== originalConfig.enableTitleOptimization) || (document.getElementById('bn-use-custom-color').checked !== originalConfig.useCustomColors) || codeThemeChanged || customCssChanged || ((document.getElementById('bn-width-mode')?.value ?? originalConfig.widthMode) !== originalConfig.widthMode) || (currentBgEnabled !== originalConfig.bgEnabled) || bgSourceChanged || (currentBgfillway !== originalConfig.bgfillway) || (currentBgOpacity !== originalConfig.bgOpacity) || (clampBlur(currentBgBlur) !== clampBlur(originalConfig.bgBlur)) || (currentBtEnabled !== originalConfig.btEnabled) || (hiToiletIntervalInput && clampHiToiletInterval(hiToiletIntervalInput.value) !== originalConfig.btInterval) || (getSelectedThemeMode() !== originalConfig.themeMode) || themeColorChanged || paletteChanged;
+        const changed = (document.getElementById('bn-enable-title-truncate').checked !== originalConfig.titleTruncate) || (document.getElementById('bn-enable-user-truncate').checked !== originalConfig.userTruncate) || (document.getElementById('bn-enable-title-truncate').checked && ti !== originalConfig.maxTitleUnits) || (document.getElementById('bn-enable-user-truncate').checked && ui !== originalConfig.maxUserUnits) || (document.getElementById('bn-hide-avatar').checked !== originalConfig.hideAvatar) || (document.getElementById('bn-enable-copy').checked !== originalConfig.enableCopy) || (document.getElementById('bn-enable-desc-copy').checked !== originalConfig.enableDescCopy) || (document.getElementById('bn-hide-orig').checked !== originalConfig.hideOrig) || (document.getElementById('bn-enable-contest-download').checked !== originalConfig.enableContestDownloadButtons) || (document.getElementById('bn-enable-contest-review').checked !== originalConfig.enableContestReviewButtons) || (document.getElementById('bn-show-user-nickname').checked !== originalConfig.showUserNickname) || ((document.getElementById('bn-default-hide-submitted-homework')?.checked ?? originalConfig.defaultHideSubmittedHomework) !== originalConfig.defaultHideSubmittedHomework) || (document.getElementById('bn-enable-user-menu').checked !== originalConfig.enableMenu) || ((templateBulkAddChk ? templateBulkAddChk.checked : originalConfig.enableTemplateBulkAdd) !== originalConfig.enableTemplateBulkAdd) || (document.getElementById('bn-enable-renew').checked !== originalConfig.enableAutoRenew) || (document.getElementById('bn-enable-ranking-filter').checked !== originalConfig.enableRankingFilter) || (document.getElementById('bn-enable-column-switch').checked !== originalConfig.columnSwitchEnabled) || (document.getElementById('bn-enable-merge-assistant').checked !== originalConfig.mergeAssistantEnabled) || (document.getElementById('bn-enable-vj').checked !== originalConfig.enableVjLink) || (document.getElementById('bn-hide-done-skip').checked !== originalConfig.hideDoneSkip) || (document.getElementById('bn-enable-quick-skip').checked !== originalConfig.enableQuickSkip) || ((document.getElementById('bn-enable-user-plan-date-navigator')?.checked ?? originalConfig.enableUserPlanDateNavigator) !== originalConfig.enableUserPlanDateNavigator) || ((document.getElementById('bn-enable-paper-editor')?.checked ?? originalConfig.enablePaperEditor) !== originalConfig.enablePaperEditor) || ((chkChatroom?.checked ?? originalConfig.enableChatroom) !== originalConfig.enableChatroom) || (document.getElementById('bn-enable-title-optimization').checked !== originalConfig.enableTitleOptimization) || (document.getElementById('bn-use-custom-color').checked !== originalConfig.useCustomColors) || codeThemeChanged || customCssChanged || ((document.getElementById('bn-width-mode')?.value ?? originalConfig.widthMode) !== originalConfig.widthMode) || (currentBgEnabled !== originalConfig.bgEnabled) || bgSourceChanged || (currentBgfillway !== originalConfig.bgfillway) || (currentBgOpacity !== originalConfig.bgOpacity) || (clampBlur(currentBgBlur) !== clampBlur(originalConfig.bgBlur)) || (currentBtEnabled !== originalConfig.btEnabled) || (hiToiletIntervalInput && clampHiToiletInterval(hiToiletIntervalInput.value) !== originalConfig.btInterval) || (getSelectedThemeMode() !== originalConfig.themeMode) || themeColorChanged || paletteChanged;
 
         saveActions.classList.toggle('bn-visible', changed);
     }
@@ -3057,6 +3068,7 @@
     };
     if (chkUserPlanDateNavigator) chkUserPlanDateNavigator.onchange = checkChanged;
     if (chkPaperEditor) chkPaperEditor.onchange = checkChanged;
+    if (chkChatroom) chkChatroom.onchange = checkChanged;
     chkTitleOpt.onchange = checkChanged;
     if (chkTemplateBulkAdd) {
         chkTemplateBulkAdd.onchange = () => {
@@ -3130,6 +3142,7 @@
         GM_setValue('enableQuickSkip', chkQuickSkip.checked);
         GM_setValue('enableUserPlanDateNavigator', chkUserPlanDateNavigator ? chkUserPlanDateNavigator.checked : enableUserPlanDateNavigator);
         GM_setValue('enablePaperEditor', chkPaperEditor ? chkPaperEditor.checked : enablePaperEditor);
+        GM_setValue('enableChatroom', chkChatroom ? chkChatroom.checked : enableChatroom);
         GM_setValue('enableTitleOptimization', chkTitleOpt.checked);
         GM_setValue('enableUserMenu', chkMenu.checked);
         GM_setValue('enableVjLink', chkVj.checked);
@@ -3243,6 +3256,7 @@
         applyQuickSkip(originalConfig.enableQuickSkip);
         if (chkUserPlanDateNavigator) chkUserPlanDateNavigator.checked = originalConfig.enableUserPlanDateNavigator;
         if (chkPaperEditor) chkPaperEditor.checked = originalConfig.enablePaperEditor;
+        if (chkChatroom) chkChatroom.checked = originalConfig.enableChatroom;
         chkTitleOpt.checked = originalConfig.enableTitleOptimization;
         if (chkTemplateBulkAdd) chkTemplateBulkAdd.checked = originalConfig.enableTemplateBulkAdd;
         const bulkEnabled = chkTemplateBulkAdd ? chkTemplateBulkAdd.checked : originalConfig.enableTemplateBulkAdd;

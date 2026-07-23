@@ -3115,6 +3115,26 @@
 
     async function init() {
         await waitForPanel();
+        let enabled = true;
+        try {
+            enabled = typeof GM_getValue !== 'function' || GM_getValue('enableChatroom', true) !== false;
+        } catch (_) {
+            enabled = true;
+        }
+        if (!enabled) {
+            const trigger = $('bn-chat-trigger');
+            const chatWindow = $('bn-chat-window');
+            if (trigger) {
+                trigger.hidden = true;
+                trigger.setAttribute('aria-hidden', 'true');
+                trigger.setAttribute('aria-expanded', 'false');
+            }
+            if (chatWindow) {
+                chatWindow.classList.remove('bn-show');
+                chatWindow.setAttribute('aria-hidden', 'true');
+            }
+            return;
+        }
         if (!buildChatWindow()) return;
         bindEvents();
         renderAll();

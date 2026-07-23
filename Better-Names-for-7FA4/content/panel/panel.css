@@ -126,6 +126,10 @@
     right: 0;
 }
 
+#bn-chat-trigger[hidden] {
+    display: none !important;
+}
+
 #bn-chat-trigger.has-unread {
     border-color: rgba(226, 90, 62, 0.72);
     box-shadow: 0 12px 28px rgba(226, 90, 62, 0.26);
@@ -1234,6 +1238,10 @@
 }
 
 .bn-section-column-truncate .bn-section-color-theme {
+    flex: 0 0 auto;
+}
+
+.bn-section-column-truncate .bn-section-chatroom {
     flex: 1 1 auto;
 }
 
