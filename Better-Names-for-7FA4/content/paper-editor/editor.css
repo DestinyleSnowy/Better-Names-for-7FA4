@@ -248,14 +248,6 @@
     display: inline-block;
     max-width: none;
 }
-#bn-paper-capture .katex .frac-line,
-#bn-paper-capture .katex .overline-line,
-#bn-paper-capture .katex .underline-line,
-#bn-paper-capture .katex .hline {
-    border-bottom-style: solid !important;
-    border-bottom-color: currentColor !important;
-}
-#bn-paper-capture .katex .hdashline { border-bottom-color: currentColor !important; }
 #bn-paper-capture pre {
     overflow: visible;
     white-space: pre-wrap;
@@ -279,7 +271,7 @@
 /* ====== 状态栏 ====== */
 .bn-pe-statusbar {
     display: flex;
-    justify-content: flex-start;
+    justify-content: space-between;
     align-items: center;
     gap: 10px;
     padding: 4px 12px;
@@ -291,6 +283,54 @@
     border-radius: 0 0 var(--bn-radius) var(--bn-radius);
     font-variant-numeric: tabular-nums;
 }
+.bn-pe-status-info {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+.bn-pe-status-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 7px;
+    flex-wrap: wrap;
+}
+.bn-pe-export-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-height: 28px;
+    padding: 4px 11px;
+    border: 1px solid var(--bn-border);
+    border-radius: var(--bn-radius-sm);
+    background: var(--bn-surface);
+    color: var(--bn-primary);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--bn-transition), border-color var(--bn-transition), opacity var(--bn-transition);
+}
+.bn-pe-export-btn:hover:not(:disabled) {
+    background: var(--bn-primary-light);
+    border-color: var(--bn-primary);
+}
+.bn-pe-export-btn:disabled {
+    cursor: default;
+    opacity: .65;
+}
+.bn-pe-submit-btn {
+    border-color: var(--bn-primary);
+    background: var(--bn-primary);
+    color: #fff;
+}
+.bn-pe-submit-btn:hover:not(:disabled) {
+    border-color: var(--bn-primary-hover);
+    background: var(--bn-primary-hover);
+    color: #fff;
+}
+.bn-pe-export-btn .icon { margin: 0; }
 
 /* ====== 模态弹窗 ====== */
 #bn-pe-modal {

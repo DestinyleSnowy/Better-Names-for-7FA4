@@ -376,58 +376,6 @@
         });
     }
 
-    function strengthenKatexRuleLines(node) {
-        node.querySelectorAll('.katex .frac-line, .katex .overline-line, .katex .underline-line, .katex .hline').forEach(line => {
-            Object.assign(line.style, {
-                borderBottomStyle: 'solid',
-                borderBottomColor: 'currentColor',
-            });
-        });
-        node.querySelectorAll('.katex .hdashline').forEach(line => {
-            Object.assign(line.style, {
-                borderBottomColor: 'currentColor',
-            });
-        });
-    }
-
-    function collectKatexRuleLines(node) {
-        const nodeRect = node.getBoundingClientRect();
-        return Array.from(node.querySelectorAll('.katex .frac-line, .katex .overline-line, .katex .underline-line, .katex .hline'))
-            .map(line => {
-                const rect = line.getBoundingClientRect();
-                const style = getComputedStyle(line);
-                const borderWidth = parseFloat(style.borderBottomWidth) || 1;
-                return {
-                    x: rect.left - nodeRect.left,
-                    y: rect.bottom - nodeRect.top - borderWidth,
-                    width: rect.width,
-                    thickness: borderWidth,
-                    color: style.color || getComputedStyle(node).color || '#1a1a2e',
-                };
-            })
-            .filter(line => line.width > 0 && line.thickness > 0);
-    }
-
-    function drawKatexRuleLines(canvas, ruleLines, width, height) {
-        if (!ruleLines.length) return;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        const scaleX = canvas.width / Math.max(1, width);
-        const scaleY = canvas.height / Math.max(1, height);
-        ctx.save();
-        ctx.globalAlpha = 0.9;
-        ruleLines.forEach(line => {
-            ctx.fillStyle = line.color;
-            ctx.fillRect(
-                line.x * scaleX,
-                line.y * scaleY,
-                Math.max(1, line.width * scaleX),
-                Math.max(1, line.thickness * scaleY)
-            );
-        });
-        ctx.restore();
-    }
-
     function getCaptureScale(width, height) {
         const sideLimit = Math.min(CAPTURE_MAX_SIDE / Math.max(1, width), CAPTURE_MAX_SIDE / Math.max(1, height));
         const areaLimit = Math.sqrt(CAPTURE_MAX_PIXELS / Math.max(1, width * height));
@@ -467,10 +415,8 @@
             fast: false,
             debug: false,
         };
-        const ruleLines = collectKatexRuleLines(node);
         const canvas = await snapdom.toCanvas(node, options);
         if (!canvas.width || !canvas.height) throw new Error('生成图片尺寸为空');
-        drawKatexRuleLines(canvas, ruleLines, width, height);
         if (!canvasHasInk(canvas)) {
             throw new Error('生成图片为空白，请检查内容或图片资源');
         }
@@ -499,7 +445,6 @@
                 await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
             }
             fitOversizedMath(node);
-            strengthenKatexRuleLines(node);
             await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
             const width = Math.ceil(Math.max(CAPTURE_MIN_WIDTH, node.clientWidth || el.clientWidth || CAPTURE_MIN_WIDTH));
             const height = Math.ceil(Math.max(1, node.scrollHeight || node.clientHeight || el.scrollHeight || 1));
@@ -652,6 +597,39 @@
             : (text || '<i class="send icon"></i> 提交答案');
     };
 
+    const setExportButtonState = (btn, state = 'idle') => {
+        const icon = document.createElement('i');
+        const label = document.createElement('span');
+        if (state === 'working') {
+            icon.className = 'spinner loading icon';
+            label.textContent = '正在导出…';
+        } else if (state === 'done') {
+            icon.className = 'check icon';
+            label.textContent = '导出成功';
+        } else {
+            icon.className = 'download icon';
+            label.textContent = '导出图片';
+        }
+        btn.replaceChildren(icon, label);
+        btn.disabled = state === 'working';
+    };
+
+    const downloadBlob = (blob, filename) => {
+        if (!(blob instanceof Blob) || !blob.size) throw new Error('导出图片为空');
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = filename;
+        link.hidden = true;
+        document.body.appendChild(link);
+        try {
+            link.click();
+        } finally {
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+        }
+    };
+
     // ---- 构建 UI ----
     function build(formEl) {
         const origField = formEl.querySelector('#answer');
@@ -663,8 +641,10 @@
         formEl.onsubmit = null;
         const cleanBtn = submitBtn.cloneNode(true);
         cleanBtn.type = 'button';
+        cleanBtn.disabled = false;
         submitBtn.parentNode.replaceChild(cleanBtn, submitBtn);
         submitBtn = cleanBtn;
+        const originalSubmitHtml = submitBtn.innerHTML;
 
         // 创建 DOM
         const container = document.createElement('div');
@@ -698,9 +678,25 @@
 
         const sb = document.createElement('div');
         sb.className = 'bn-pe-statusbar';
+        const statusInfo = document.createElement('div');
+        statusInfo.className = 'bn-pe-status-info';
         const cc = document.createElement('span');
         cc.textContent = '0 字符';
-        sb.append(cc);
+        statusInfo.appendChild(cc);
+        const exportBtn = document.createElement('button');
+        exportBtn.type = 'button';
+        exportBtn.className = 'bn-pe-export-btn';
+        exportBtn.title = '将当前 Markdown 和 LaTeX 预览导出为 PNG 图片';
+        setExportButtonState(exportBtn);
+        const editorSubmitBtn = document.createElement('button');
+        editorSubmitBtn.type = 'button';
+        editorSubmitBtn.className = 'bn-pe-export-btn bn-pe-submit-btn';
+        editorSubmitBtn.title = '将当前 Markdown 和 LaTeX 预览生成为图片并提交';
+        setBtnLoading(editorSubmitBtn, false);
+        const statusActions = document.createElement('div');
+        statusActions.className = 'bn-pe-status-actions';
+        statusActions.append(exportBtn, editorSubmitBtn);
+        sb.append(statusInfo, statusActions);
 
         container.append(toolbar, body, sb);
 
@@ -744,7 +740,7 @@
             const hint = document.createElement('span');
             hint.textContent = '已恢复草稿';
             hint.style.cssText = 'color:var(--bn-primary);font-size:11px;margin-left:8px;opacity:1;transition:opacity .6s ease 2s;';
-            sb.appendChild(hint);
+            statusInfo.appendChild(hint);
             setTimeout(() => { hint.style.opacity = '0'; setTimeout(() => hint.remove(), 700); }, 100);
         }
 
@@ -761,8 +757,12 @@
 
         // 提交拦截
         let submitting = false;
+        let exporting = false;
+        let exportFeedbackTimer = null;
         const setSubmitLoading = (loading, text) => {
-            setBtnLoading(submitBtn, loading, text);
+            setBtnLoading(submitBtn, loading, loading ? text : originalSubmitHtml);
+            setBtnLoading(editorSubmitBtn, loading, loading ? text : undefined);
+            exportBtn.disabled = loading || exporting;
         };
         const renderAndCapturePreview = async () => {
             if (!textarea.value.trim()) {
@@ -774,11 +774,44 @@
             return capture(previewEl);
         };
 
+        async function handleExport(e) {
+            e?.preventDefault();
+            e?.stopPropagation();
+            e?.stopImmediatePropagation?.();
+            if (exporting || submitting) return;
+
+            exporting = true;
+            clearTimeout(exportFeedbackTimer);
+            setExportButtonState(exportBtn, 'working');
+            submitBtn.disabled = true;
+            editorSubmitBtn.disabled = true;
+            let succeeded = false;
+            try {
+                const imageBlob = await renderAndCapturePreview();
+                if (!imageBlob) return;
+                downloadBlob(imageBlob, getAnswerImageFileName());
+                succeeded = true;
+            } catch (err) {
+                console.error('[BN-Paper] 导出图片失败:', err);
+                alert('导出图片失败: ' + err.message);
+            } finally {
+                exporting = false;
+                submitBtn.disabled = false;
+                editorSubmitBtn.disabled = false;
+                setExportButtonState(exportBtn, succeeded ? 'done' : 'idle');
+                if (succeeded) {
+                    exportFeedbackTimer = setTimeout(() => {
+                        if (!exporting && !submitting) setExportButtonState(exportBtn, 'idle');
+                    }, 1600);
+                }
+            }
+        }
+
         async function handleSubmit(e) {
             e?.preventDefault();
             e?.stopPropagation();
             e?.stopImmediatePropagation?.();
-            if (submitting) return;
+            if (submitting || exporting) return;
             submitting = true;
 
             // 如果已有文件，直接提交
@@ -793,13 +826,12 @@
                 return;
             }
 
-            const oldHtml = submitBtn.innerHTML;
             setSubmitLoading(true, '生成图片中...');
             try {
                 const imageBlob = await renderAndCapturePreview();
                 if (!imageBlob) {
                     submitting = false;
-                    setSubmitLoading(false, oldHtml);
+                    setSubmitLoading(false);
                     return;
                 }
 
@@ -812,12 +844,14 @@
             } catch (err) {
                 alert('提交失败: ' + err.message);
                 submitting = false;
-                setSubmitLoading(false, oldHtml);
+                setSubmitLoading(false);
             }
         }
 
         formEl.addEventListener('submit', handleSubmit, true);
         submitBtn.addEventListener('click', handleSubmit, true);
+        editorSubmitBtn.addEventListener('click', handleSubmit, true);
+        exportBtn.addEventListener('click', handleExport, true);
 
         return { textarea, previewEl };
     }
