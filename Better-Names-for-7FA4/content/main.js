@@ -3697,7 +3697,7 @@ td.bn-plan-quick-skip-target .bn-plan-quick-skip-wrap {
 /* === BN PATCH: contest page download & review buttons === */
 (function () {
     const downloadEnabled = GM_getValue('enableContestDownloadButtons', false);
-    const reviewEnabled = GM_getValue('enableContestReviewButtons', false);
+    const reviewEnabled = GM_getValue('enableContestReviewButtons', true);
     const pathMatch = location.pathname.match(/^\/contest\/(\d+)(?:\/?(?:[?#].*)?)?$/);
     if ((!downloadEnabled && !reviewEnabled) || !pathMatch) return;
 
