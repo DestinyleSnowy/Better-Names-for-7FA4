@@ -2311,77 +2311,36 @@
         disableNeedWarn();
     }
 
-    function createPanelWakeController() {
-        const reasons = Object.freeze({
-            PIN: 'pin', TRIGGER: 'hover:trigger', PANEL: 'hover:panel', BRIDGE: 'hover:bridge', FOCUS: 'focus',
-        });
-        const PANEL_HIDE_DELAY = 300;
-        const HOVER_SUPPRESS_MS = 600;
-        const DRAG_HOVER_SUPPRESS_MS = 260;
-        const HOVER_BRIDGE_PADDING = 2;
-        const HOVER_BRIDGE_GAP_MAX = 24;
-        const wakeReasons = new Set();
-
-        let pointerMovedSinceLoad = false;
-        let lastPointerClientX = null;
-        let lastPointerClientY = null;
-        const nowTs = () => {
-            if (typeof performance !== 'undefined' && performance.now) return performance.now();
-            return Date.now();
-        };
-        const hoverSuppressUntil = nowTs() + HOVER_SUPPRESS_MS;
-        window.addEventListener('pointermove', (event) => {
-            pointerMovedSinceLoad = true;
-            if (!event) return;
-            if (!Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return;
-            lastPointerClientX = event.clientX;
-            lastPointerClientY = event.clientY;
-        }, {passive: true});
-
-        let hideTimer = null;
+    function createPanelToggleController() {
         let initialRevealPending = true;
-        let initialRevealFrame = null;
-        let hoverWakeBlockedUntil = 0;
+        let revealFrame = null;
 
-        const isHoverWakeBlocked = () => nowTs() < hoverWakeBlockedUntil;
-        const canHonorHoverWake = () => pointerMovedSinceLoad && nowTs() >= hoverSuppressUntil && !isHoverWakeBlocked();
-        const shouldRevealPanel = () => pinned || wakeReasons.size > 0;
         const cancelPendingReveal = () => {
-            if (initialRevealFrame != null) {
-                cancelAnimationFrame(initialRevealFrame);
-                initialRevealFrame = null;
-            }
-        };
-        const cancelHide = () => {
-            if (hideTimer != null) {
-                clearTimeout(hideTimer);
-                hideTimer = null;
-            }
+            if (revealFrame == null) return;
+            cancelAnimationFrame(revealFrame);
+            revealFrame = null;
         };
 
         const showPanel = () => {
             if (isDragging || container.classList.contains('bn-dragging')) return;
             bringContainerToFront();
-            if (panel.classList.contains('bn-show')) {
-                cancelPendingReveal();
-                panel.classList.add('bn-show');
-                updateContainerState();
-                return;
-            }
+            if (panel.classList.contains('bn-show') || revealFrame != null) return;
+
             const commitReveal = () => {
-                initialRevealFrame = null;
-                if (!shouldRevealPanel()) return;
+                revealFrame = null;
                 panel.classList.add('bn-show');
                 updateContainerState();
             };
+
             if (initialRevealPending) {
                 initialRevealPending = false;
-                initialRevealFrame = requestAnimationFrame(() => {
-                    initialRevealFrame = requestAnimationFrame(commitReveal);
+                revealFrame = requestAnimationFrame(() => {
+                    revealFrame = requestAnimationFrame(commitReveal);
                 });
-            } else {
-                commitReveal();
+                return;
             }
+
+            commitReveal();
         };
 
         const hidePanel = () => {
@@ -2392,154 +2351,32 @@
             updateContainerState();
         };
 
-        const isPointerInHoverBridge = () => {
-            if (!Number.isFinite(lastPointerClientX) || !Number.isFinite(lastPointerClientY)) return false;
-            let panelRect;
-            let triggerRect;
-            try {
-                panelRect = panel.getBoundingClientRect();
-                triggerRect = trigger.getBoundingClientRect();
-            } catch (_) {
-                return false;
-            }
-            if (!panelRect || !triggerRect) return false;
-            const px = lastPointerClientX;
-            const py = lastPointerClientY;
-
-            const overlapLeft = Math.max(panelRect.left, triggerRect.left) - HOVER_BRIDGE_PADDING;
-            const overlapRight = Math.min(panelRect.right, triggerRect.right) + HOVER_BRIDGE_PADDING;
-            if (overlapRight <= overlapLeft) return false;
-            if (px < overlapLeft || px > overlapRight) return false;
-
-            const panelAboveGap = triggerRect.top - panelRect.bottom;
-            if (panelAboveGap > 0 && panelAboveGap <= HOVER_BRIDGE_GAP_MAX) {
-                const bridgeTop = panelRect.bottom - HOVER_BRIDGE_PADDING;
-                const bridgeBottom = triggerRect.top + HOVER_BRIDGE_PADDING;
-                return py >= bridgeTop && py <= bridgeBottom;
-            }
-
-            const panelBelowGap = panelRect.top - triggerRect.bottom;
-            if (panelBelowGap > 0 && panelBelowGap <= HOVER_BRIDGE_GAP_MAX) {
-                const bridgeTop = triggerRect.bottom - HOVER_BRIDGE_PADDING;
-                const bridgeBottom = panelRect.top + HOVER_BRIDGE_PADDING;
-                return py >= bridgeTop && py <= bridgeBottom;
-            }
-
-            return false;
-        };
-
-        const detectHoverReason = () => {
-            if (isDragging || container.classList.contains('bn-dragging') || isHoverWakeBlocked()) return null;
-            try {
-                if (panel.matches(':hover')) return reasons.PANEL;
-                if (trigger.matches(':hover')) return reasons.TRIGGER;
-                if (isPointerInHoverBridge()) return reasons.BRIDGE;
-            } catch (_) { /* ignore */
-            }
-            return null;
-        };
-
-        const requestWake = (reason) => {
-            if ((isDragging || container.classList.contains('bn-dragging')) && reason !== reasons.PIN) return;
-            if (reason) wakeReasons.add(reason);
-            cancelHide();
-            showPanel();
-        };
-
-        const scheduleHide = () => {
-            cancelHide();
-            if (wakeReasons.size || pinned) return;
-            hideTimer = setTimeout(() => {
-                if (pinned || wakeReasons.size) return;
-                const hoverReason = detectHoverReason();
-                if (hoverReason) {
-                    if (hoverReason === reasons.BRIDGE) {
-                        scheduleHide();
-                        return;
-                    }
-                    if (canHonorHoverWake()) requestWake(hoverReason);
-                    return;
-                }
-                const activeElement = document.activeElement;
-                if (activeElement && container.contains(activeElement)) {
-                    if (panel.classList.contains('bn-show') || canHonorHoverWake()) {
-                        requestWake(reasons.FOCUS);
-                    }
-                    return;
-                }
-                hidePanel();
-            }, PANEL_HIDE_DELAY);
-        };
-
-        const releaseWake = (reason) => {
-            if (!reason) return;
-            if (!wakeReasons.delete(reason)) return;
-            if (!wakeReasons.size && !pinned) scheduleHide();
-        };
-
-        const attachHoverWake = (element, reason) => {
-            if (!element) return;
-            element.addEventListener('mouseenter', () => {
-                if (isDragging || container.classList.contains('bn-dragging')) return;
-                if (!canHonorHoverWake()) return;
-                requestWake(reason);
-            });
-            element.addEventListener('mouseleave', () => releaseWake(reason));
-        };
-
         const syncPinnedState = () => {
             pinBtn.classList.toggle('bn-pinned', pinned);
-            if (pinned) requestWake(reasons.PIN); else releaseWake(reasons.PIN);
+            if (pinned) showPanel();
         };
 
         const toggleFromTrigger = () => {
-            if (panel.classList.contains('bn-show')) {
-                releaseWake(reasons.TRIGGER);
+            if (panel.classList.contains('bn-show') || revealFrame != null) {
                 hidePanel();
                 return;
             }
-            requestWake(reasons.TRIGGER);
             showPanel();
         };
 
-        const onFocusIn = (event) => {
-            const target = event && event.target ? event.target : null;
-            if (target) {
-                if (chatTrigger && (target === chatTrigger || chatTrigger.contains(target))) return;
-                if (chatWindowEl && chatWindowEl.contains(target)) return;
-            }
-            if (!panel.classList.contains('bn-show') && !canHonorHoverWake()) return;
-            requestWake(reasons.FOCUS);
-        };
-
-        const onFocusOut = (event) => {
-            const next = event.relatedTarget;
-            if (next && container.contains(next)) return;
-            releaseWake(reasons.FOCUS);
-        };
-
         const onDragStart = () => {
-            hoverWakeBlockedUntil = Number.POSITIVE_INFINITY;
-            wakeReasons.delete(reasons.TRIGGER);
-            wakeReasons.delete(reasons.PANEL);
-            wakeReasons.delete(reasons.FOCUS);
             cancelPendingReveal();
-            cancelHide();
             if (!pinned) panel.classList.remove('bn-show');
             updateContainerState();
         };
 
         const onDragEnd = () => {
-            hoverWakeBlockedUntil = nowTs() + DRAG_HOVER_SUPPRESS_MS;
-            wakeReasons.delete(reasons.TRIGGER);
-            wakeReasons.delete(reasons.PANEL);
-            wakeReasons.delete(reasons.FOCUS);
-            if (pinned) requestWake(reasons.PIN); else panel.classList.remove('bn-show');
+            if (pinned) showPanel(); else panel.classList.remove('bn-show');
             updateContainerState();
         };
 
         return {
-            reasons, attachHoverWake, syncPinnedState, toggleFromTrigger, onFocusIn, onFocusOut, onDragStart, onDragEnd,
+            syncPinnedState, toggleFromTrigger, onDragStart, onDragEnd,
         };
     }
 
@@ -2551,8 +2388,8 @@
         a.forEach(processUserLink);
     }
 
-    const wakeController = createPanelWakeController();
-    wakeController.syncPinnedState();
+    const panelToggleController = createPanelToggleController();
+    panelToggleController.syncPinnedState();
     updateContainerState();
 
     titleInp.disabled = !originalConfig.titleTruncate;
@@ -2653,8 +2490,6 @@
         colorSidebar.classList.add('bn-show');
     }
 
-    wakeController.attachHoverWake(trigger, wakeController.reasons.TRIGGER);
-    wakeController.attachHoverWake(panel, wakeController.reasons.PANEL);
     trigger.addEventListener('click', (event) => {
         if (isDragging || container.classList.contains('bn-dragging')) return;
         if (__bn_nowMs() < __bn_suppressTriggerClickUntil) {
@@ -2662,7 +2497,7 @@
             return;
         }
         event.preventDefault();
-        wakeController.toggleFromTrigger();
+        panelToggleController.toggleFromTrigger();
     });
     if (!BN_NEW_CHAT_FRONTEND) {
     if (chatTrigger) {
@@ -2745,9 +2580,6 @@
     chatUpdateFullscreenButton();
     chatSetGroupOpsVisible(false);
     }
-    container.addEventListener('focusin', wakeController.onFocusIn);
-    container.addEventListener('focusout', wakeController.onFocusOut);
-
     function __bn_applyTransform(x, y) {
         __bn_dragX = x;
         __bn_dragY = y;
@@ -2823,7 +2655,7 @@
         dragPending = false;
         isDragging = true;
         __bn_clearSettleState();
-        wakeController.onDragStart();
+        panelToggleController.onDragStart();
         panel.classList.remove('bn-show');
 
         const rect = trigger.getBoundingClientRect();
@@ -2888,7 +2720,7 @@
             if (!isDragging) trigger.style.transition = '';
             container.classList.remove('bn-drag-settling');
         }, 180);
-        wakeController.onDragEnd();
+        panelToggleController.onDragEnd();
         __bn_cleanupPointer();
     }
 
@@ -3086,7 +2918,7 @@
     pinBtn.addEventListener('click', () => {
         pinned = !pinned;
         GM_setValue('panelPinned', pinned);
-        wakeController.syncPinnedState();
+        panelToggleController.syncPinnedState();
         updateContainerState();
     });
     if (fireworksBtn) {
