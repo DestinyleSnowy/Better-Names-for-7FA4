@@ -180,74 +180,34 @@
     const manifestVersion = normalizeVersionString(readManifestVersion());
     const manifestVersionInfo = parseComparableVersion(manifestVersion);
     const WELCOME_SEEN_VERSION_KEY = 'bn.welcome.seenVersion';
-    const WELCOME_BASE_VERSION = '2026.07';
-    const WELCOME_PATCH_TITLE = '新增版本 Better Names for 7FA4 2026.08.01';
-    const WELCOME_CHANGELOG_CODE_NAME = 'Justin';
-    const WELCOME_CHANGELOG_2026_07_ITEMS = [
+    const WELCOME_LETTER_PARAGRAPHS = [
+        '感谢每一位一直以来支持该插件的伙伴。你们的使用、反馈与陪伴，让这个小小的项目能够一点点走到今天，BN 难免会存在一些问题，还请大家多多包涵。',
+        '借此机会，BN 把祝福送给所有正在学习 OI 的同学，尤其是刚从 NOI 赛场凯旋归来的你们。',
+        '无论结果是否如愿，能够一路走到这里，本身就已经是一件很了不起的事。那些反复调试的深夜、面对难题时的坚持，以及赛场上的全力以赴，都不会因为一次成绩而失去意义。',
+        '一次比赛不能定义你的能力，也不能决定你的未来。若有遗憾，就允许自己失落一会儿，但不要因此否定走过的路。愿你依然保留对算法的热爱，也依然相信自己的潜力。',
+        '山高路远，步履不停。感谢大家一路同行，也祝每一位 OIer 都能继续走向属于自己的下一次突破！',
+    ];
+    const WELCOME_FEATURES = [
         {
-            text: '添加并修复聊天室功能。',
-            children: [
-                '优化聊天消息排序，消息按时间从旧到新显示，最新消息位于底部。',
-                '优化会话列表排序，优先按最近消息时间排列。',
-                '修复私聊中无法加载自己发送消息的问题。',
-                '改进更早消息加载逻辑，滚动到顶部附近时自动加载。',
-                '移除“加载更早消息”按钮，调整会话标题、ID 与状态信息为同一行显示。',
-                '增大消息输入预览区域，并支持开关预览。',
-                '添加聊天消息本地缓存，减少刷新后重复拉取历史消息。',
-                '修复聊天室新消息提示在部分会话缺少消息基线时失效的问题。',
-                '优化聊天室自动刷新间隔与后台探测逻辑，降低接口请求频率。',
-                '加强聊天消息与预览内容的 Markdown/HTML 清理，减少不安全内容注入风险。',
-            ],
-        },
-        {text: '恢复用户显示选项为“显示用户昵称”，移除尝试显示用户真名与用户名的相关选项。'},
-        {text: '新增“默认隐藏已提交作业”显示选项，问题页已提交作业默认收缩并支持手动展开。'},
-        {text: '新增个人计划日期导航，进入长计划页时默认跳转到今日计划，并修复长计划页面被固定高度截断的问题。'},
-        {text: '修复配置面板在未修改设置时仍显示“保存配置”和“取消更改”的问题。'},
-        {text: '修复默认关闭自定义颜色时用户颜色不渲染的问题。'},
-        {text: '调整默认年级用户颜色显示效果。'},
-        {text: '更换彩蛋。'},
-    ];
-    const WELCOME_CHANGELOG_2026_07_01_ITEMS = [
-        {text: '移除恶心的历史代码高亮样式，改为可选启用内置浅色代码主题或上传 CSS。'},
-    ];
-    const WELCOME_CHANGELOG_2026_07_02_ITEMS = [
-        {text: '修复未启用自定义代码高亮主题时，网站原先代码配色会闪一下后消失的问题。'},
-        {text: '修复 “格式化代码” 按钮在不开启自定义主题位置便宜的问题'},
-        {text: '优化个人计划日期导航样式，支持拖动调整位置。'},
-        {text: '修复聊天室存在的部分问题'},
-    ];
-    const WELCOME_CHANGELOG_2026_08_ITEMS = [
-        {text: '新增纸面作业编辑器。'},
-        {text: '修复提交后纸面题编辑器可能嵌入“已提交作业”展开面板的问题。'},
-        {text: '修复聊天室部分好友缺少 real_name 时不显示的问题。'},
-        {text: '修复聊天室文本文件上传内容未转义导致预览结构异常的问题。'},
-        {text: '新增聊天室长消息折叠，降低超长文本撑开聊天窗口的影响。'},
-        {text: '新增提交记录页原始代码/格式化代码悬浮切换按钮，启用自定义代码高亮主题时也可快速切换。'},
-        {text: '增强聊天室接口响应字段兼容性，并防止重复发送。'},
-        {text: '更新 submitter'},
-        {text: '我也忘记改了些啥了大哥大姐们，谁可以贡献块饼干，谁可以贡献点钞票！'},
-    ];
-    const WELCOME_CHANGELOG_2026_08_01_ITEMS = [
-        {text: '修复纸面作业编辑器提交图片异常。'},
-        {text: '完全重构聊天室（In progress）。'},
-        {text: '修复存在的部分问题。'},
-    ];
-    const WELCOME_PATCH_CHANGELOGS = [
-        {
-            version: '2026.07.01',
-            items: WELCOME_CHANGELOG_2026_07_01_ITEMS,
+            eyebrow: '交互升级',
+            title: '面板唤起，改为点击',
+            description: '告别容易误触的悬停唤起。现在点击入口即可打开面板，操作更明确、更稳定。',
+            illustration: 'content/panel/welcome-panel-click.svg',
+            alt: '鼠标点击 Better Names 面板入口的插画',
         },
         {
-            version: '2026.07.02',
-            items: WELCOME_CHANGELOG_2026_07_02_ITEMS,
+            eyebrow: '编辑器修复',
+            title: '分数线可以正确导出了',
+            description: '修复 Markdown 编辑器导出时遗漏或错误处理分数线的问题，纸面内容输出更可靠。',
+            illustration: 'content/panel/welcome-score-line.svg',
+            alt: 'Markdown 文档正确导出分数线的插画',
         },
         {
-            version: '2026.08',
-            items: WELCOME_CHANGELOG_2026_08_ITEMS,
-        },
-        {
-            version: '2026.08.01',
-            items: WELCOME_CHANGELOG_2026_08_01_ITEMS,
+            eyebrow: '榜单效率',
+            title: '榜单合并，自动完成',
+            description: '榜单多页合并流程完成自动化，减少重复操作，更快看到完整排名。',
+            illustration: 'content/panel/welcome-ranking-merge.svg',
+            alt: '多个榜单自动汇总成完整排名的插画',
         },
     ];
     const isSupportedHostname = (host) => {
@@ -893,6 +853,7 @@
     const joinPlanModalBodyEl = container.querySelector('#bn-plan-detail-modal-body');
     const joinPlanModalCloseEls = container.querySelectorAll('[data-bn-plan-modal-close="1"]');
     const joinPlanModalCloseBtnEl = container.querySelector('.bn-plan-detail-modal-close');
+    const donateQrImageEl = container.querySelector('#bn-donate-qr-image');
     const chatWindowEl = container.querySelector('#bn-chat-window');
     const chatWindowHeaderEl = container.querySelector('.bn-chat-window-header');
     const chatWindowCloseBtnEl = container.querySelector('#bn-chat-window-close');
@@ -1021,6 +982,9 @@
     }
     if (updateNoticeEl && manifestVersion) {
         checkForPanelUpdates(updateNoticeEl, updateVersionEl);
+    }
+    if (donateQrImageEl) {
+        donateQrImageEl.src = resolveRuntimeUrl('content/panel/donate.jpg');
     }
     syncThemeModeUI(currentThemeMode);
     applyThemeMode(currentThemeMode);
@@ -1795,26 +1759,6 @@
         return fireworksEngine;
     }
 
-    function renderWelcomeChangelogItems(items) {
-        return items.map(item => {
-            const text = typeof item === 'string' ? item : item.text;
-            const children = item && Array.isArray(item.children) ? item.children : [];
-            const childHtml = children.length
-                ? `<ul>${children.map(child => `<li>${escapeHtml(child)}</li>`).join('')}</ul>`
-                : '';
-            return `<li><span>${escapeHtml(text || '')}</span>${childHtml}</li>`;
-        }).join('');
-    }
-
-    function renderWelcomeChangelogSections(sections) {
-        return sections.map(section => `
-            <section class="bn-welcome-changelog-section">
-                <h3>${escapeHtml(section.title)}</h3>
-                <ul>${renderWelcomeChangelogItems(section.items)}</ul>
-            </section>
-        `).join('');
-    }
-
     function readWelcomeSeenVersion() {
         try {
             return normalizeVersionString(String(GM_getValue(WELCOME_SEEN_VERSION_KEY, '') || ''));
@@ -1827,31 +1771,6 @@
         return Boolean(manifestVersion && readWelcomeSeenVersion() !== manifestVersion);
     }
 
-    function getWelcomeChangelogSections(seenVersion) {
-        const sections = [];
-        const normalizedSeenVersion = normalizeVersionString(seenVersion);
-        const seenVersionInfo = parseComparableVersion(normalizedSeenVersion);
-        const baseVersionInfo = parseComparableVersion(WELCOME_BASE_VERSION);
-        const shouldShowBase = !seenVersionInfo || !baseVersionInfo || compareParsedVersions(baseVersionInfo, seenVersionInfo) > 0;
-        if (shouldShowBase) {
-            sections.push({
-                title: WELCOME_BASE_VERSION,
-                items: WELCOME_CHANGELOG_2026_07_ITEMS,
-            });
-        }
-        WELCOME_PATCH_CHANGELOGS.forEach(section => {
-            const patchVersionInfo = parseComparableVersion(section.version);
-            const shouldShowPatch = !seenVersionInfo || !patchVersionInfo || compareParsedVersions(patchVersionInfo, seenVersionInfo) > 0;
-            if (shouldShowPatch) {
-                sections.push({
-                    title: section.version,
-                    items: section.items,
-                });
-            }
-        });
-        return sections;
-    }
-
     function markFirstLoadWelcomeSeen() {
         if (!manifestVersion) return;
         try {
@@ -1860,61 +1779,325 @@
         }
     }
 
+    function appendWelcomeInlineText(target, text) {
+        const parts = String(text || '').split(/(\*\*[^*]+\*\*)/g);
+        parts.forEach(part => {
+            if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+                const strong = document.createElement('strong');
+                strong.textContent = part.slice(2, -2);
+                target.appendChild(strong);
+            } else if (part) {
+                target.appendChild(document.createTextNode(part));
+            }
+        });
+    }
+
+    function renderWelcomeChangelog(markdown, target) {
+        target.textContent = '';
+        let topList = null;
+        let nestedList = null;
+        let lastTopItem = null;
+        const resetLists = () => {
+            topList = null;
+            nestedList = null;
+            lastTopItem = null;
+        };
+
+        String(markdown || '').replace(/^\uFEFF/, '').split(/\r?\n/).forEach(rawLine => {
+            const line = rawLine.replace(/\s+$/, '');
+            if (!line.trim()) {
+                resetLists();
+                return;
+            }
+
+            const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+            if (headingMatch) {
+                resetLists();
+                const level = Math.min(6, Math.max(2, headingMatch[1].length));
+                const heading = document.createElement(`h${level}`);
+                appendWelcomeInlineText(heading, headingMatch[2]);
+                target.appendChild(heading);
+                return;
+            }
+
+            const quoteMatch = line.match(/^>\s?(.*)$/);
+            if (quoteMatch) {
+                resetLists();
+                const quote = document.createElement('blockquote');
+                appendWelcomeInlineText(quote, quoteMatch[1]);
+                target.appendChild(quote);
+                return;
+            }
+
+            const listMatch = line.match(/^(\s*)-\s+(.+)$/);
+            if (listMatch) {
+                const isNested = listMatch[1].length >= 2;
+                if (!isNested) {
+                    nestedList = null;
+                    if (!topList) {
+                        topList = document.createElement('ul');
+                        target.appendChild(topList);
+                    }
+                    lastTopItem = document.createElement('li');
+                    appendWelcomeInlineText(lastTopItem, listMatch[2]);
+                    topList.appendChild(lastTopItem);
+                    return;
+                }
+                if (lastTopItem) {
+                    if (!nestedList) {
+                        nestedList = document.createElement('ul');
+                        lastTopItem.appendChild(nestedList);
+                    }
+                    const nestedItem = document.createElement('li');
+                    appendWelcomeInlineText(nestedItem, listMatch[2]);
+                    nestedList.appendChild(nestedItem);
+                    return;
+                }
+            }
+
+            resetLists();
+            const paragraph = document.createElement('p');
+            appendWelcomeInlineText(paragraph, line);
+            target.appendChild(paragraph);
+        });
+    }
+
     function showFirstLoadWelcome() {
         if (!document.body || !shouldShowFirstLoadWelcome()) return;
         const existing = document.getElementById('bn-welcome-modal');
         if (existing) return;
-        const seenVersion = readWelcomeSeenVersion();
-        const changelogSections = getWelcomeChangelogSections(seenVersion);
-        const changelogLabel = changelogSections.map(section => section.title).join(' 和 ');
+
+        const createElement = (tagName, className, text) => {
+            const element = document.createElement(tagName);
+            if (className) element.className = className;
+            if (text != null) element.textContent = String(text);
+            return element;
+        };
+        const previouslyFocused = document.activeElement;
         const modal = document.createElement('div');
         modal.id = 'bn-welcome-modal';
         modal.setAttribute('role', 'dialog');
         modal.setAttribute('aria-modal', 'true');
         modal.setAttribute('aria-labelledby', 'bn-welcome-title');
-        modal.innerHTML = `
-            <div class="bn-welcome-dialog">
-                <div class="bn-welcome-header">
-                    <div class="bn-welcome-kicker">Better Names for 7FA4</div>
-                    <h2 id="bn-welcome-title">${escapeHtml(WELCOME_PATCH_TITLE)}</h2>
-                    <div class="bn-welcome-code-name">版本代号：${escapeHtml(WELCOME_CHANGELOG_CODE_NAME)}</div>
-                </div>
-                <div class="bn-welcome-changelog" aria-label="${escapeHtml(changelogLabel)} 更新内容">
-                    ${renderWelcomeChangelogSections(changelogSections)}
-                </div>
-                <div class="bn-welcome-actions">
-                    <button type="button" class="bn-welcome-close" data-bn-welcome-close="1">知道了</button>
-                </div>
-            </div>
-        `;
+
+        const dialog = createElement('div', 'bn-welcome-dialog');
+        const progress = createElement('div', 'bn-welcome-progress');
+        progress.setAttribute('aria-label', '新版本介绍进度');
+        const progressDots = [0, 1, 2].map(index => {
+            const dot = createElement('span', 'bn-welcome-progress-dot');
+            dot.setAttribute('aria-hidden', 'true');
+            progress.appendChild(dot);
+            return dot;
+        });
+        dialog.appendChild(progress);
+
+        const letterScreen = createElement('section', 'bn-welcome-screen bn-welcome-letter');
+        const letterKicker = createElement('div', 'bn-welcome-kicker', 'BETTER NAMES · 一封信');
+        const letterTitle = createElement('h2', '', '致全体 Better Names 用户：');
+        letterTitle.id = 'bn-welcome-title';
+        const letterBody = createElement('div', 'bn-welcome-letter-body');
+        WELCOME_LETTER_PARAGRAPHS.forEach(text => {
+            letterBody.appendChild(createElement('p', '', text));
+        });
+        letterBody.appendChild(createElement('p', 'bn-welcome-signature', '@鱼oe不缺氧'));
+        const letterActions = createElement('div', 'bn-welcome-actions');
+        const letterNext = createElement('button', 'bn-welcome-button bn-welcome-button-primary', '看看新变化');
+        letterNext.type = 'button';
+        letterActions.appendChild(letterNext);
+        letterScreen.append(letterKicker, letterTitle, letterBody, letterActions);
+
+        const featureScreen = createElement('section', 'bn-welcome-screen bn-welcome-features');
+        featureScreen.hidden = true;
+        const featureHeader = createElement('div', 'bn-welcome-screen-header');
+        featureHeader.append(
+            createElement('div', 'bn-welcome-kicker', '本次重大更改'),
+            createElement('h2', '', '更顺手，也更省心')
+        );
+        featureHeader.querySelector('h2').id = 'bn-welcome-feature-title';
+        const carousel = createElement('div', 'bn-welcome-carousel');
+        carousel.tabIndex = 0;
+        carousel.setAttribute('aria-roledescription', '轮播图');
+        const track = createElement('div', 'bn-welcome-carousel-track');
+        const cards = WELCOME_FEATURES.map((feature, index) => {
+            const card = createElement('article', 'bn-welcome-feature-card');
+            card.setAttribute('aria-label', `${index + 1} / ${WELCOME_FEATURES.length}：${feature.title}`);
+            const illustrationWrap = createElement('div', 'bn-welcome-feature-illustration');
+            const illustration = document.createElement('img');
+            illustration.src = resolveRuntimeUrl(feature.illustration);
+            illustration.alt = feature.alt;
+            illustrationWrap.appendChild(illustration);
+            const copy = createElement('div', 'bn-welcome-feature-copy');
+            copy.append(
+                createElement('div', 'bn-welcome-feature-eyebrow', feature.eyebrow),
+                createElement('h3', '', feature.title),
+                createElement('p', '', feature.description)
+            );
+            card.append(illustrationWrap, copy);
+            track.appendChild(card);
+            return card;
+        });
+        const carouselDots = createElement('div', 'bn-welcome-carousel-dots');
+        carouselDots.setAttribute('aria-label', '选择重大更改');
+        const cardDots = WELCOME_FEATURES.map((feature, index) => {
+            const button = createElement('button', 'bn-welcome-carousel-dot');
+            button.type = 'button';
+            button.setAttribute('aria-label', `查看第 ${index + 1} 项：${feature.title}`);
+            carouselDots.appendChild(button);
+            return button;
+        });
+        carousel.append(track, carouselDots);
+        const featureActions = createElement('div', 'bn-welcome-actions bn-welcome-feature-actions');
+        const featureBack = createElement('button', 'bn-welcome-button bn-welcome-button-quiet', '返回');
+        featureBack.type = 'button';
+        const featureNext = createElement('button', 'bn-welcome-button bn-welcome-button-primary', '下一个');
+        featureNext.type = 'button';
+        featureActions.append(featureBack, featureNext);
+        featureScreen.append(featureHeader, carousel, featureActions);
+
+        const changelogScreen = createElement('section', 'bn-welcome-screen bn-welcome-release-notes');
+        changelogScreen.hidden = true;
+        const changelogHeader = createElement('div', 'bn-welcome-screen-header');
+        changelogHeader.append(
+            createElement('div', 'bn-welcome-kicker', '完整更新记录'),
+            createElement('h2', '', 'CHANGELOG')
+        );
+        changelogHeader.querySelector('h2').id = 'bn-welcome-changelog-title';
+        const changelog = createElement('div', 'bn-welcome-changelog');
+        changelog.tabIndex = -1;
+        changelog.setAttribute('aria-label', 'Better Names 完整更新记录');
+        changelog.setAttribute('aria-busy', 'true');
+        changelog.appendChild(createElement('p', 'bn-welcome-loading', '正在加载完整更新记录…'));
+        const changelogActions = createElement('div', 'bn-welcome-actions');
+        const changelogBack = createElement('button', 'bn-welcome-button bn-welcome-button-quiet', '返回');
+        changelogBack.type = 'button';
+        const enterButton = createElement('button', 'bn-welcome-button bn-welcome-button-primary', '进入使用');
+        enterButton.type = 'button';
+        enterButton.disabled = true;
+        changelogActions.append(changelogBack, enterButton);
+        changelogScreen.append(changelogHeader, changelog, changelogActions);
+
+        dialog.append(letterScreen, featureScreen, changelogScreen);
+        modal.appendChild(dialog);
+
+        const screens = [letterScreen, featureScreen, changelogScreen];
+        const screenTitleIds = ['bn-welcome-title', 'bn-welcome-feature-title', 'bn-welcome-changelog-title'];
+        let screenIndex = 0;
+        let cardIndex = 0;
+        let pointerStartX = null;
+        const showScreen = index => {
+            screenIndex = Math.max(0, Math.min(screens.length - 1, index));
+            screens.forEach((screen, currentIndex) => {
+                screen.hidden = currentIndex !== screenIndex;
+            });
+            progressDots.forEach((dot, currentIndex) => {
+                dot.classList.toggle('bn-active', currentIndex === screenIndex);
+                dot.classList.toggle('bn-complete', currentIndex < screenIndex);
+            });
+            modal.setAttribute('aria-labelledby', screenTitleIds[screenIndex]);
+            dialog.classList.toggle('bn-welcome-dialog-wide', screenIndex === 2);
+            const focusTarget = screenIndex === 0 ? letterNext : screenIndex === 1 ? carousel : changelog;
+            requestAnimationFrame(() => focusTarget.focus({preventScroll: true}));
+        };
+        const showCard = index => {
+            cardIndex = Math.max(0, Math.min(cards.length - 1, index));
+            track.style.transform = `translateX(-${cardIndex * 100}%)`;
+            cards.forEach((card, currentIndex) => {
+                card.setAttribute('aria-hidden', currentIndex === cardIndex ? 'false' : 'true');
+            });
+            cardDots.forEach((dot, currentIndex) => {
+                const isActive = currentIndex === cardIndex;
+                dot.classList.toggle('bn-active', isActive);
+                dot.setAttribute('aria-current', isActive ? 'true' : 'false');
+            });
+            featureNext.textContent = cardIndex === cards.length - 1 ? '查看完整更新记录' : '下一个';
+        };
+
         const closeWelcome = () => {
             markFirstLoadWelcomeSeen();
             modal.classList.remove('bn-show');
             setTimeout(() => modal.remove(), 220);
             document.removeEventListener('keydown', handleKeyDown);
-        };
-        const handleKeyDown = (event) => {
-            if (event.key === 'Escape') closeWelcome();
-        };
-        modal.addEventListener('click', event => {
-            if (event.target === modal) closeWelcome();
-        });
-        modal.querySelectorAll('[data-bn-welcome-close="1"]').forEach(button => {
-            button.addEventListener('click', closeWelcome);
-        });
-        document.addEventListener('keydown', handleKeyDown);
-        document.body.appendChild(modal);
-        requestAnimationFrame(() => modal.classList.add('bn-show'));
-        setTimeout(() => {
-            const closeButton = modal.querySelector('[data-bn-welcome-close="1"]');
-            if (closeButton && typeof closeButton.focus === 'function') {
+            if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
                 try {
-                    closeButton.focus({preventScroll: true});
-                } catch (_) {
-                    closeButton.focus();
+                    previouslyFocused.focus({preventScroll: true});
+                } catch (_) { /* ignore */
                 }
             }
-        }, 0);
+        };
+        const handleKeyDown = (event) => {
+            if (event.key === 'Tab') {
+                const focusable = Array.from(screens[screenIndex].querySelectorAll(
+                    'button:not([disabled]), [href], input:not([disabled]), [tabindex="0"]'
+                )).filter(element => !element.hidden);
+                if (focusable.length) {
+                    const first = focusable[0];
+                    const last = focusable[focusable.length - 1];
+                    if (event.shiftKey && document.activeElement === first) {
+                        event.preventDefault();
+                        last.focus();
+                    } else if (!event.shiftKey && document.activeElement === last) {
+                        event.preventDefault();
+                        first.focus();
+                    }
+                }
+            } else if (screenIndex === 1 && event.key === 'ArrowLeft') {
+                event.preventDefault();
+                showCard(cardIndex - 1);
+            } else if (screenIndex === 1 && event.key === 'ArrowRight') {
+                event.preventDefault();
+                showCard(cardIndex + 1);
+            }
+        };
+        letterNext.addEventListener('click', () => showScreen(1));
+        featureBack.addEventListener('click', () => showScreen(0));
+        featureNext.addEventListener('click', () => {
+            if (cardIndex < cards.length - 1) {
+                showCard(cardIndex + 1);
+            } else {
+                showScreen(2);
+            }
+        });
+        changelogBack.addEventListener('click', () => showScreen(1));
+        enterButton.addEventListener('click', closeWelcome);
+        cardDots.forEach((dot, index) => {
+            dot.addEventListener('click', () => showCard(index));
+        });
+        carousel.addEventListener('pointerdown', event => {
+            pointerStartX = event.clientX;
+        });
+        carousel.addEventListener('pointerup', event => {
+            if (pointerStartX == null) return;
+            const distance = event.clientX - pointerStartX;
+            pointerStartX = null;
+            if (Math.abs(distance) < 42) return;
+            showCard(cardIndex + (distance < 0 ? 1 : -1));
+        });
+        carousel.addEventListener('pointercancel', () => {
+            pointerStartX = null;
+        });
+
+        document.addEventListener('keydown', handleKeyDown);
+        document.body.appendChild(modal);
+        showCard(0);
+        showScreen(0);
+        requestAnimationFrame(() => modal.classList.add('bn-show'));
+
+        fetch(resolveRuntimeUrl('CHANGELOG.md'), {cache: 'no-cache'})
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.text();
+            })
+            .then(markdown => {
+                renderWelcomeChangelog(markdown, changelog);
+                changelog.setAttribute('aria-busy', 'false');
+                enterButton.disabled = false;
+            })
+            .catch(error => {
+                console.warn('[BN] 完整更新记录加载失败', error);
+                changelog.textContent = '';
+                changelog.appendChild(createElement('p', 'bn-welcome-load-error', '完整更新记录加载失败，请重新加载页面后再试。'));
+                changelog.setAttribute('aria-busy', 'false');
+            });
     }
 
     function createBirthdayElement(tagName, className, text) {

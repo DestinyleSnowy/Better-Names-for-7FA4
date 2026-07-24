@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 260" role="img" aria-labelledby="title desc">
+  <title id="title">榜单自动合并</title>
+  <desc id="desc">三份分散榜单沿着箭头汇入一份完整排名。</desc>
+  <defs>
+    <linearGradient id="rank" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#fff"/>
+      <stop offset="1" stop-color="#e8f6f3"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="10" stdDeviation="9" flood-color="#246b67" flood-opacity=".17"/>
+    </filter>
+  </defs>
+  <circle cx="54" cy="48" r="17" fill="#ffc27f" opacity=".75"/>
+  <circle cx="320" cy="203" r="12" fill="#a99af3" opacity=".62"/>
+  <path d="M28 221c51-27 98-28 141-3 42 25 94 24 157-4" fill="none" stroke="#acd9d2" stroke-width="10" stroke-linecap="round" opacity=".56"/>
+  <g fill="#fff" stroke="#9fcac6" stroke-width="2">
+    <rect x="39" y="66" width="90" height="40" rx="11"/>
+    <rect x="39" y="119" width="90" height="40" rx="11"/>
+    <rect x="39" y="172" width="90" height="40" rx="11"/>
+  </g>
+  <g fill="#62b9ac">
+    <circle cx="59" cy="86" r="7"/>
+    <circle cx="59" cy="139" r="7"/>
+    <circle cx="59" cy="192" r="7"/>
+  </g>
+  <g fill="#c9dedc">
+    <rect x="75" y="78" width="36" height="6" rx="3"/>
+    <rect x="75" y="89" width="27" height="5" rx="2.5"/>
+    <rect x="75" y="131" width="36" height="6" rx="3"/>
+    <rect x="75" y="142" width="27" height="5" rx="2.5"/>
+    <rect x="75" y="184" width="36" height="6" rx="3"/>
+    <rect x="75" y="195" width="27" height="5" rx="2.5"/>
+  </g>
+  <g fill="none" stroke="#3e9f94" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M139 86h32c12 0 13 18 25 18h7"/>
+    <path d="M139 139h64"/>
+    <path d="M139 192h32c12 0 13-18 25-18h7"/>
+    <path d="m194 96 10 8-10 8M194 131l10 8-10 8M194 166l10 8-10 8"/>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="213" y="44" width="108" height="169" rx="18" fill="url(#rank)" stroke="#9fcac6" stroke-width="2"/>
+    <rect x="233" y="63" width="68" height="13" rx="6.5" fill="#57ad9f"/>
+    <g>
+      <circle cx="240" cy="100" r="10" fill="#f0b44c"/>
+      <text x="240" y="104" fill="#fff" font-family="Arial, sans-serif" font-size="11" font-weight="700" text-anchor="middle">1</text>
+      <rect x="258" y="95" width="38" height="8" rx="4" fill="#bbd8d4"/>
+      <circle cx="240" cy="132" r="10" fill="#9aaaba"/>
+      <text x="240" y="136" fill="#fff" font-family="Arial, sans-serif" font-size="11" font-weight="700" text-anchor="middle">2</text>
+      <rect x="258" y="127" width="31" height="8" rx="4" fill="#bbd8d4"/>
+      <circle cx="240" cy="164" r="10" fill="#c98e62"/>
+      <text x="240" y="168" fill="#fff" font-family="Arial, sans-serif" font-size="11" font-weight="700" text-anchor="middle">3</text>
+      <rect x="258" y="159" width="42" height="8" rx="4" fill="#bbd8d4"/>
+      <circle cx="240" cy="196" r="10" fill="#7dbdb5"/>
+      <text x="240" y="200" fill="#fff" font-family="Arial, sans-serif" font-size="11" font-weight="700" text-anchor="middle">4</text>
+      <rect x="258" y="191" width="34" height="8" rx="4" fill="#bbd8d4"/>
+    </g>
+  </g>
+</svg>

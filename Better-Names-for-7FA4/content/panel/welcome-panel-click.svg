@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 260" role="img" aria-labelledby="title desc">
+  <title id="title">点击唤起面板</title>
+  <desc id="desc">一只鼠标指针点击 Better Names 按钮，设置面板随之展开。</desc>
+  <defs>
+    <linearGradient id="window" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#eaf3ff"/>
+    </linearGradient>
+    <linearGradient id="button" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#55a8f6"/>
+      <stop offset="1" stop-color="#247bd2"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="12" stdDeviation="10" flood-color="#31608f" flood-opacity=".18"/>
+    </filter>
+  </defs>
+  <circle cx="68" cy="53" r="20" fill="#ffd39e" opacity=".85"/>
+  <circle cx="312" cy="58" r="11" fill="#b9a8ff" opacity=".65"/>
+  <path d="M35 209c42-25 78-26 108-4 30 21 65 22 105 1 29-15 54-13 77 6" fill="none" stroke="#b7d5f3" stroke-width="10" stroke-linecap="round" opacity=".6"/>
+  <g filter="url(#shadow)">
+    <rect x="60" y="39" width="237" height="166" rx="18" fill="url(#window)" stroke="#b8d2ed" stroke-width="2"/>
+    <path d="M60 65h237" stroke="#c8d9eb" stroke-width="2"/>
+    <circle cx="80" cy="52" r="4" fill="#ff8d85"/>
+    <circle cx="94" cy="52" r="4" fill="#ffc55d"/>
+    <circle cx="108" cy="52" r="4" fill="#69cf9b"/>
+    <rect x="78" y="82" width="93" height="13" rx="6.5" fill="#c7d9eb"/>
+    <rect x="78" y="106" width="151" height="9" rx="4.5" fill="#d8e5f2"/>
+    <rect x="78" y="124" width="130" height="9" rx="4.5" fill="#d8e5f2"/>
+    <rect x="78" y="152" width="82" height="33" rx="10" fill="url(#button)"/>
+    <text x="119" y="173" fill="#fff" font-family="Arial, sans-serif" font-size="12" font-weight="700" text-anchor="middle">Better Names</text>
+  </g>
+  <g transform="translate(179 123)">
+    <path d="m20 11 2-22m12 25 15-16M3 21l-17-14m55 24 22-2" fill="none" stroke="#ff9a4d" stroke-width="5" stroke-linecap="round"/>
+    <path d="M12 17 49 54l-17 3 9 21-12 6-10-22L7 74Z" fill="#203958" stroke="#fff" stroke-width="5" stroke-linejoin="round"/>
+  </g>
+</svg>

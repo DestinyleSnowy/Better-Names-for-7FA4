@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 260" role="img" aria-labelledby="title desc">
+  <title id="title">正确导出分数线</title>
+  <desc id="desc">Markdown 编辑文档中的分数线被完整导出到纸面。</desc>
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#fff"/>
+      <stop offset="1" stop-color="#f5f0ff"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="12" stdDeviation="10" flood-color="#55458d" flood-opacity=".18"/>
+    </filter>
+  </defs>
+  <circle cx="52" cy="186" r="16" fill="#98d7c2" opacity=".72"/>
+  <circle cx="313" cy="55" r="21" fill="#ffd19c" opacity=".76"/>
+  <path d="M49 222c47-22 91-19 131 8 37 24 84 21 139-10" fill="none" stroke="#ccbff3" stroke-width="10" stroke-linecap="round" opacity=".55"/>
+  <g filter="url(#shadow)">
+    <path d="M98 27h132l46 46v153H98Z" fill="url(#paper)" stroke="#c9bde9" stroke-width="2"/>
+    <path d="M230 27v46h46" fill="#e8defb" stroke="#c9bde9" stroke-width="2" stroke-linejoin="round"/>
+    <rect x="120" y="55" width="79" height="12" rx="6" fill="#b9a5e8"/>
+    <rect x="120" y="85" width="127" height="8" rx="4" fill="#d9d0ee"/>
+    <rect x="120" y="102" width="109" height="8" rx="4" fill="#d9d0ee"/>
+    <rect x="120" y="119" width="122" height="8" rx="4" fill="#d9d0ee"/>
+    <path d="M119 154h135" stroke="#7957ce" stroke-width="5" stroke-linecap="round"/>
+    <path d="M119 166h135" stroke="#7957ce" stroke-width="2" stroke-linecap="round" opacity=".65"/>
+    <rect x="120" y="188" width="82" height="9" rx="4.5" fill="#d9d0ee"/>
+  </g>
+  <g transform="translate(44 73)">
+    <rect width="76" height="58" rx="13" fill="#263c5d"/>
+    <path d="m18 18-8 11 8 11M58 18l8 11-8 11M43 13 33 45" fill="none" stroke="#9ed0ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g transform="translate(261 160)">
+    <circle cx="24" cy="24" r="24" fill="#42b883"/>
+    <path d="m13 24 8 8 15-17" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
