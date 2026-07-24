@@ -4105,29 +4105,49 @@
         }, true);
     }
 
-    function extractOriginalNickname(rawText) {
+    function normalizeUserLabel(rawText) {
         if (typeof rawText !== 'string') return '';
-        let normalized = rawText.replace(/[\u00A0\s]+/g, ' ');
-        normalized = normalized.trim();
+        return rawText.replace(/[\u00A0\s]+/g, ' ').trim();
+    }
+
+    function extractOriginalNickname(rawText) {
+        const normalized = normalizeUserLabel(rawText);
         if (!normalized) return '';
-        const fullIdx = normalized.indexOf('（');
-        const halfIdx = normalized.indexOf('(');
-        let firstParenIdx;
-        if (fullIdx >= 0 && halfIdx >= 0) {
-            firstParenIdx = Math.min(fullIdx, halfIdx);
-        } else {
-            firstParenIdx = Math.max(fullIdx, halfIdx);
+
+        const isFullWidth = normalized.endsWith('）');
+        const closing = isFullWidth ? '）' : (normalized.endsWith(')') ? ')' : '');
+        if (!closing) return '';
+        const opening = isFullWidth ? '（' : '(';
+        let depth = 0;
+        let suffixStart = -1;
+        for (let i = normalized.length - 1; i >= 0; i--) {
+            if (normalized[i] === closing) depth++;
+            if (normalized[i] === opening) {
+                depth--;
+                if (depth === 0) {
+                    suffixStart = i;
+                    break;
+                }
+            }
         }
-        if (firstParenIdx > 0) {
-            const prefix = normalized.slice(0, firstParenIdx).trim();
-            if (prefix) return prefix;
+        if (suffixStart <= 0) return '';
+
+        // Newer Vue views use "nickname（uid/account）", while the home-page
+        // rankings use the legacy "username(nickname)" format.
+        return isFullWidth
+            ? normalized.slice(0, suffixStart).trim()
+            : normalized.slice(suffixStart + 1, -1).trim();
+    }
+
+    function getOriginalUserLabel(anchor, currentText) {
+        const cached = normalizeUserLabel(anchor?.dataset?.bnOriginalUserLabel || '');
+        if (cached) return cached;
+
+        const original = normalizeUserLabel(currentText);
+        if (original && anchor?.dataset) {
+            anchor.dataset.bnOriginalUserLabel = original;
         }
-        const match = normalized.match(/[（(]\s*([^（）()]+?)\s*[）)]/);
-        if (match && match[1]) {
-            const inner = match[1].trim();
-            if (inner) return inner;
-        }
-        return '';
+        return original;
     }
 
     function parseColorToRgb(color) {
@@ -4283,8 +4303,8 @@
 
         const uid = resolveUidFromHref(rawHref, a);
         if (!uid) return;
-        if (!markOnce(a, 'UserDone')) return;
         if (!isBareUserProfileHref(rawHref, uid)) return;
+        if (!markOnce(a, 'UserDone')) return;
         const info = users[uid];
         if (info && GRADE_LABELS[info.colorKey]) a.setAttribute('title', GRADE_LABELS[info.colorKey]);
 
@@ -4293,9 +4313,11 @@
             if (n.nodeType === Node.TEXT_NODE) baseText += n.textContent;
         });
         baseText = baseText.trim();
-        const defaultSource = baseText || (a.textContent || '').trim();
+        const currentSource = baseText || (a.textContent || '').trim();
+        const defaultSource = getOriginalUserLabel(a, currentSource);
         if (isLikelyUrlLabel(defaultSource, rawHref)) return;
-        const originalNickname = (showUserNickname && info) ? extractOriginalNickname(baseText) : '';
+        const originalNickname = extractOriginalNickname(defaultSource)
+            || normalizeUserLabel(a.dataset.bnOriginalNickname || '');
         if (originalNickname) a.dataset.bnOriginalNickname = originalNickname;
 
         const img = a.querySelector('img');
@@ -4307,7 +4329,7 @@
         let combinedName = defaultSource;
         if (info) {
             combinedName = typeof info.name === 'string' ? info.name : (defaultSource || '');
-            if (showUserNickname && originalNickname) {
+            if (showUserNickname && originalNickname && originalNickname !== combinedName) {
                 combinedName += `（${originalNickname}）`;
             }
             if (info.colorKey === "clear") a.style.color = '';
