@@ -258,6 +258,7 @@
     const enableRankingFilterSetting = readConfigValue('rankingFilter.enabled');
     const enableColumnSwitchSetting = readConfigValue('rankingFilter.columnSwitch.enabled') !== false;
     const enableMergeAssistantSetting = readConfigValue('rankingMerge.enabled') !== false;
+    let rankingMergeLockedForAdmin = false;
     const enableVjLink = readConfigValue('enableVjLink');
     const hideDoneSkip = readConfigValue('hideDoneSkip');
     let rawQuickSkip, quickSkipMigrated;
@@ -3151,7 +3152,9 @@
         GM_setValue('enableAutoRenew', chkAutoRenew.checked);
         GM_setValue('rankingFilter.enabled', chkRankingFilter.checked);
         if (chkColumnSwitch) GM_setValue('rankingFilter.columnSwitch.enabled', chkColumnSwitch.checked);
-        if (chkMergeAssistant) GM_setValue('rankingMerge.enabled', chkMergeAssistant.checked);
+        if (chkMergeAssistant && !rankingMergeLockedForAdmin) {
+            GM_setValue('rankingMerge.enabled', chkMergeAssistant.checked);
+        }
 
         const obj = {};
         COLOR_KEYS.forEach(k => {
@@ -7248,10 +7251,22 @@
         return NaN;
     }
 
+    let betterNamesUsersPromise = null;
+
     async function fetchBetterNamesUsers() {
-        const response = await fetch("/better_names");
-        const json = await response.json();
-        return json.users;
+        if (!betterNamesUsersPromise) {
+            betterNamesUsersPromise = (async () => {
+                const response = await fetch('/better_names');
+                if (!response.ok) throw new Error(`Better Names request failed: HTTP ${response.status}`);
+                const json = await response.json();
+                const users = Array.isArray(json) ? json : json && json.users;
+                return Array.isArray(users) ? users : [];
+            })().catch((error) => {
+                betterNamesUsersPromise = null;
+                throw error;
+            });
+        }
+        return betterNamesUsersPromise;
     }
 
     function isUserInBetterNames(usersList, uid) {
@@ -7262,6 +7277,34 @@
             const parsed = Number(rawId);
             return Number.isFinite(parsed) && parsed === uid;
         });
+    }
+
+    async function refreshRankingMergeAdminLock() {
+        if (!chkMergeAssistant) return;
+        const uid = resolveCurrentUserIdForJoinPlan();
+        if (!Number.isFinite(uid) || uid <= 0) return;
+        try {
+            const usersList = await fetchBetterNamesUsers();
+            const currentUser = usersList.find((entry) => {
+                if (!entry || typeof entry !== 'object') return false;
+                const rawId = entry.id ?? entry.user_id ?? entry.uid;
+                return Number(rawId) === uid;
+            });
+            if (!currentUser || currentUser.is_admin !== true) return;
+
+            rankingMergeLockedForAdmin = true;
+            chkMergeAssistant.checked = true;
+            chkMergeAssistant.disabled = true;
+            chkMergeAssistant.setAttribute('aria-disabled', 'true');
+            const label = chkMergeAssistant.closest('label');
+            if (label) {
+                label.title = '管理员账号已使用网站自带的榜单合并功能';
+            }
+            originalConfig.mergeAssistantEnabled = true;
+            checkChanged();
+        } catch (error) {
+            console.warn('[BN] Failed to apply ranking merge admin lock', error);
+        }
     }
 
     async function refreshJoinPlanStatus() {
@@ -7378,6 +7421,7 @@
     }
 
     bindJoinPlanDetailToggle();
+    void refreshRankingMergeAdminLock();
     if (!JOIN_PLAN_STATUS_BLOCKED_PATH_RE.test(location.pathname || '')) {
         refreshJoinPlanStatus();
     }

@@ -225,10 +225,58 @@ function isRankingUrl(url) {
     }
 }
 
+// Runs in the page so the request uses the active 7FA4 login session.
+async function detectCurrentUserIsAdmin() {
+    const resolveCurrentUserId = () => {
+        const dropdown = document.querySelector('#user-dropdown');
+        if (dropdown) {
+            const raw = dropdown.dataset?.user_id
+                || dropdown.dataset?.userId
+                || dropdown.getAttribute('data-user_id')
+                || dropdown.getAttribute('data-user-id');
+            if (raw && /^\d+$/.test(String(raw))) return Number(raw);
+        }
+        const userLink = document.querySelector('#user-dropdown a[href^="/user/"]');
+        const match = userLink && (userLink.getAttribute('href') || '').match(/\/user\/(\d+)/);
+        return match ? Number(match[1]) : NaN;
+    };
+
+    const uid = resolveCurrentUserId();
+    if (!Number.isFinite(uid) || uid <= 0) return false;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    try {
+        const response = await fetch('/better_names', {
+            credentials: 'same-origin',
+            signal: controller.signal
+        });
+        if (!response.ok) return false;
+        const json = await response.json();
+        const users = Array.isArray(json) ? json : json && json.users;
+        if (!Array.isArray(users)) return false;
+        return users.some((entry) => {
+            if (!entry || typeof entry !== 'object') return false;
+            const entryId = Number(entry.id ?? entry.user_id ?? entry.uid);
+            return Number.isFinite(entryId) && entryId === uid && entry.is_admin === true;
+        });
+    } catch (error) {
+        console.warn('[BN] Failed to detect current admin status', error);
+        return false;
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
 // 注入到页面主世界的函数（会被 chrome.scripting.executeScript 注入）
 function patchJQueryGet(options) {
     try {
         const prefEnabled = !options || options.enabled !== false;
+        const disabledForAdmin = Boolean(options && options.isAdmin);
+        if (disabledForAdmin) {
+            console.log('show-all: native ranking merge is available for this admin; skip automatic merge');
+            return;
+        }
         if (!prefEnabled) {
             console.log('show-all: merge assistant disabled via settings');
             return;
@@ -772,8 +820,6 @@ function patchJQueryGet(options) {
                     console.log('show-all: ensureRowsForUsers completed; all missing school/grade handled for table_id=', table_id);
                 }
 
-                applyGoldHighlightForTable(table_id, Array.isArray(users) ? users : [], mapping);
-
             } catch (e) {
                 console.error('show-all: ensureRowsForUsers unexpected error', e);
             }
@@ -788,8 +834,31 @@ function patchJQueryGet(options) {
             const progressCb = typeof options.onProgress === 'function' ? options.onProgress : null;
 
             let mergedUsers = [];
+            const seenUsers = new Set();
             let pagesFetched = 0;
             const startTime = Date.now();
+
+            const userKey = (user) => {
+                const uid = resolveUserId(user);
+                if (uid) return `id:${uid}`;
+                try {
+                    return `json:${JSON.stringify(user)}`;
+                } catch (_) {
+                    return `value:${String(user)}`;
+                }
+            };
+
+            const appendUniqueUsers = (users) => {
+                let added = 0;
+                for (const user of Array.isArray(users) ? users : []) {
+                    const key = userKey(user);
+                    if (seenUsers.has(key)) continue;
+                    seenUsers.add(key);
+                    mergedUsers.push(user);
+                    added++;
+                }
+                return added;
+            };
 
             const buildStats = () => ({
                 pages: pagesFetched,
@@ -857,7 +926,7 @@ function patchJQueryGet(options) {
             }
             let users = extractItems(first) || [];
             const isTopArray = Array.isArray(first);
-            mergedUsers = users.slice();
+            appendUniqueUsers(users);
             pagesFetched = 1;
             const mergedTable = (first && first.table && typeof first.table === 'object') ? Object.assign({}, first.table) : {};
             const totalHint = first && (first.total || first.total_count || first.count);
@@ -899,7 +968,17 @@ function patchJQueryGet(options) {
                         });
                         break;
                     }
-                    mergedUsers.push(...a);
+                    const added = appendUniqueUsers(a);
+                    if (added === 0) {
+                        console.log('show-all: page', page, 'repeats previously fetched users - stop');
+                        emit({
+                            text: `第 ${page} 页与已有数据重复，已完成合并`,
+                            stage: 'duplicate',
+                            tone: 'info',
+                            currentPage: page
+                        });
+                        break;
+                    }
                     if (j && j.table && typeof j.table === 'object') {
                         for (const k in j.table) mergedTable[k] = j.table[k];
                     }
@@ -946,14 +1025,6 @@ function patchJQueryGet(options) {
             console.log('show-all: gatherAllPages done. total merged users =', mergedUsers.length);
             emit({text: `合并完成，共 ${mergedUsers.length} 条数据`, stage: 'done', tone: 'success'});
 
-            emit({text: '正在渲染榜单...', stage: 'render', tone: 'info'});
-            try {
-                await ensureRowsForUsers(originalUrlStr, mergedUsers);
-                emit({text: '渲染完成', stage: 'render-done', tone: 'success'});
-            } catch (e) {
-                console.warn('show-all: ensure rows error', e);
-                emit({text: '渲染阶段出现问题，请检查控制台', stage: 'render-error', tone: 'warning'});
-            }
             return out;
         }
 
@@ -1490,9 +1561,121 @@ function patchJQueryGet(options) {
                     return {button, status: null};
                 };
 
-                const controls = ensureControls();
+                // Ranking requests are merged automatically. Keep the old control helpers
+                // above for compatibility with older injected copies, but do not mount the
+                // floating manual card for new pages.
+                const controls = null;
                 const mergeButton = controls && controls.button;
                 const statusEl = controls && controls.status;
+                const PROGRESS_ID = 'bn-ranking-merge-progress';
+                const PROGRESS_STYLE_ID = 'bn-ranking-merge-progress-style';
+                const activeProgressTokens = new Set();
+                let progressHideTimer = null;
+                let progressRemoveTimer = null;
+
+                const ensureProgressStyle = () => {
+                    if (document.getElementById(PROGRESS_STYLE_ID)) return;
+                    const style = document.createElement('style');
+                    style.id = PROGRESS_STYLE_ID;
+                    style.textContent = `
+@keyframes bn-ranking-merge-slide {
+  0% { transform: translateX(-110%); }
+  55% { transform: translateX(90%); }
+  100% { transform: translateX(290%); }
+}
+#${PROGRESS_ID} {
+  position: fixed;
+  inset: 0 0 auto 0;
+  width: 100%;
+  height: 4px;
+  z-index: 2147483647;
+  overflow: hidden;
+  pointer-events: none;
+  background: rgba(99, 102, 241, 0.18);
+  opacity: 1;
+  transition: opacity 180ms ease;
+}
+#${PROGRESS_ID} > span {
+  display: block;
+  width: 38%;
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6, #22d3ee);
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.7);
+  animation: bn-ranking-merge-slide 1.05s ease-in-out infinite;
+}
+                    `;
+                    (document.head || document.documentElement).appendChild(style);
+                };
+
+                const ensureProgressBar = () => {
+                    ensureProgressStyle();
+                    let progress = document.getElementById(PROGRESS_ID);
+                    if (!progress) {
+                        progress = document.createElement('div');
+                        progress.id = PROGRESS_ID;
+                        progress.setAttribute('role', 'progressbar');
+                        progress.setAttribute('aria-label', '榜单自动合并进度');
+                        const bar = document.createElement('span');
+                        progress.appendChild(bar);
+                        (document.body || document.documentElement).appendChild(progress);
+                    }
+                    return progress;
+                };
+
+                const beginMergeProgress = () => {
+                    if (progressHideTimer) clearTimeout(progressHideTimer);
+                    if (progressRemoveTimer) clearTimeout(progressRemoveTimer);
+                    progressHideTimer = null;
+                    progressRemoveTimer = null;
+                    const token = {};
+                    activeProgressTokens.add(token);
+                    const progress = ensureProgressBar();
+                    const bar = progress.firstElementChild;
+                    progress.style.display = 'block';
+                    progress.style.opacity = '1';
+                    progress.setAttribute('aria-valuetext', '正在合并榜单');
+                    if (bar) {
+                        bar.style.width = '38%';
+                        bar.style.transform = '';
+                        bar.style.animation = 'bn-ranking-merge-slide 1.05s ease-in-out infinite';
+                        bar.style.background = '';
+                    }
+                    return token;
+                };
+
+                const updateMergeProgress = (payload) => {
+                    const progress = document.getElementById(PROGRESS_ID);
+                    if (!progress || !payload || typeof payload !== 'object') return;
+                    const stats = payload.stats || {};
+                    const pages = Number(stats.pages) || 0;
+                    const users = Number(stats.users) || 0;
+                    progress.setAttribute(
+                        'aria-valuetext',
+                        pages > 0 ? `已抓取 ${pages} 页，${users} 人` : '正在合并榜单'
+                    );
+                };
+
+                const finishMergeProgress = (token, succeeded) => {
+                    activeProgressTokens.delete(token);
+                    if (activeProgressTokens.size > 0) return;
+                    const progress = document.getElementById(PROGRESS_ID);
+                    if (!progress) return;
+                    const bar = progress.firstElementChild;
+                    progress.setAttribute('aria-valuetext', succeeded ? '榜单合并完成' : '榜单合并失败');
+                    if (bar) {
+                        bar.style.animation = 'none';
+                        bar.style.transform = 'none';
+                        bar.style.width = '100%';
+                        bar.style.background = succeeded ? '#22c55e' : '#ef4444';
+                    }
+                    progressHideTimer = setTimeout(() => {
+                        progress.style.opacity = '0';
+                        progressRemoveTimer = setTimeout(() => {
+                            if (activeProgressTokens.size === 0 && progress.isConnected) progress.remove();
+                        }, 220);
+                    }, succeeded ? 260 : 900);
+                };
+
                 const clearPendingMergeKick = () => {
                     if (pendingMergeKick) {
                         clearTimeout(pendingMergeKick);
@@ -1589,18 +1772,15 @@ function patchJQueryGet(options) {
                         replayLastGet = () => patchedGet.apply($, argsCopy);
                         clearPendingMergeKick();
 
-                        if (!gatherRequested) {
-                            if (!gatherInProgress) setStatus('检测到榜单数据，可点击「合并榜单」', 'info');
-                            return origGet.apply($, args);
-                        }
-
                         gatherRequested = false;
                         gatherInProgress = true;
                         setButtonBusy('合并中...');
+                        const progressToken = beginMergeProgress();
                         const deferred = $.Deferred();
 
                         const notifyProgress = (payload) => {
                             if (payload && typeof payload === 'object') {
+                                updateMergeProgress(payload);
                                 if (payload.stats) updateStatsDisplay(payload.stats);
                                 const tone = payload.tone || (payload.text
                                     ? (/失败|错误|异常/.test(payload.text) ? 'error'
@@ -1659,6 +1839,7 @@ function patchJQueryGet(options) {
                                     }
                                     gatherInProgress = false;
                                     setButtonIdle(RETRY_TEXT);
+                                    finishMergeProgress(progressToken, false);
                                     deferred.resolve(merged);
                                     return;
                                 }
@@ -1673,13 +1854,14 @@ function patchJQueryGet(options) {
                                 setButtonIdle(RETRY_TEXT);
                                 setStatus('合并完成，可重新执行合并', 'success');
                                 triggerFilterReload();
-                                scheduleGoldHighlightReapply();
+                                finishMergeProgress(progressToken, true);
                                 deferred.resolve(merged);
                             } catch (err) {
                                 console.error('show-all: gatherAllPages error', err);
                                 setStatus('合并失败，回退到原始请求', 'error');
                                 setButtonIdle(ERROR_RETRY_TEXT);
                                 gatherInProgress = false;
+                                finishMergeProgress(progressToken, false);
                                 fallbackToOriginal();
                             }
                         })();
@@ -1713,13 +1895,20 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
             }
             chrome.scripting.executeScript({
                 target: {tabId: tabId},
-                func: patchJQueryGet,
-                args: [{enabled: rankingMergeEnabled}],
+                func: detectCurrentUserIsAdmin,
                 world: 'MAIN'
+            }).then((results) => {
+                const isAdmin = Boolean(results && results[0] && results[0].result === true);
+                return chrome.scripting.executeScript({
+                    target: {tabId: tabId},
+                    func: patchJQueryGet,
+                    args: [{enabled: rankingMergeEnabled, isAdmin}],
+                    world: 'MAIN'
+                });
             }).then(() => {
-                console.log('show-all: patchJQueryGet injected to', tab.url);
+                console.log('show-all: admin check completed and ranking merge state applied to', tab.url);
             }).catch((err) => {
-                console.error('show-all: failed to inject patchJQueryGet', err);
+                console.error('show-all: failed to detect admin or inject patchJQueryGet', err);
             });
         }
     } catch (e) {
