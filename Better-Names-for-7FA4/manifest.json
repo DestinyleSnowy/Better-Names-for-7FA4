@@ -17,17 +17,17 @@
     "webRequest"
   ],
   "host_permissions": [
-    "http://*.7fa4.cn:8888/*",
-    "http://*.7fa4.cn:5283/*",
-    "http://*.7fa4.cn:9080/*",
-    "http://10.210.57.10:8888/*",
-    "http://10.210.57.10:5283/*",
-    "http://211.137.101.118:8888/*",
-    "http://211.137.101.118:5283/*",
-    "http://10.210.57.10:9080/*",
-    "http://211.137.101.118:9080/*",
+    "https://*.7fa4.cn:8888/*",
+    "https://*.7fa4.cn:5283/*",
+    "https://*.7fa4.cn:9080/*",
+    "https://10.210.57.10:8888/*",
+    "https://10.210.57.10:5283/*",
+    "https://211.137.101.118:8888/*",
+    "https://211.137.101.118:5283/*",
+    "https://10.210.57.10:9080/*",
+    "https://211.137.101.118:9080/*",
     "https://gravatar.loli.net/*",
-    "http://gravatar.loli.net/*"
+    "https://gravatar.loli.net/*"
   ],
   "background": {
     "scripts": [
@@ -42,17 +42,17 @@
   "content_scripts": [
     {
       "matches": [
-        "http://*.7fa4.cn:8888/*",
-        "http://*.7fa4.cn:5283/*",
-        "http://10.210.57.10:8888/*",
-        "http://10.210.57.10:5283/*",
-        "http://211.137.101.118:8888/*",
-        "http://211.137.101.118:5283/*"
+        "https://*.7fa4.cn:8888/*",
+        "https://*.7fa4.cn:5283/*",
+        "https://10.210.57.10:8888/*",
+        "https://10.210.57.10:5283/*",
+        "https://211.137.101.118:8888/*",
+        "https://211.137.101.118:5283/*"
       ],
       "exclude_matches": [
-        "http://*.7fa4.cn:9080/*",
-        "http://10.210.57.10:9080/*",
-        "http://211.137.101.118:9080/*"
+        "https://*.7fa4.cn:9080/*",
+        "https://10.210.57.10:9080/*",
+        "https://211.137.101.118:9080/*"
       ],
       "css": [
         "content/panel/panel.css",
@@ -77,28 +77,28 @@
     },
     {
       "matches": [
-        "http://in.7fa4.cn:8888/user_plans/*",
-        "http://in.7fa4.cn:5283/user_plans/*",
-        "http://jx.7fa4.cn:8888/user_plans/*",
-        "http://jx.7fa4.cn:5283/user_plans/*",
-        "http://10.210.57.10:8888/user_plans/*",
-        "http://10.210.57.10:5283/user_plans/*",
-        "http://211.137.101.118:8888/user_plans/*",
-        "http://211.137.101.118:5283/user_plans/*",
-        "http://in.7fa4.cn:8888/review/user_tags/html?tag_id=*",
-        "http://in.7fa4.cn:5283/review/user_tags/html?tag_id=*",
-        "http://jx.7fa4.cn:8888/review/user_tags/html?tag_id=*",
-        "http://jx.7fa4.cn:5283/review/user_tags/html?tag_id=*",
-        "http://10.210.57.10:8888/review/user_tags/html?tag_id=*",
-        "http://10.210.57.10:5283/review/user_tags/html?tag_id=*",
-        "http://211.137.101.118:8888/review/user_tags/html?tag_id=*",
-        "http://211.137.101.118:5283/review/user_tags/html?tag_id=*"
+        "https://in.7fa4.cn:8888/user_plans/*",
+        "https://in.7fa4.cn:5283/user_plans/*",
+        "https://jx.7fa4.cn:8888/user_plans/*",
+        "https://jx.7fa4.cn:5283/user_plans/*",
+        "https://10.210.57.10:8888/user_plans/*",
+        "https://10.210.57.10:5283/user_plans/*",
+        "https://211.137.101.118:8888/user_plans/*",
+        "https://211.137.101.118:5283/user_plans/*",
+        "https://in.7fa4.cn:8888/review/user_tags/html?tag_id=*",
+        "https://in.7fa4.cn:5283/review/user_tags/html?tag_id=*",
+        "https://jx.7fa4.cn:8888/review/user_tags/html?tag_id=*",
+        "https://jx.7fa4.cn:5283/review/user_tags/html?tag_id=*",
+        "https://10.210.57.10:8888/review/user_tags/html?tag_id=*",
+        "https://10.210.57.10:5283/review/user_tags/html?tag_id=*",
+        "https://211.137.101.118:8888/review/user_tags/html?tag_id=*",
+        "https://211.137.101.118:5283/review/user_tags/html?tag_id=*"
       ],
       "exclude_matches": [
-        "http://in.7fa4.cn:9080/*",
-        "http://jx.7fa4.cn:9080/*",
-        "http://10.210.57.10:9080/*",
-        "http://211.137.101.118:9080/*"
+        "https://in.7fa4.cn:9080/*",
+        "https://jx.7fa4.cn:9080/*",
+        "https://10.210.57.10:9080/*",
+        "https://211.137.101.118:9080/*"
       ],
       "css": [
         "content/libs/katex/katex.min.css",
@@ -115,11 +115,11 @@
     },
     {
       "matches": [
-        "http://*.7fa4.cn:8888/user/*",
-        "http://*.7fa4.cn:5283/user/*",
-        "http://10.210.57.10:8888/user/*",
-        "http://10.210.57.10:5283/user/*",
-        "http://211.137.101.118:8888/user/*"
+        "https://*.7fa4.cn:8888/user/*",
+        "https://*.7fa4.cn:5283/user/*",
+        "https://10.210.57.10:8888/user/*",
+        "https://10.210.57.10:5283/user/*",
+        "https://211.137.101.118:8888/user/*"
       ],
       "css": [
         "content/libs/katex/katex.min.css"
