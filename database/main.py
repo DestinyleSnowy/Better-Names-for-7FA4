@@ -13,6 +13,7 @@ from user_db_crypto import (
     get_fernet_from_env,
     read_json,
     read_uid_keys,
+    read_users_db_as_plain,
 )
 
 BASE = "https://jx.7fa4.cn:8888"
@@ -41,13 +42,21 @@ HEADERS = {
 if COOKIE_STR:
     HEADERS["Cookie"] = COOKIE_STR
 
-GRADE_TO_COLORKEY = {
-    "小四": "x4", "小五": "x5", "小六": "x6",
-    "初一": "c1", "初二": "c2", "初三": "c3",
-    "高一": "g1", "高二": "g2", "高三": "g3",
-    "大一": "d1", "大二": "d2", "大三": "d3", "大四": "d4",
-    "毕业": "by", "教练": "jl", "教师": "jl", "其他": "uk",
+# colorKey 使用“高中毕业年份（届）”
+# 当前学年的秋季年份；每年 9 月开学后 +1
+# 注意：若榜单上的年级还是上一学年的旧数据，这里要改回上一学年的秋季年份
+SCHOOL_YEAR_START = 2026
+# 各年级距离高中毕业的年份差
+YEARS_TO_GRADUATION = {
+    "小四": 9, "小五": 8, "小六": 7,
+    "初一": 6, "初二": 5, "初三": 4,
+    "高一": 3, "高二": 2, "高三": 1,
+    "大一": 0, "大二": -1, "大三": -2, "大四": -3,
 }
+GRADE_TO_COLORKEY = {
+    grade: str(SCHOOL_YEAR_START + offset) for grade, offset in YEARS_TO_GRADUATION.items()
+}
+GRADE_TO_COLORKEY.update({"毕业": "by", "教练": "jl", "教师": "jl", "其他": "uk"})
 ALT_TEXT = {"大  一": "大一", "大  二": "大二", "大  三": "大三", "大  四": "大四", "教  练": "教练", "其  他": "其他"}
 SPECIAL_JL_NAMES = {"陈许旻", "程宇轩", "钟胡天翔", "陈恒宇", "徐淑君", "徐苒茨", "王多灵", "李雪梅"}
 SPECIAL_UID_OVERRIDES = {
@@ -101,6 +110,16 @@ def extract_name_from_user_plan(html: str) -> Optional[str]:
     m = re.search(r"\n-\s*([^\n<]+)", td.get_text("\n"))
     return m.group(1).strip() if m else None
 
+def normalize_colorkey(text: str) -> Optional[str]:
+    """榜单“毕业年份”列可能是“2032届/2032”，也可能是旧的年级文本（高三、小六…）。"""
+    if not text:
+        return None
+    txt = ALT_TEXT.get(text.strip(), text.strip())
+    m = re.search(r"(20\d{2})", txt)
+    if m:
+        return m.group(1)
+    return GRADE_TO_COLORKEY.get(txt)
+
 def extract_uid_and_colorkey_from_ranklist(html: str) -> Dict[int, str]:
     soup = BeautifulSoup(html, "lxml")
     result: Dict[int, str] = {}
@@ -115,9 +134,7 @@ def extract_uid_and_colorkey_from_ranklist(html: str) -> Dict[int, str]:
         td_grade = tr.select_one("td.graduate_year")
         if not td_grade:
             continue
-        txt = td_grade.get_text(strip=True)
-        txt = ALT_TEXT.get(txt, txt)
-        colorkey = GRADE_TO_COLORKEY.get(txt)
+        colorkey = normalize_colorkey(td_grade.get_text(strip=True))
         if colorkey:
             result[uid] = colorkey
     return result
@@ -223,12 +240,27 @@ async def crawl_colorkeys() -> Dict[int, str]:
                     print(f"[rank] {done}/{total}")
     return out
 
-def to_users_object(names: Dict[int, str], cols: Dict[int, str]) -> Dict[int, Dict[str, str]]:
+def load_existing_names() -> Dict[int, str]:
+    """读取现有数据库里的姓名：本次抓取不到姓名时沿用旧值，避免把已有姓名清空。"""
+    out: Dict[int, str] = {}
+    for key, info in read_users_db_as_plain(DATA_DIR / "users.json", require_key_for_encrypted=False).items():
+        try:
+            uid = int(key)
+        except (TypeError, ValueError):
+            continue
+        name = info.get("name") if isinstance(info, dict) else None
+        if isinstance(name, str) and name.strip():
+            out[uid] = name
+    return out
+
+def to_users_object(names: Dict[int, str], cols: Dict[int, str], existing_names: Optional[Dict[int, str]] = None) -> Dict[int, Dict[str, str]]:
     users: Dict[int, Dict[str, str]] = {}
     existing_max = load_existing_max_uid()
+    known_names = existing_names or {}
     max_uid = max([*names.keys(), *cols.keys(), existing_max, UID_START - 1])
     for uid in range(UID_START, max_uid + 1):
-        users[uid] = {"name": names.get(uid, ""), "colorKey": cols.get(uid, "uk")}
+        name = names.get(uid, "") or known_names.get(uid, "")
+        users[uid] = {"name": name, "colorKey": cols.get(uid, "uk")}
     return users
 
 def apply_special_colorkeys(users: Dict[int, Dict[str, str]]) -> None:
@@ -354,7 +386,8 @@ async def main():
     names = await crawl_names(initial_end)
     print(f"姓名抓取完成：{len(names)} 条。")
 
-    users = to_users_object(names, colorkeys)
+    existing_names = load_existing_names()
+    users = to_users_object(names, colorkeys, existing_names)
     special_rules = load_special_rules()
     apply_special_colorkeys(users)
     apply_configured_overrides(users, special_rules)

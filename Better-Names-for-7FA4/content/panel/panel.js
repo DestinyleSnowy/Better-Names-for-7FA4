@@ -315,8 +315,25 @@
     const layoutConfig = {
         pinned: !!readConfigValue('panelPinned'), corner: readConfigValue(CORNER_KEY),
     };
+    // 旧版 colorKey（年级编码）→ 高中毕业年份，用于迁移用户已保存的自定义配色
+    const LEGACY_COLOR_KEY_MAP = {
+        x4: '2034', x5: '2033', x6: '2032',
+        c1: '2031', c2: '2030', c3: '2029',
+        g1: '2028', g2: '2027', g3: '2026',
+        d1: '2025', d2: '2024', d3: '2023', d4: '2022'
+    };
+    const migrateLegacyPalette = (stored) => {
+        if (!stored || typeof stored !== 'object') return {};
+        const out = {};
+        Object.keys(stored).forEach(key => {
+            const value = stored[key];
+            if (typeof value !== 'string') return;
+            out[LEGACY_COLOR_KEY_MAP[key] || key] = value;
+        });
+        return out;
+    };
     const paletteConfig = {
-        storedPalette: safeGetJSON('userPalette', CONFIG_DEFAULTS.userPalette),
+        storedPalette: migrateLegacyPalette(safeGetJSON('userPalette', CONFIG_DEFAULTS.userPalette)),
         useCustomColors: readConfigValue('useCustomColors'),
     };
     const configCenter = {
@@ -811,25 +828,19 @@
         }
     }
 
-    const COLOR_KEYS = ['x4', 'x5', 'x6', 'c1', 'c2', 'c3', 'g1', 'g2', 'g3', 'd1', 'd2', 'd3', 'd4', 'by', 'jl', 'uk'];
-    const LEVEL_LABELS = {
-        x4: '小2022级',
-        x5: '小2021级',
-        x6: '小2020级',
-        c1: '初2025级',
-        c2: '初2024级',
-        c3: '初2023级',
-        g1: '高2025级',
-        g2: '高2024级',
-        g3: '高2023级',
-        d1: '大2025级',
-        d2: '大2024级',
-        d3: '大2023级',
-        d4: '大2022级',
-        by: '毕业',
-        jl: '教练',
-        uk: '其他'
-    };
+    // colorKey 直接使用“高中毕业年份（届）”，例如 2032 表示 2032 年高中毕业
+    const CURRENT_SCHOOL_YEAR = 2026;    // 当前学年的秋季年份，每年 9 月开学后 +1
+    const GRADUATION_YEAR_START = 2022;  // 数据库中最早的毕业年份
+    const GRADUATION_YEAR_END = 2035;    // 数据库中最晚的毕业年份，逐年 +1
+    const GRADUATION_YEAR_KEYS = [];
+    for (let year = GRADUATION_YEAR_END; year >= GRADUATION_YEAR_START; year -= 1) {
+        GRADUATION_YEAR_KEYS.push(String(year));
+    }
+    const COLOR_KEYS = [...GRADUATION_YEAR_KEYS, 'by', 'jl', 'uk'];
+    const LEVEL_LABELS = {by: '毕业', jl: '教练', uk: '其他'};
+    GRADUATION_YEAR_KEYS.forEach(year => {
+        LEVEL_LABELS[year] = `${year}届`;
+    });
     const COLOR_LABELS = LEVEL_LABELS;
     const GRADE_LABELS = LEVEL_LABELS;
 
@@ -838,26 +849,28 @@
     const storedPalette = configCenter.palette.storedPalette;
     const useCustomColors = configCenter.palette.useCustomColors;
 
-    const palettes = {
-        light: {
-            x4: '#8c8c8c',
-            x5: '#722ed1',
-            x6: '#9254de',
-            c1: '#ff4d4f',
-            c2: '#fa8c16',
-            c3: '#faad14',
-            g1: '#ca00ca',
-            g2: '#52c41a',
-            g3: '#13c2c2',
-            d1: '#9254de',
-            d2: '#597ef7',
-            d3: '#73d13d',
-            d4: '#bfbfbf',
-            by: '#8c8c8c',
-            jl: '#ff85c0',
-            uk: '#5e6e5e'
-        }
+    // “距离高中毕业还有几年” → 颜色，沿用原来的年级配色
+    const STAGE_COLORS = {
+        9: '#8c8c8c',     // 小四
+        8: '#722ed1',     // 小五
+        7: '#9254de',     // 小六
+        6: '#ff4d4f',     // 初一
+        5: '#fa8c16',     // 初二
+        4: '#faad14',     // 初三
+        3: '#ca00ca',     // 高一
+        2: '#52c41a',     // 高二
+        1: '#13c2c2',     // 高三
+        0: '#9254de',     // 大一
+        '-1': '#597ef7',  // 大二
+        '-2': '#73d13d',  // 大三
+        '-3': '#bfbfbf'   // 大四
     };
+    const OTHER_COLOR = '#5e6e5e';
+    const lightPalette = {by: '#8c8c8c', jl: '#ff85c0', uk: OTHER_COLOR};
+    GRADUATION_YEAR_KEYS.forEach(year => {
+        lightPalette[year] = STAGE_COLORS[Number(year) - CURRENT_SCHOOL_YEAR] || OTHER_COLOR;
+    });
+    const palettes = {light: lightPalette};
 
     const palette = Object.assign({}, palettes.light, useCustomColors ? storedPalette : {});
     let currentThemeMode = themeMode;
@@ -4875,9 +4888,22 @@
         a.querySelectorAll('.bn-icon').forEach(el => el.remove());
         a.querySelectorAll('.bn-user-tags').forEach(el => el.remove());
 
+        // 只有毕业年份、没有姓名（例如新增但还没抓到姓名）时不改写页面上的用户名，
+        // 只套用颜色和悬浮提示，避免把原有昵称清空
+        const knownName = info && typeof info.name === 'string' ? info.name.trim() : '';
+        if (info && !knownName) {
+            if (info.colorKey === "clear") a.style.color = '';
+            else {
+                const c = palette[info.colorKey];
+                if (c) a.style.color = c;
+            }
+            renderUserTags(a, info.tags);
+            return;
+        }
+
         let combinedName = defaultSource;
         if (info) {
-            combinedName = typeof info.name === 'string' ? info.name : (defaultSource || '');
+            combinedName = knownName;
             if (showUserNickname && originalNickname && originalNickname !== combinedName) {
                 combinedName += `（${originalNickname}）`;
             }
