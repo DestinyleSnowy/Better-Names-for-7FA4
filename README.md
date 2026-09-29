@@ -1,9 +1,25 @@
 # Better Names for 7FA4
 
+## Better Names for 7FA4 终止维护及后续开发转向公告
+
+感谢大家一直以来对 Better Names for 7FA4 的使用、支持与反馈。
+
+**即日起，Better Names for 7FA4 正式停止维护，后续开发与维护重心已转向 [Asterveil](https://github.com/DestinyleSnowy/Asterveil)。** 旧项目将不再提供功能更新、问题修复及网站适配。感谢每一位参与测试、提出建议和贡献代码的朋友。
+
+接下来，改善 7FA4 使用体验的工作将在 Asterveil 中继续。新项目采用全新的架构设计，致力于提供更好的使用体验。仍在使用旧版的用户，可以根据自身需求安排切换。
+
+**Asterveil 的功能范围与旧项目有所不同，目前尚未迁移用户名替换为姓名的功能。** 如需保留该功能，可以在使用 Asterveil 的同时继续启用 Better Names，但请关闭 Better Names 控制面板中的所有功能开关，以减少功能重叠与冲突。
+
+感谢大家陪伴 Better Names for 7FA4 走到这里。Asterveil 见～
+
+---
+
+> 以下为旧版项目的历史说明，更新、反馈与贡献相关描述不再代表当前维护安排。
+
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Version](https://img.shields.io/badge/version-2026.10-green.svg)
 ![Manifest](https://img.shields.io/badge/manifest-v3-brightgreen.svg)
-![PRs Welcome](https://img.shields.io/badge/PRs-welcome-orange.svg)
+![Maintenance](https://img.shields.io/badge/maintenance-discontinued-red.svg)
 
 Better Names for 7FA4 是一款面向 7FA4 在线评测系统的浏览器扩展。它在保留原站使用方式的基础上，补充用户昵称与颜色映射、界面增强、计划与复盘渲染、聊天室、外站题提交等功能，让 7FA4 的日常使用更顺手。
 
